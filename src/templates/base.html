@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel='stylesheet' type='text/css' href='/static/css/base.css'>
+        <link rel='stylesheet' type='text/css' href='/static/css/content.css'>
+        {% block css %}
+        {% endblock css %}
+        <meta content='width=device-width, initial-scale=0.5, maximum-scale=0.5, user-scalable=no' name='viewport'>
+        <title>{% block title %}{% endblock title %}</title>
+    </head>
+    <body>
+        <div id='top_menu'>
+            <ul>
+                {% block menu %}
+                {% endblock menu %}
+            </ul>
+        </div>
+
+        <div id='content'>
+        {% block content %}
+        {% endblock content %}
+        </div>
+
+        {% block javascript %}
+        {% endblock javascript %}
+    </body>
+</html>

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}
+Sign-up
+{% endblock title %}
+
+{% block menu %}
+<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
+{% endblock menu %}
+
+{% block content %}
+<table>
+	<thead>
+		<tr>
+			<th>Id</th>
+			<th>Nome da planta</th>
+			<th>Temperatura do ar (ºC)</th>
+			<th>Umidade do ar (%)</th>
+			<th>Temperatura do solo (ºC)</th>
+			<th>Resistividade do solo</th>
+			<th>Intensidade de luz</th>
+			<th>Data</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for event in events %}
+		<tr>
+			<td>{{event.id}}</td>
+			<td>{{event.plant_id}}</td>
+			<td>{{event.air_temperature}}ºC</td>
+			<td>{{event.air_humidity}}%</td>
+			<td>{{event.soil_temperature}}ºC</td>
+			<td>{{event.soil_resistivity}}</td>
+			<td>{{event.light}}</td>
+			<td>{{event.timestamp}}</td>
+		</tr>
+	{% endfor %}
+	<tbody>
+</table>
+{% endblock content %}

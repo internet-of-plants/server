@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}
+Sign-up
+{% endblock title %}
+
+{% block menu %}
+<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
+{% endblock menu %}
+
+{% block content %}
+<form class='form login' method="POST">
+    <input type="hidden" name="csrf_token" value="{{csrf_token}}">
+    <div>
+        <b>Name</b>
+        <input type='text' name='name'>
+    </div>
+    <div>
+        <b>E-mail</b>
+        <input type='text' name='email'>
+    </div>
+    <div>
+    <div>
+        <b>Password</b>
+        <input type='password' name='password'>
+    </div>
+    <div>
+        <input class='submit' type='submit' value='Sign-up'>
+    </div>
+</form>
+{% endblock content %}
