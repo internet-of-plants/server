@@ -11,6 +11,14 @@ macro_rules! error {
 }
 
 #[macro_export]
+macro_rules! get_user_id {
+    ($state: expr) => (match ::lib::auth::user_id(&$state) {
+        Some(uid) => uid,
+        None => return ::lib::http::bad_request($state)
+    });
+}
+
+#[macro_export]
 macro_rules! assert_csrf {
     ($state: expr, $path_key: expr) => ({
         use lib::auth::is_csrf_valid;
@@ -28,9 +36,10 @@ macro_rules! assert_csrf {
 macro_rules! assert_auth {
     ($state: expr) => (assert_auth!($state, "signup"));
     ($state: expr, $path_key: expr) => ({
+        use lib::auth::is_auth;
         assert_csrf!($state, $path_key);
         if !is_auth(&$state) {
-            return redirect(state, url_for!($path_key));
+            return redirect($state, url_for!($path_key));
         }
     });
 }
@@ -38,7 +47,7 @@ macro_rules! assert_auth {
 #[macro_export]
 macro_rules! __from_body {
     ($state: expr, $type: ty) => ({
-        use middleware::body::BodyData;
+        use middlewares::body::BodyData;
         use gotham::state::FromState;
         use serde_urlencoded::from_str;
 
@@ -119,25 +128,18 @@ macro_rules! url_for {
 
 #[macro_export]
 macro_rules! query_one {
-    ($state: expr, $exec: expr, $type: ty) => ({
-        use lib::http::not_found;
-        let values = query!($state, $exec, $type);
-        if values.len() > 0 {
-            values[0].clone()
-        } else {
-            return not_found($state);
-        }
-    });
+    ($state: expr, $exec: expr, $type: ty) => (__query_maker!($state, $exec, first, $type));
 }
 
+
 #[macro_export]
-macro_rules! query {
-    ($state: expr, $exec: expr, $type: ty) => ({
-        use middleware::db::Connection;
+macro_rules! __query_maker {
+    ($state: expr, $exec: expr, $action: ident, $type: ty) => ({
+        use middlewares::db::Connection;
         use gotham::state::FromState;
         use lib::http::internal_server_error;
         let value = match Connection::try_borrow_from(&$state) {
-            Some(&Connection(ref conn)) => match $exec.load::<$type>(&**conn) {
+            Some(&Connection(ref conn)) => match $exec.$action::<$type>(&**conn) {
                 Ok(v) => Some(v),
                 Err(error) => {
                     error!("{:?}", error);
@@ -153,19 +155,24 @@ macro_rules! query {
     });
 }
 
+
+#[macro_export]
+macro_rules! query {
+    ($state: expr, $exec: expr, $type: ty) => (__query_maker!($state, $exec, load, $type));
+}
+
 #[macro_export]
 macro_rules! insert {
-    ($state: expr, $table: ident, $value: expr) => ({
-        use middleware::db::Connection;
+    ($state: expr, $table: ident, $value: expr, $type: ty) => ({
+        use middlewares::db::Connection;
         use gotham::state::FromState;
         use diesel::insert_into;
         use lib::http::internal_server_error;
         let value = match Connection::try_borrow_from(&$state) {
             Some(&Connection(ref conn)) => match insert_into($table)
                 .values(&$value)
-                .returning(id)
-                .get_results(&**conn) {
-                    Ok(v) => Some(v[0]),
+                .get_result::<$type>(&**conn) {
+                    Ok(v) => Some(v),
                     Err(error) => {
                         error!("{:?}", error);
                         None

@@ -38,7 +38,8 @@ pub fn set_csrf_token(state: &mut State) {
     let session = SessionData::<Option<Session>>::borrow_mut_from(state);
     match **session {
         Some(_) => {},
-        None => **session = Some(Session { csrf_token: random_string(30), id: None})
+        None => **session = Some(Session { csrf_token: random_string(30),
+                                           id: None})
     }
 }
 
@@ -61,9 +62,10 @@ pub fn hash_password(password: &str) -> String {
 
     pwhash::pwhash(&normalized_pw,
                    pwhash::OPSLIMIT_INTERACTIVE,
-                   pwhash::MEMLIMIT_INTERACTIVE).unwrap()
-                                                .as_ref()
-                                                .to_hex()
+                   pwhash::MEMLIMIT_INTERACTIVE)
+        .unwrap()
+        .as_ref()
+        .to_hex()
 }
 
 /// Returns true if password matches the hash
@@ -72,8 +74,13 @@ pub fn check_password(password: &str, hash: &str) -> bool {
     let normalized_pw = basic_hash(password).into_bytes();
 
     // Turns Hex back into byte array
-    let undigested_hash: Vec<u8> = FromHex::from_hex(hash.to_owned().into_bytes()).unwrap();
-    let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash).unwrap();
+    let undigested_hash: Vec<u8> = FromHex::from_hex(hash
+        .to_owned()
+        .into_bytes())
+        .unwrap();
+
+    let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash)
+        .unwrap();
 
     pwhash::pwhash_verify(&hash_obj, &normalized_pw)
 }
@@ -83,6 +90,14 @@ pub fn deauth(state: &mut State) {
         _ => {}
     }
 }
+
+pub fn user_id(state: &State) -> Option<i32> {
+    match **SessionData::<Option<Session>>::borrow_from(state) {
+        Some(Session { csrf_token: _, id: Some(id) }) => Some(id),
+        _ => None
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

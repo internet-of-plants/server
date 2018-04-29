@@ -27,12 +27,13 @@ pub fn signup_post(mut state: State) -> (State, Response) {
 
     let form = from_body!(state, "signup", SignupForm);
     let user = NewUser {
+        username: form.username,
         email: form.email,
         password_hash: hash_password(&form.password)
     };
 
-    let user_id = insert!(state, users, user);
-    authenticate(&mut state, user_id);
+    let user = insert!(state, users, user, User);
+    authenticate(&mut state, user.id);
 
     redirect(state, url_for!("home"))
 }
@@ -53,7 +54,8 @@ pub fn signin_post(mut state: State) -> (State, Response) {
     }
 
     let form = from_body!(state, "signin", SigninForm);
-    let user = query_one!(state, users.filter(email.eq(form.email)), User);
+    let user = query_one!(state, users.filter(email.eq(form.login.clone())
+                                          .or(username.eq(form.login))), User);
 
     if check_password(&form.password, &user.password_hash) {
         authenticate(&mut state, user.id);

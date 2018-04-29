@@ -29,7 +29,7 @@ extern crate rand;
 mod schema;
 #[macro_use]
 mod lib;
-mod middleware;
+mod middlewares;
 mod router;
 mod controllers;
 mod models;

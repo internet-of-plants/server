@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}
+Plants
+{% endblock title %}
+
+{% block menu %}
+<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
+{% endblock menu %}
+
+{% block content %}
+<table>
+	<thead>
+		<tr>
+			<th>Id</th>
+			<th>Nome</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for plant in plants %}
+		<tr>
+			<td>{{plant.id}}</td>
+			<td>{{plant.name}}</td>
+		</tr>
+	{% endfor %}
+	<tbody>
+</table>
+{% endblock content %}

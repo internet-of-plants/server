@@ -14,7 +14,8 @@ table! {
 table! {
     plants (id) {
         id -> Int4,
-        type_slug -> Nullable<Bpchar>,
+        name -> Bpchar,
+        type_slug -> Bpchar,
         user_id -> Int4,
     }
 }
@@ -31,6 +32,7 @@ table! {
 table! {
     users (id) {
         id -> Int4,
+        username -> Bpchar,
         email -> Bpchar,
         password_hash -> Bpchar,
     }

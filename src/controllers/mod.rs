@@ -1,6 +1,10 @@
 pub mod user;
+pub mod plant;
+pub mod plant_type;
 
 pub use self::user::*;
+pub use self::plant::*;
+pub use self::plant_type::*;
 
 use gotham::state::State;
 use lib::http::render_template;

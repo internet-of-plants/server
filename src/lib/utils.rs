@@ -6,6 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::collections::HashMap;
 use std::sync::RwLock;
 
+pub type UID = i32;
+pub type BigUID = i64;
+pub type Celsius = i16;
+pub type Percentage = i16;
+pub type AnalogRead = i16;
+
 lazy_static! {
     pub static ref REVERSE_ROUTE_TABLE: RwLock<HashMap<String, String>> = RwLock::new(HashMap::new());
 }

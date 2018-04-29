@@ -4,8 +4,8 @@ use gotham::pipeline::new_pipeline;
 use gotham::pipeline::single::single_pipeline;
 use gotham::middleware::session::NewSessionMiddleware;
 use hyper::{Get, Post};
-use middleware::body::BodyMiddleware;
-use middleware::db::DbMiddleware;
+use middlewares::body::BodyMiddleware;
+use middlewares::db::DbMiddleware;
 use lib::auth::Session;
 use controllers;
 
@@ -20,12 +20,18 @@ pub fn router() -> Router {
 
     router! {
         (chain, pipeline),
-        "home" => ("/", Get, controllers::home),
+        "home" => ("/", Get, controllers::plant_post),
+
         "signup" => ("/signup", Get, controllers::signup),
         "signup_post" => ("/signup", Post, controllers::signup_post),
         "signin" => ("/signin", Get, controllers::signin),
         "signin_post" => ("/signin", Post, controllers::signin_post),
-        "logou" => ("/logout", Get, controllers::logout),
+        "logout" => ("/logout", Get, controllers::logout),
+
+        "plants" => ("/plants", Get, controllers::plant_index),
+        "plant_post" => ("/plant", Post, controllers::plant_post),
+        "plant_type_post" => ("/plant_type", Post, controllers::plant_type_post),
+
         "logs" => ("/logs", Get, controllers::logs),
     }
 }
