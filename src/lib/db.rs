@@ -1,10 +1,8 @@
-use std::env;
-
-use diesel::pg::*;
 use r2d2::{Pool, PooledConnection};
 use r2d2_diesel::ConnectionManager;
-
 use dotenv::dotenv;
+use std::env;
+use diesel::pg::*;
 
 // Define here which Db will be used (postgresql, mysql, sqlite)
 pub type ConnectionType = PgConnection;

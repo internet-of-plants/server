@@ -1,3 +1,5 @@
+use schema::users;
+
 pub type Celsius = i16;
 pub type Percentage = i16;
 
@@ -13,10 +15,16 @@ pub struct Event {
     pub timestamp: i64
 }
 
-#[derive(Queryable, Debug, Serialize)]
+#[derive(Queryable, Debug, Serialize, Clone)]
 pub struct User {
-    pub id: i64,
-    pub name: String,
+    pub id: i32,
     pub email: String,
-    pub password: String
+    pub password_hash: String
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "users"]
+pub struct NewUser {
+    pub email: String,
+    pub password_hash: String
 }

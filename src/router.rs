@@ -4,7 +4,8 @@ use gotham::pipeline::new_pipeline;
 use gotham::pipeline::single::single_pipeline;
 use gotham::middleware::session::NewSessionMiddleware;
 use hyper::{Get, Post};
-use middlewares::body::BodyMiddleware;
+use middleware::body::BodyMiddleware;
+use middleware::db::DbMiddleware;
 use lib::auth::Session;
 use controllers;
 
@@ -14,6 +15,7 @@ pub fn router() -> Router {
                 .with_session_type::<Option<Session>>()
                 .insecure())
         .add(BodyMiddleware)
+        .add(DbMiddleware)
         .build());
 
     router! {
@@ -21,6 +23,9 @@ pub fn router() -> Router {
         "home" => ("/", Get, controllers::home),
         "signup" => ("/signup", Get, controllers::signup),
         "signup_post" => ("/signup", Post, controllers::signup_post),
+        "signin" => ("/signin", Get, controllers::signin),
+        "signin_post" => ("/signin", Post, controllers::signin_post),
+        "logou" => ("/logout", Get, controllers::logout),
         "logs" => ("/logs", Get, controllers::logs),
     }
 }

@@ -1,12 +1,14 @@
+use hex::{FromHex, ToHex};
+use sodiumoxide::crypto::pwhash;
 use gotham::state::FromState;
 use gotham::middleware::session::SessionData;
-use lib::utils::random_string;
+use lib::utils::{basic_hash, random_string};
 use gotham::state::State;
 
 #[derive(StateData, Serialize, Deserialize, Debug)]
 pub struct Session {
     csrf_token: String,
-    id: Option<i64>
+    id: Option<i32>
 }
 
 #[derive(StateData, Deserialize, Debug)]
@@ -15,17 +17,21 @@ struct CsrfToken {
 }
 
 pub fn is_auth(state: &State) -> bool {
-    false
+    match **SessionData::<Option<Session>>::borrow_from(state) {
+        Some(Session { csrf_token: _, id: Some(_) }) => true,
+        _ => false
+    }
 }
 
 pub fn is_csrf_valid(state: &mut State) -> bool {
-    match (__from_body!(state, CsrfToken), get_csrf_token(&state)) {
-        (Some(CsrfToken { csrf_token: form }), Some(cookie)) => if *cookie == form {
-            return true
+    let form = __from_body!(state, CsrfToken);
+    let cookie = csrf_token(&state);
+    match (form, cookie) {
+        (Some(CsrfToken { csrf_token: form }), Some(cookie)) => {
+            *cookie == form
         },
-        _ => return false
+        _ => false
     }
-    false
 }
 
 pub fn set_csrf_token(state: &mut State) {
@@ -36,140 +42,16 @@ pub fn set_csrf_token(state: &mut State) {
     }
 }
 
-pub fn get_csrf_token(state: &State) -> Option<&String> {
+pub fn csrf_token(state: &State) -> Option<&String> {
     match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session { ref csrf_token, id }) => Some(csrf_token),
+        Some(Session { ref csrf_token, id: _}) => Some(csrf_token),
         None => None
     }
 }
 
-/*
-use lib::hex::{FromHex, ToHex};
-use iron_sessionstorage::{Value, SessionRequestExt};
-use iron::method::{Get, Post};
-use params;
-use iron::Request;
-use sodiumoxide::crypto::pwhash;
-use config::get_config;
-use lib::utils::{unix_epoch, basic_hash, get_param, random_string};
-use lib::serde_json;
-
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
-struct Auth {
-    actor_id: i64,
-    expiration_date: u64
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
-struct CsrfToken {
-    token: String
-}
-
-impl Value for CsrfToken {
-    fn get_key() -> &'static str { "csrf_token" }
-    fn into_raw(self) -> String { serde_json::to_string(&self).unwrap() }
-    fn from_raw(value: String) -> Option<CsrfToken>  { serde_json::from_str(&value).unwrap() }
-}
-
-impl Value for Auth {
-    fn get_key() -> &'static str { "actor" }
-    fn into_raw(self) -> String { serde_json::to_string(&self).unwrap() }
-    fn from_raw(value: String) -> Option<Auth>  { serde_json::from_str(&value).unwrap() }
-}
-
-/// Returns Result with actor_id stored in signed session (if auth, else None)
-pub fn get_actor_id(req: &mut Request) -> Option<i64> {
-    match req.session().get::<Auth>() {
-        Ok(Some(auth)) => Some(auth.actor_id),
-        _ => None
-    }
-}
-
-/// Abstract CSRF generation, make tests easier
-pub fn generate_csrf_token() -> String {
-    let _token = random_string(30);
-
-    // TODO: Create test end-point to retrieve real CSRF token instead
-    //       of bypassing its randomness
-    #[cfg(test)]
-    // Allows predicting tests values
-    return "4".to_string();
-
-    // Avoid warning, during test this is dead-code
-    #[cfg(not(test))]
-    _token
-}
-
-/// Checks for CSRF token, if it's POST request, sets token if missing in GET request
-pub fn csrf_auth(req: &mut Request) -> bool {
-    match req.method {
-        Post => {
-            let from_cookie = match req.session().get::<CsrfToken>() {
-                Ok(Some(cookie)) => Some(cookie),
-                _ => None
-            };
-
-            let from_form = match get_param(req, "csrf-token") {
-                Some(params::Value::String(value)) => Some(value),
-                _ => None
-            };
-
-            match (from_form, from_cookie) {
-                (Some(form), Some(cookie)) => form == cookie.token,
-                _ => false
-            }
-        },
-        Get => {
-            match req.session().get::<CsrfToken>() {
-                Ok(Some(_)) => {},
-                _ => req.session().set(CsrfToken {
-                    token: generate_csrf_token()
-                }).unwrap(),
-            }
-
-            true
-        },
-        _ => false
-    }
-}
-
-/// Returns boolean result, checking the session expiration (if exists at all)
-/// Checks for CSRF token, if it's POST request
-pub fn is_auth(req: &mut Request) -> bool {
-    let auth = match req.session().get::<Auth>() {
-        Ok(Some(auth)) => unix_epoch() < auth.expiration_date,
-        _ => false
-    };
-
-    csrf_auth(req) && auth
-}
-
-/// Returns CSRF Token stored in cookie
-pub fn get_csrf_token(req: &mut Request) -> Option<String> {
-    match req.session().get::<CsrfToken>() {
-        Ok(Some(cookie)) => Some(cookie.token),
-        _ => None
-    }
-}
-
-/// Stores actor_id and expiration in signed session
-pub fn authenticate_actor(id: i64, req: &mut Request){
-    deauth(req);
-
-    req.session().set(Auth {
-        actor_id: id,
-        expiration_date: (unix_epoch()
-                          + get_config::<u64>("SESSION_DURATION") * 60)
-    }).unwrap();
-
-    req.session().set(CsrfToken {
-        token: generate_csrf_token()
-    }).unwrap();
-}
-
-/// Clear signed session
-pub fn deauth(req: &mut Request) {
-    req.session().clear().unwrap();
+pub fn authenticate(state: &mut State, id: i32) {
+    let session = SessionData::<Option<Session>>::borrow_mut_from(state);
+    **session = Some(Session { csrf_token: random_string(30), id: Some(id)})
 }
 
 /// Returns the hash of the password (libsodium pwhash)
@@ -194,6 +76,57 @@ pub fn check_password(password: &str, hash: &str) -> bool {
     let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash).unwrap();
 
     pwhash::pwhash_verify(&hash_obj, &normalized_pw)
+}
+
+pub fn deauth(state: &mut State) {
+    match SessionData::<Option<Session>>::take_from(state).discard(state) {
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Integration test to assure the password authentication is working
+    fn password_handler() {
+        assert!(check_password("hello", &hash_password("hello")));
+        assert!(!check_password("hell", &hash_password("hello")));
+    }
+}
+
+/*
+use iron::Request;
+use lib::utils::{unix_epoch, basic_hash, get_param, random_string};
+use lib::serde_json;
+
+/// Returns Result with actor_id stored in signed session (if auth, else None)
+pub fn get_actor_id(req: &mut Request) -> Option<i64> {
+    match req.session().get::<Auth>() {
+        Ok(Some(auth)) => Some(auth.actor_id),
+        _ => None
+    }
+}
+
+/// Stores actor_id and expiration in signed session
+pub fn authenticate_actor(id: i64, req: &mut Request){
+    deauth(req);
+
+    req.session().set(Auth {
+        actor_id: id,
+        expiration_date: (unix_epoch()
+                          + get_config::<u64>("SESSION_DURATION") * 60)
+    }).unwrap();
+
+    req.session().set(CsrfToken {
+        token: generate_csrf_token()
+    }).unwrap();
+}
+
+/// Clear signed session
+pub fn deauth(req: &mut Request) {
+    req.session().clear().unwrap();
 }
 
 #[cfg(test)]
@@ -222,13 +155,6 @@ mod tests {
             let from_raw = CsrfToken::from_raw(raw).unwrap();
             assert_eq!(csrf_token, from_raw);
         }
-    }
-
-    #[test]
-    /// Integration test to assure the password authentication is working
-    fn password_handler() {
-        assert!(check_password("hello", &hash_password("hello")));
-        assert!(!check_password("hell", &hash_password("hello")));
     }
 }
 */

@@ -4,7 +4,7 @@ use hyper::{Response, StatusCode};
 use hyper::header::Location;
 use tera::{Tera, Context};
 use mime;
-use lib::auth::get_csrf_token;
+use lib::auth::csrf_token;
 
 lazy_static! {
     pub static ref TERA: Tera = compile_templates!("src/templates/*");
@@ -18,17 +18,31 @@ pub fn redirect(state: State, uri: String) -> (State, Response) {
     (state, response)
 }
 
+pub fn internal_server_error(state: State) -> (State, Response) {
+    let response = create_response(&state,
+                                   StatusCode::InternalServerError,
+                                   None);
+    (state, response)
+}
+
+pub fn not_found(state: State) -> (State, Response) {
+    let response = create_response(&state,
+                                   StatusCode::NotFound,
+                                   None);
+    (state, response)
+}
+
 pub fn bad_request(state: State) -> (State, Response) {
-    let mut response = create_response(&state,
-                                       StatusCode::BadRequest,
-                                       None);
+    let response = create_response(&state,
+                                   StatusCode::BadRequest,
+                                   None);
     (state, response)
 }
 
 pub fn render_template(state: State, template: &str,
                        ctx: &mut Context) -> (State, Response) {
     // `is_auth` sets csrf token in GET requests if non existent
-    ctx.add("csrf_token", &get_csrf_token(&state).unwrap());
+    ctx.add("csrf_token", &csrf_token(&state).unwrap());
 
     match TERA.render(template, ctx) {
         Ok(content) => {

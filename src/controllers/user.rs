@@ -2,10 +2,13 @@ use gotham::state::State;
 use hyper::Response;
 use tera::Context;
 
-use models::User;
-use forms::SignupForm;
+use models::{NewUser, User};
+use forms::{SignupForm, SigninForm};
 use lib::http::{render_template, redirect};
-use lib::auth::is_auth;
+use lib::auth::{is_auth, hash_password, authenticate, check_password, deauth};
+
+use diesel::prelude::*;
+use schema::users::dsl::*;
 
 /// Returns the HTML form to create a new account
 pub fn signup(state: State) -> (State, Response) {
@@ -22,75 +25,50 @@ pub fn signup_post(mut state: State) -> (State, Response) {
         return redirect(state, url_for!("home"));
     }
 
-    let signup = from_body!(state, "signup", SignupForm);
-    println!("{:?}", signup);
+    let form = from_body!(state, "signup", SignupForm);
+    let user = NewUser {
+        email: form.email,
+        password_hash: hash_password(&form.password)
+    };
 
-    /*
-    let mut actor = ActorDb::new(None, name, email, password);
-    actor.save();
-
-    // actor.save() stores the id so actor.get_id() will return Some(i64)
-    let actor_id = actor.get_id().unwrap();
-
-    // Saves signed cookie to authenticate actor
-    authenticate_actor(actor_id, req);
-    */
+    let user_id = insert!(state, users, user);
+    authenticate(&mut state, user_id);
 
     redirect(state, url_for!("home"))
 }
-/*
 
 /// Returns the HTML form to authenticate as an actor
-fn signin(mut state: State) -> (State, Response) {
-    if is_auth(req) {
-        return redirect(url_for!(req, "home"));
+pub fn signin(state: State) -> (State, Response) {
+    if is_auth(&state) {
+        return redirect(state, url_for!("home"));
     }
 
-    let mut ctx = Context::new();
-    // `is_auth` sets csrf token in GET requests if non existent
-    ctx.add("csrf_token", &get_csrf_token(req).unwrap());
-    render_template("signin.html", &mut ctx)
+    render_template(state, "signin.html", &mut Context::new())
 }
 
 /// Receives email, password, authenticates actor
-fn signin_post(mut state: State) -> (State, Response) {
-    if is_auth(req) {
-        return redirect(url_for!(req, "home"));
+pub fn signin_post(mut state: State) -> (State, Response) {
+    if is_auth(&state) {
+        return redirect(state, url_for!("home"));
     }
 
-    let email = match get_param(req, "email") {
-        Some(Value::String(value)) => value,
-        Some(_) => return invalid_value("e-mail"),
-        None => return missing_field("e-mail")
-    };
+    let form = from_body!(state, "signin", SigninForm);
+    let user = query_one!(state, users.filter(email.eq(form.email)), User);
 
-    let password = match get_param(req, "password") {
-        Some(Value::String(value)) => value,
-        Some(_) => return invalid_value("password"),
-        None => return missing_field("password")
-    };
-
-    match ActorDb::authenticate(&email, &password) {
-        Some(id) => authenticate_actor(id, req),
-        None => return not_found("Wrong e-mail or password")
+    if check_password(&form.password, &user.password_hash) {
+        authenticate(&mut state, user.id);
     }
 
-    redirect(url_for!(req, "home"))
+    redirect(state, url_for!("home"))
 }
 
 // Logout user
-fn logout(mut state: State) -> (State, Response) {
-    if !is_auth(req){
-        return redirect(url_for!(req, "signin"));
-    }
-
-    deauth(req);
-    redirect(url_for!(req, "signin"))
+pub fn logout(mut state: State) -> (State, Response) {
+    deauth(&mut state);
+    redirect(state, url_for!("signin"))
 }
 
-#[cfg(test)]
-use iron::Headers;
-
+/*
 #[cfg(test)]
 impl ActorClient {
     /// Authenticate user for further requests, for testing purposes
