@@ -6,9 +6,11 @@ use models::{NewUser, User};
 use forms::{SignupForm, SigninForm};
 use lib::http::{render_template, redirect};
 use lib::auth::{is_auth, hash_password, authenticate, check_password, deauth};
+use lib::db::connection;
 
 use diesel::prelude::*;
-use schema::users::dsl::*;
+use diesel::insert_into;
+use schema::users;
 
 /// Returns the HTML form to create a new account
 pub fn signup(state: State) -> (State, Response) {
@@ -32,7 +34,9 @@ pub fn signup_post(mut state: State) -> (State, Response) {
         password_hash: hash_password(&form.password)
     };
 
-    let user = insert!(state, users, user, User);
+    let user = try_db!(state, insert_into(users::table)
+        .values(&user)
+        .get_result::<User>(&*connection()));
     authenticate(&mut state, user.id);
 
     redirect(state, url_for!("home"))
@@ -54,14 +58,18 @@ pub fn signin_post(mut state: State) -> (State, Response) {
     }
 
     let form = from_body!(state, "signin", SigninForm);
-    let user = query_one!(state, users.filter(email.eq(form.login.clone())
-                                          .or(username.eq(form.login))), User);
+
+    let user = try_db!(state, users::table
+        .filter(users::email.eq(form.login.clone())
+                    .or(users::username.eq(form.login)))
+        .first::<User>(&*connection()));
 
     if check_password(&form.password, &user.password_hash) {
         authenticate(&mut state, user.id);
+        redirect(state, url_for!("home"))
+    } else {
+        redirect(state, url_for!("signin"))
     }
-
-    redirect(state, url_for!("home"))
 }
 
 // Logout user

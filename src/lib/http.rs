@@ -4,10 +4,15 @@ use hyper::{Response, StatusCode};
 use hyper::header::Location;
 use tera::{Tera, Context};
 use mime;
+use lib::template_filter::url_for_filter;
 use lib::auth::csrf_token;
 
 lazy_static! {
-    pub static ref TERA: Tera = compile_templates!("src/templates/*");
+    pub static ref TERA: Tera = {
+        let mut t = compile_templates!("src/templates/*");
+        t.register_filter("url_for", url_for_filter);
+        t
+    };
 }
 
 pub fn redirect(state: State, uri: String) -> (State, Response) {

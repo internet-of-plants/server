@@ -4,7 +4,7 @@ use gotham::middleware::Middleware;
 use futures::stream::Stream;
 use futures::Future;
 use lib::auth::set_csrf_token;
-use hyper::Body;
+use hyper::{Body, Method, Post};
 use std::str;
 
 #[derive(StateData, Debug)]
@@ -18,6 +18,11 @@ impl Middleware for BodyMiddleware {
                    chain: Chain) -> Box<HandlerFuture>
       where Chain: 'static + FnOnce(State) -> Box<HandlerFuture> {
         set_csrf_token(&mut state);
+
+        match Method::borrow_from(&mut state) {
+            &Post => {},
+            _ => return chain(state)
+        }
 
         Box::new(Body::take_from(&mut state)
             .concat2()

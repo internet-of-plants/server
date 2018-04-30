@@ -1,23 +1,28 @@
 CREATE TABLE users (
     id            SERIAL PRIMARY KEY,
+    username      CHAR(255) NOT NULL,
     email         CHAR(255) NOT NULL,
-    password_hash CHAR(255) NOT NULL
+    password_hash CHAR(204) NOT NULL,
+    UNIQUE (username),
+    UNIQUE (email)
 );
+INSERT INTO users (id, username, email, password_hash) VALUES (1, 'Deleted', '', '');
 
 CREATE TABLE plant_types (
     id      SERIAL PRIMARY KEY,
     name    CHAR(255) NOT NULL,
-    slug    CHAR(255) NOT NULL,
-    user_id INTEGER,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
+    slug    CHAR(20) NOT NULL,
+    user_id INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id),
     UNIQUE (slug)
 );
 
 CREATE TABLE plants (
-    id        SERIAL PRIMARY KEY,
-    type_slug CHAR(255),
-    user_id   INTEGER NOT NULL,
-    FOREIGN KEY (type_slug) REFERENCES plant_types (slug) ON DELETE SET NULL,
+    id      SERIAL PRIMARY KEY,
+    name    CHAR(255) NOT NULL,
+    type_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    FOREIGN KEY (type_id) REFERENCES plant_types (id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 

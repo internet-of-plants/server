@@ -1,7 +1,7 @@
 use lib::utils::UID;
 use schema::users;
 
-#[derive(Queryable, Debug, Serialize, Clone)]
+#[derive(Queryable, Serialize, Debug)]
 pub struct User {
     pub id: UID,
     pub username: String,

@@ -1,4 +1,5 @@
 extern crate gotham;
+extern crate serde_json;
 #[macro_use]
 extern crate gotham_derive;
 extern crate hyper;

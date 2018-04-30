@@ -37,6 +37,7 @@ macro_rules! assert_auth {
     ($state: expr) => (assert_auth!($state, "signup"));
     ($state: expr, $path_key: expr) => ({
         use lib::auth::is_auth;
+
         assert_csrf!($state, $path_key);
         if !is_auth(&$state) {
             return redirect($state, url_for!($path_key));
@@ -88,17 +89,25 @@ macro_rules! from_body {
     });
 }
 
+#[macro_export]
+macro_rules! from_path {
+    ($state: expr, $type: ty) => ({
+        use gotham::state::FromState;
+        IdPath::borrow_from(&$state)
+    });
+}
+
 macro_rules! router {
-    (($chain: expr, $pipeline: expr), $($key: expr => ($uri: expr, $method: expr, $func: expr)),*) => {
-        hash_map!(($chain, $pipeline), $($key => ($uri, $method, $func),)*)
+    (($chain: expr, $pipeline: expr), $($key: expr => ($uri: expr, $method: expr, $route: expr)),*) => {
+        hash_map!(($chain, $pipeline), $($key => ($uri, $method, $path),)*)
     };
-    (($chain: expr, $pipeline: expr), $($key: expr => ($uri: expr, $method: expr, $func: expr),)*) => ({
+    (($chain: expr, $pipeline: expr), $($key: expr => ($uri: expr, $method: expr, $route: expr),)*) => ({
         use lib::utils::REVERSE_ROUTE_TABLE;
-        build_router($chain, $pipeline, |router| {
+        build_router($chain, $pipeline, |route| {
             $(
                 match $method {
-                    Get => router.get($uri).to($func),
-                    Post => router.post($uri).to($func),
+                    Get => route.get($uri).to($route),
+                    Post => route.post($uri).to($route),
                     _ => panic!("Method {:?} not implemented in router.rs",
                                 $method)
                 }
@@ -127,62 +136,27 @@ macro_rules! url_for {
 }
 
 #[macro_export]
-macro_rules! query_one {
-    ($state: expr, $exec: expr, $type: ty) => (__query_maker!($state, $exec, first, $type));
-}
-
-
-#[macro_export]
-macro_rules! __query_maker {
-    ($state: expr, $exec: expr, $action: ident, $type: ty) => ({
-        use middlewares::db::Connection;
-        use gotham::state::FromState;
+macro_rules! try_db_empty {
+    ($state: expr, $expr: expr) => ({
         use lib::http::internal_server_error;
-        let value = match Connection::try_borrow_from(&$state) {
-            Some(&Connection(ref conn)) => match $exec.$action::<$type>(&**conn) {
-                Ok(v) => Some(v),
-                Err(error) => {
-                    error!("{:?}", error);
-                    None
-                }
-            },
-            None => None
-        };
-        match value {
-            Some(v) => v,
-            None => return internal_server_error($state)
+        use diesel::NotFound;
+        match $expr {
+            Ok(value) => value,
+            Err(NotFound) => Vec::new(),
+            Err(_) => return internal_server_error($state)
         }
     });
 }
 
-
 #[macro_export]
-macro_rules! query {
-    ($state: expr, $exec: expr, $type: ty) => (__query_maker!($state, $exec, load, $type));
-}
-
-#[macro_export]
-macro_rules! insert {
-    ($state: expr, $table: ident, $value: expr, $type: ty) => ({
-        use middlewares::db::Connection;
-        use gotham::state::FromState;
-        use diesel::insert_into;
-        use lib::http::internal_server_error;
-        let value = match Connection::try_borrow_from(&$state) {
-            Some(&Connection(ref conn)) => match insert_into($table)
-                .values(&$value)
-                .get_result::<$type>(&**conn) {
-                    Ok(v) => Some(v),
-                    Err(error) => {
-                        error!("{:?}", error);
-                        None
-                    }
-            },
-            None => None
-        };
-        match value {
-            Some(v) => v,
-            None => return internal_server_error($state)
+macro_rules! try_db {
+    ($state: expr, $expr: expr) => ({
+        use lib::http::{not_found, internal_server_error};
+        use diesel::{NotFound};
+        match $expr {
+            Ok(value) => value,
+            Err(NotFound) => return not_found($state),
+            Err(_) => return internal_server_error($state)
         }
     });
 }

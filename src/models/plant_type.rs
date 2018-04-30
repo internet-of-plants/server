@@ -1,12 +1,21 @@
 use lib::utils::UID;
+use models::User;
 use schema::plant_types;
 
-#[derive(Queryable, Debug, Serialize, Clone)]
+#[derive(Queryable, Serialize, Debug)]
+pub struct PlantTypeView {
+    pub id: UID,
+    pub name: String,
+    pub slug: String,
+    pub user: User
+}
+
+#[derive(Queryable, Serialize, Debug)]
 pub struct PlantType {
     pub id: UID,
     pub name: String,
     pub slug: String,
-    pub user_id: Option<UID>
+    pub user_id: UID
 }
 
 #[derive(Insertable, Debug)]

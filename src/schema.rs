@@ -15,7 +15,7 @@ table! {
     plants (id) {
         id -> Int4,
         name -> Bpchar,
-        type_slug -> Bpchar,
+        type_id -> Int4,
         user_id -> Int4,
     }
 }
@@ -25,7 +25,7 @@ table! {
         id -> Int4,
         name -> Bpchar,
         slug -> Bpchar,
-        user_id -> Nullable<Int4>,
+        user_id -> Int4,
     }
 }
 
@@ -40,6 +40,7 @@ table! {
 
 joinable!(events -> plants (plant_id));
 joinable!(plant_types -> users (user_id));
+joinable!(plants -> plant_types (type_id));
 joinable!(plants -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(

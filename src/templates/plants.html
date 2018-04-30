@@ -9,20 +9,73 @@ Plants
 {% endblock menu %}
 
 {% block content %}
-<table>
-	<thead>
-		<tr>
-			<th>Id</th>
-			<th>Nome</th>
-		</tr>
-	</thead>
-	<tbody>
-	{% for plant in plants %}
-		<tr>
-			<td>{{plant.id}}</td>
-			<td>{{plant.name}}</td>
-		</tr>
-	{% endfor %}
-	<tbody>
-</table>
+<form action='{{ "plant_type_post" | url_for }}' method='POST'>
+    <input type="hidden" name="csrf_token" value="{{csrf_token}}">
+	<table>
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Name</th>
+				<th>Slug</th>
+				<th>Creator Username</th>
+				<th>-</th>
+			</tr>
+		</thead>
+		<tbody>
+		{% for plant_type in plant_types %}
+			<tr>
+				<td>{{plant_type.id}}</td>
+				<td>{{plant_type.name}}</td>
+				<td>{{plant_type.slug}}</td>
+				<td>{{plant_type.user.username}}</td>
+				<td></td>
+			</tr>
+		{% endfor %}
+			<tr>
+				<td>-</td>
+				<td><input type="text" name="name"></td>
+				<td><input type="text" name="slug"></td>
+				<td></td>
+				<td><input type="submit"></td>
+			</tr>
+		<tbody>
+	</table>
+</form>
+<form action='{{ "plant_post" | url_for }}' method='POST'>
+    <input type="hidden" name="csrf_token" value="{{csrf_token}}">
+	<table>
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nome</th>
+				<th>Tipo</th>
+				<th>-</th>
+			</tr>
+		</thead>
+		<tbody>
+		{% for plant in plants %}
+			<tr>
+				<td>{{plant.id}}</td>
+				<td>{{plant.name}}</td>
+				<td>{{plant.plant_type.name}}</td>
+				<td></td>
+			</tr>
+		{% endfor %}
+			<tr>
+				<td>-</td>
+				<td><input type="text" name="name"></td>
+				<td>
+					<select name="type_id">
+						{% for plant_type in plant_types %}
+							<option value="{{plant_type.id}}">
+								{{plant_type.name}}
+							</option>
+						{% endfor %}
+					</select>
+				</td>
+				<td><input type="submit"></td>
+			</tr>
+		<tbody>
+	</table>
+</form>
 {% endblock content %}
