@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}
+Plant Type {{ plant_type.name }}
+{% endblock title %}
+
+{% block content %}
+<h2>{{ plant_type.name }}</h2>
+<p><i>{{ plant_type.slug }}</i></p>
+<p><b>Creator: </b><a href="{{ 'user' | url_for(id=plant_type.user.id|str) }}">{{ plant_type.user.username }}</a></p>
+
+{% endblock content %}

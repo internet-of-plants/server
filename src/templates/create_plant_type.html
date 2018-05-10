@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}
+Create new plant type
+{% endblock title %}
+
+{% block content %}
+<form action="{{ 'plant_type_post' | url_for }}" method='POST' enctype='multipart/form-data'>
+    <input type="hidden" name="csrf_token" value="{{csrf_token}}">
+
+    <div>
+        <b>Name</b>
+		<input type="text" name="name" required='required'></td>
+    </div>
+
+	<div class='media'>
+		<b>Photo</b>
+		<input type='file' name='filename' required='required'>
+		<div class='media-dummy'>
+			<div class='success'>Files selected.</div>
+			<div class='default'>Drag'n'drop or click here to select files to upload.</div>
+		</div>
+	</div>
+
+	<input type="submit"></td>
+</form>
+{% endblock content %}

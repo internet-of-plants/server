@@ -13,6 +13,20 @@
         <div id='top_menu'>
             <ul>
                 {% block menu %}
+                    {% if is_auth %}
+                        <li><a href="{{ 'plants' | url_for }}" title='Plants'>Plants</a></li>
+                        <li><a href="{{ 'events' | url_for }}" title='Events'>Events</a></li>
+                        <li><a href="{{ 'user' | url_for(name=current_user.username) }}" title='My Profile'>My Profile</a></li>
+                        <li style="float: right;">
+                            <form action="{{ 'logout' | url_for }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{csrf_token}}" />
+                                <input class="menu-form" type="submit" value="Logout">
+                            </form>
+                        </li>
+                    {% else %}
+                        <li><a href="{{ 'signup' | url_for }}" title='Signup'>Signup</a></li>
+                        <li><a href="{{ 'signin' | url_for }}" title='Signin'>Signin</a></li>
+                    {% endif %}
                 {% endblock menu %}
             </ul>
         </div>

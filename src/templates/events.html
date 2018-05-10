@@ -4,10 +4,6 @@
 Events
 {% endblock title %}
 
-{% block menu %}
-<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
-{% endblock menu %}
-
 {% block content %}
 <table>
 	<thead>
@@ -19,6 +15,7 @@ Events
 			<th>Temperatura do solo (ºC)</th>
 			<th>Resistividade do solo</th>
 			<th>Intensidade de luz</th>
+			<th>Relógio do dispositivo</th>
 			<th>Data</th>
 		</tr>
 	</thead>
@@ -26,12 +23,13 @@ Events
 	{% for event in events %}
 		<tr>
 			<td>{{event.id}}</td>
-			<td>{{event.plant_id}}</td>
+			<td>{{event.plant.name}}</td>
 			<td>{{event.air_temperature}}ºC</td>
 			<td>{{event.air_humidity}}%</td>
 			<td>{{event.soil_temperature}}ºC</td>
 			<td>{{event.soil_resistivity}}</td>
 			<td>{{event.light}}</td>
+			<td>{{event.device_timestamp}}</td>
 			<td>{{event.timestamp}}</td>
 		</tr>
 	{% endfor %}

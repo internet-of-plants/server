@@ -1,40 +1,50 @@
 CREATE TABLE users (
     id            SERIAL PRIMARY KEY,
-    username      CHAR(255) NOT NULL,
-    email         CHAR(255) NOT NULL,
-    password_hash CHAR(204) NOT NULL,
+    username      VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(204) NOT NULL,
+    timestamp     BIGINT       NOT NULL DEFAULT extract(epoch from now()),
+    CHECK (username <> '' AND email <> ''),
     UNIQUE (username),
     UNIQUE (email)
 );
-INSERT INTO users (id, username, email, password_hash) VALUES (1, 'Deleted', '', '');
+CREATE INDEX users_username_index on users using hash(username);
+INSERT INTO users (username, email, password_hash) VALUES ('Deleted', 'deleted@example.com', '');
 
 CREATE TABLE plant_types (
-    id      SERIAL PRIMARY KEY,
-    name    CHAR(255) NOT NULL,
-    slug    CHAR(20) NOT NULL,
-    user_id INTEGER NOT NULL,
+    id        SERIAL PRIMARY KEY,
+    name      VARCHAR(255) NOT NULL,
+    slug      VARCHAR(20)  NOT NULL,
+    filename  CHAR(20)     NOT NULL,
+    user_id   INTEGER      NOT NULL,
+    timestamp BIGINT       NOT NULL DEFAULT extract(epoch from now()),
     FOREIGN KEY (user_id) REFERENCES users (id),
+    CHECK (name <> '' AND slug <> '' AND filename <> ''),
     UNIQUE (slug)
 );
+CREATE INDEX plant_types_slug_index on plant_types using hash(slug);
 
 CREATE TABLE plants (
-    id      SERIAL PRIMARY KEY,
-    name    CHAR(255) NOT NULL,
-    type_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
+    id        SERIAL PRIMARY KEY,
+    name      VARCHAR(255) NOT NULL,
+    type_id   INTEGER      NOT NULL,
+    user_id   INTEGER      NOT NULL,
+    timestamp BIGINT       NOT NULL DEFAULT extract(epoch from now()),
+    CHECK (name <> ''),
     FOREIGN KEY (type_id) REFERENCES plant_types (id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 CREATE TABLE events (
     id                       BIGSERIAL PRIMARY KEY,
-    plant_id                 INTEGER NOT NULL,
+    plant_id                 INTEGER  NOT NULL,
     air_temperature_celsius  SMALLINT NOT NULL,
     air_humidity_percentage  SMALLINT NOT NULL,
     soil_temperature_celsius SMALLINT NOT NULL,
     soil_resistivity         SMALLINT NOT NULL,
     light                    SMALLINT NOT NULL,
-    timestamp                BIGINT NOT NULL,
+    device_timestamp         INTEGER  NOT NULL,
+    timestamp                BIGINT   NOT NULL DEFAULT extract(epoch from now()),
     FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE,
-    CHECK (air_humidity_percentage > 0 AND light > 0 AND timestamp > 0)
+    CHECK (air_humidity_percentage > 0 AND light > 0 AND device_timestamp > 0)
 );

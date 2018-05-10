@@ -4,12 +4,15 @@
 Plants
 {% endblock title %}
 
-{% block menu %}
-<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
-{% endblock menu %}
-
 {% block content %}
-<form action='{{ "plant_type_post" | url_for }}' method='POST'>
+{% for plant_type in plant_types %}
+<div>
+	<img src="{{ 'static' | url_for(_0='thumb', _1=plant_type.filename|extension)}}" alt="Photo of {{plant_type.name}}">
+	<h3>{{plant_type.name}}</h3>
+	<p>Creator: <a href="{{ 'user' | url_for(slug=plant_type.user.username) }}"<b>{{plant_type.user.username}}</p>
+</div>
+{% endfor %}
+<form action="{{ 'plant_type_post' | url_for }}" method='POST'>
     <input type="hidden" name="csrf_token" value="{{csrf_token}}">
 	<table>
 		<thead>
@@ -18,51 +21,48 @@ Plants
 				<th>Name</th>
 				<th>Slug</th>
 				<th>Creator Username</th>
-				<th>-</th>
 			</tr>
 		</thead>
 		<tbody>
 		{% for plant_type in plant_types %}
 			<tr>
 				<td>{{plant_type.id}}</td>
-				<td>{{plant_type.name}}</td>
+				<td><a href="{{ 'plant_type' | url_for(id=plant_type.id|str) }}">{{plant_type.name}}</td>
 				<td>{{plant_type.slug}}</td>
-				<td>{{plant_type.user.username}}</td>
-				<td></td>
+				<td><a href="{{ 'user' | url_for(name=plant_type.user.username) }}">{{plant_type.user.username}}</td>
 			</tr>
 		{% endfor %}
 			<tr>
 				<td>-</td>
 				<td><input type="text" name="name"></td>
-				<td><input type="text" name="slug"></td>
 				<td></td>
 				<td><input type="submit"></td>
 			</tr>
 		<tbody>
 	</table>
 </form>
-<form action='{{ "plant_post" | url_for }}' method='POST'>
+<form action="{{ 'plant_post' | url_for }}" method='POST'>
     <input type="hidden" name="csrf_token" value="{{csrf_token}}">
 	<table>
 		<thead>
 			<tr>
 				<th>Id</th>
-				<th>Nome</th>
+				<th>Name</th>
 				<th>Tipo</th>
-				<th>-</th>
+				<th></th>
 			</tr>
 		</thead>
 		<tbody>
 		{% for plant in plants %}
 			<tr>
 				<td>{{plant.id}}</td>
-				<td>{{plant.name}}</td>
-				<td>{{plant.plant_type.name}}</td>
-				<td></td>
+				<td><a href="{{ 'plant' | url_for(id=plant.id|str) }}">{{plant.name}}</a></td>
+				<td><a href="{{ 'plant_type' | url_for(id=plant.plant_type.id|str) }}">{{plant.plant_type.name}}</a></td>
+				<th></th>
 			</tr>
 		{% endfor %}
 			<tr>
-				<td>-</td>
+				<td>#</td>
 				<td><input type="text" name="name"></td>
 				<td>
 					<select name="type_id">

@@ -1,5 +1,21 @@
 use models::Plant;
-use lib::utils::{Celsius, Percentage, UID, BigUID, AnalogRead};
+use schema::events;
+use lib::utils::{AnalogRead, BigUID, Celsius, DeviceTimestamp, Percentage, Timestamp, UID};
+
+#[macro_export]
+macro_rules! EventViewSql {
+    () => ((
+        events::id,
+        (plants::all_columns),
+        events::air_temperature_celsius,
+        events::air_humidity_percentage,
+        events::soil_temperature_celsius,
+        events::soil_resistivity,
+        events::light,
+        events::device_timestamp,
+        events::timestamp
+    ));
+}
 
 #[derive(Queryable, Serialize, Debug)]
 pub struct EventView {
@@ -10,7 +26,8 @@ pub struct EventView {
     pub soil_temperature: Celsius,
     pub soil_resistivity: AnalogRead,
     pub light: AnalogRead,
-    pub timestamp: i64
+    pub device_timestamp: DeviceTimestamp,
+    pub timestamp: Timestamp,
 }
 
 #[derive(Queryable, Serialize, Debug)]
@@ -22,5 +39,18 @@ pub struct Event {
     pub soil_temperature: Celsius,
     pub soil_resistivity: AnalogRead,
     pub light: AnalogRead,
-    pub timestamp: i64
+    pub device_timestamp: DeviceTimestamp,
+    pub timestamp: Timestamp,
+}
+
+#[derive(Insertable, Debug)]
+#[table_name = "events"]
+pub struct NewEvent {
+    pub plant_id: UID,
+    pub air_temperature_celsius: Celsius,
+    pub air_humidity_percentage: Percentage,
+    pub soil_temperature_celsius: Celsius,
+    pub soil_resistivity: AnalogRead,
+    pub light: AnalogRead,
+    pub device_timestamp: DeviceTimestamp,
 }

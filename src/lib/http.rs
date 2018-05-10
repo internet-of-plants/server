@@ -2,69 +2,69 @@ use gotham::http::response::create_response;
 use gotham::state::State;
 use hyper::{Response, StatusCode};
 use hyper::header::Location;
-use tera::{Tera, Context};
+use tera::{Context, Tera};
 use mime;
-use lib::template_filter::url_for_filter;
-use lib::auth::csrf_token;
+use lib::template_filter::*;
+use lib::auth::{csrf_token, is_auth, user};
 
 lazy_static! {
     pub static ref TERA: Tera = {
         let mut t = compile_templates!("src/templates/*");
         t.register_filter("url_for", url_for_filter);
+        t.register_filter("str", str_filter);
+        t.register_filter("extension", extension_filter);
         t
     };
 }
 
 pub fn redirect(state: State, uri: String) -> (State, Response) {
-    let mut response = create_response(&state,
-                                       StatusCode::SeeOther,
-                                       None);
+    let mut response = create_response(&state, StatusCode::SeeOther, None);
     response.headers_mut().set(Location::new(uri));
     (state, response)
 }
 
 pub fn internal_server_error(state: State) -> (State, Response) {
-    let response = create_response(&state,
-                                   StatusCode::InternalServerError,
-                                   None);
+    let response = create_response(&state, StatusCode::InternalServerError, None);
     (state, response)
 }
 
 pub fn not_found(state: State) -> (State, Response) {
-    let response = create_response(&state,
-                                   StatusCode::NotFound,
-                                   None);
+    let response = create_response(&state, StatusCode::NotFound, None);
     (state, response)
 }
 
 pub fn bad_request(state: State) -> (State, Response) {
-    let response = create_response(&state,
-                                   StatusCode::BadRequest,
-                                   None);
+    let response = create_response(&state, StatusCode::BadRequest, None);
     (state, response)
 }
 
-pub fn render_template(state: State, template: &str,
-                       ctx: &mut Context) -> (State, Response) {
+pub fn success(state: State) -> (State, Response) {
+    let response = create_response(&state, StatusCode::Ok, None);
+    (state, response)
+}
+
+pub fn render_template(state: State, template: &str, ctx: &mut Context) -> (State, Response) {
     // `is_auth` sets csrf token in GET requests if non existent
     ctx.add("csrf_token", &csrf_token(&state).unwrap());
+    ctx.add("is_auth", &is_auth(&state));
+    ctx.add("current_user", &user(&state));
 
     match TERA.render(template, ctx) {
         Ok(content) => {
             let response = create_response(
                 &state,
                 StatusCode::Ok,
-                Some((content.into_bytes(), mime::TEXT_HTML))
+                Some((content.into_bytes(), mime::TEXT_HTML)),
             );
             (state, response)
-        },
+        }
         Err(err) => {
             error!("Error compiling template {}", template);
             error!("{:?}", err);
             let response = create_response(
                 &state,
                 StatusCode::InternalServerError,
-                Some((vec![], mime::TEXT_HTML))
+                Some((vec![], mime::TEXT_HTML)),
             );
             (state, response)
         }

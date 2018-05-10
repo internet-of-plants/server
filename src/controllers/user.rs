@@ -2,15 +2,40 @@ use gotham::state::State;
 use hyper::Response;
 use tera::Context;
 
-use models::{NewUser, User};
-use forms::{SignupForm, SigninForm};
-use lib::http::{render_template, redirect};
-use lib::auth::{is_auth, hash_password, authenticate, check_password, deauth};
+use models::{NewUser, User, UserView};
+use forms::{SigninForm, SignupForm};
+use lib::http::{bad_request, redirect, render_template};
+use lib::auth::{authenticate, check_password, deauth, hash_password, is_auth};
 use lib::db::connection;
+use router::SlugPath;
 
 use diesel::prelude::*;
 use diesel::insert_into;
 use schema::users;
+
+use slugify::slugify;
+
+lazy_static! {
+    static ref ANTI_TIMING_HASH: String = hash_password(&"");
+}
+
+pub fn user(mut state: State) -> (State, Response) {
+    assert_auth!(state);
+
+    let username = from_path!(state, SlugPath).slug;
+
+    let user = try_db!(
+        state,
+        users::table
+            .filter(users::username.eq(username))
+            .select(UserViewSql!())
+            .first::<UserView>(&*connection())
+    );
+
+    let mut ctx = Context::new();
+    ctx.add("user", &user);
+    render_template(state, "user.html", &mut ctx)
+}
 
 /// Returns the HTML form to create a new account
 pub fn signup(state: State) -> (State, Response) {
@@ -27,17 +52,28 @@ pub fn signup_post(mut state: State) -> (State, Response) {
         return redirect(state, url_for!("home"));
     }
 
-    let form = from_body!(state, "signup", SignupForm);
+    let form = from_body!(state, url_for!("signup"), SignupForm);
     let user = NewUser {
-        username: form.username,
+        username: slugify!(&form.username),
         email: form.email,
-        password_hash: hash_password(&form.password)
+        password_hash: hash_password(&form.password),
     };
 
-    let user = try_db!(state, insert_into(users::table)
-        .values(&user)
-        .get_result::<User>(&*connection()));
-    authenticate(&mut state, user.id);
+    let user = try_db!(
+        state,
+        insert_into(users::table)
+            .values(&user)
+            .get_result::<User>(&*connection())
+    );
+    authenticate(
+        &mut state,
+        UserView {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            timestamp: user.timestamp,
+        },
+    );
 
     redirect(state, url_for!("home"))
 }
@@ -57,23 +93,47 @@ pub fn signin_post(mut state: State) -> (State, Response) {
         return redirect(state, url_for!("home"));
     }
 
-    let form = from_body!(state, "signin", SigninForm);
+    let form = from_body!(state, url_for!("signin"), SigninForm);
 
-    let user = try_db!(state, users::table
-        .filter(users::email.eq(form.login.clone())
-                    .or(users::username.eq(form.login)))
-        .first::<User>(&*connection()));
+    let user = try_db_option!(
+        state,
+        users::table
+            .filter(
+                users::email
+                    .eq(form.login.clone())
+                    .or(users::username.eq(form.login))
+            )
+            .first::<User>(&*connection())
+    );
 
-    if check_password(&form.password, &user.password_hash) {
-        authenticate(&mut state, user.id);
-        redirect(state, url_for!("home"))
-    } else {
-        redirect(state, url_for!("signin"))
+    // Hardens against timing attacks
+    match user {
+        Some(user) => {
+            if check_password(&form.password, &user.password_hash) {
+                authenticate(
+                    &mut state,
+                    UserView {
+                        id: user.id,
+                        username: user.username,
+                        email: user.email,
+                        timestamp: user.timestamp,
+                    },
+                );
+                redirect(state, url_for!("home"))
+            } else {
+                redirect(state, url_for!("signin"))
+            }
+        }
+        None => {
+            check_password(&form.password, &ANTI_TIMING_HASH);
+            bad_request(state)
+        }
     }
 }
 
 // Logout user
 pub fn logout(mut state: State) -> (State, Response) {
+    assert_csrf!(state, url_for!("login"));
     deauth(&mut state);
     redirect(state, url_for!("signin"))
 }

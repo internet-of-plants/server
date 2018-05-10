@@ -4,10 +4,6 @@
 Sign-up
 {% endblock title %}
 
-{% block menu %}
-<li><a href="/signin" title='Sign-in'>Sign-in</a></li>
-{% endblock menu %}
-
 {% block content %}
 <form class='form login' method="POST">
     <input type="hidden" name="csrf_token" value="{{csrf_token}}">

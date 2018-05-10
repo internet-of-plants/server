@@ -10,32 +10,64 @@ use controllers;
 
 #[derive(Deserialize, StateData, StaticResponseExtender)]
 pub struct IdPath {
-    pub id: i32
+    pub id: i32,
+}
+
+#[derive(Deserialize, StateData, StaticResponseExtender)]
+pub struct SlugPath {
+    pub slug: String,
+}
+
+#[derive(Deserialize, StateData, StaticResponseExtender, Debug)]
+pub struct PathExtractor {
+    #[serde(rename = "*")] pub parts: Vec<String>,
 }
 
 pub fn router() -> Router {
-    let (chain, pipeline) = single_pipeline(new_pipeline()
-        .add(NewSessionMiddleware::default()
-                .with_session_type::<Option<Session>>()
-                .insecure())
-        .add(BodyMiddleware)
-        .build());
+    let (chain, pipeline) = single_pipeline(
+        new_pipeline()
+            .add(
+                NewSessionMiddleware::default()
+                    .with_session_type::<Option<Session>>()
+                    .insecure(),
+            )
+            .add(BodyMiddleware)
+            .build(),
+    );
 
-    router! {
-        (chain, pipeline),
-        "home" => ("/", Get, controllers::plant_index),
+    build_router(chain, pipeline, |r| {
+        route!("home" => ("/", Get, r)).to(controllers::plant_index);
 
-        "signup" => ("/signup", Get, controllers::signup),
-        "signup_post" => ("/signup", Post, controllers::signup_post),
-        "signin" => ("/signin", Get, controllers::signin),
-        "signin_post" => ("/signin", Post, controllers::signin_post),
-        "logout" => ("/logout", Get, controllers::logout),
+        route!("signup" => ("/signup", Get, r)).to(controllers::signup);
+        route!("signup_post" => ("/signup", Post, r)).to(controllers::signup_post);
+        route!("signin" => ("/signin", Get, r)).to(controllers::signin);
+        route!("signin_post" => ("/signin", Post, r)).to(controllers::signin_post);
+        route!("logout" => ("/logout", Post, r)).to(controllers::logout);
 
-        //"plant" => ("/plant/:id", Get, |router| router.with_path_extractor::<IdPath>().to(controllers::plant),
-        "plants" => ("/plants", Get, controllers::plant_index),
-        "plant_post" => ("/plant", Post, controllers::plant_post),
-        "plant_type_post" => ("/plant_type", Post, controllers::plant_type_post),
+        route!("user" => ("/user/:slug:[a-zA-Z0-9_-]+", Get, r))
+            .with_path_extractor::<SlugPath>()
+            .to(controllers::user);
 
-        "events" => ("/events", Get, controllers::event_index),
-    }
+        route!("plant" => ("/plant/:id:[0-9]+", Get, r))
+            .with_path_extractor::<IdPath>()
+            .to(controllers::plant);
+
+        route!("create_plant_type" => ("/create_plant_type", Get, r))
+            .to(controllers::create_plant_type);
+
+        route!("plant_type" => ("/plant_type/:slug:[a-zA-Z0-9_-]+", Get, r))
+            .with_path_extractor::<SlugPath>()
+            .to(controllers::plant_type);
+
+        route!("plants" => ("/plants", Get, r)).to(controllers::plant_index);
+        route!("plant_post" => ("/plant", Post, r)).to(controllers::plant_post);
+        route!("plant_type_post" => ("/plant_type", Post, r)).to(controllers::plant_type_post);
+
+        route!("event_post" => ("/event", Post, r)).to(controllers::event_post);
+        route!("events" => ("/events", Get, r)).to(controllers::event_index);
+
+        route!("static" => ("/static/*", Get, r))
+            .with_path_extractor::<PathExtractor>()
+            .to(controllers::static_file);
+    })
 }

@@ -1,0 +1,172 @@
+#content > .form {
+    border: 24px solid #2d2d2d;
+    border-radius: 2px;
+    padding: 24px;
+    margin: 0 0 20px 0;
+}
+
+#content > .form > div {
+    margin-bottom: 10px;
+}
+
+#content > .form > div:last-of-type {
+    margin-bottom: 0;
+}
+
+#content .delete {
+    background: none;
+    border: none;
+}
+
+#content .delete:hover {
+    color: red;
+    cursor: pointer;
+}
+
+#content .form > input.delete {
+    float: right;
+    color: #ccc;
+}
+
+#content > .form > div > textarea, #content > .form input[type="text"], #content > .form input[type="password"] {
+    width: 95%;
+    max-width: 95%;
+    margin: 10px 2.5%;
+    color: #ccc;
+    background-color: #2d2d2d;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    font-size: 12pt;
+}
+
+#content div.post p {
+    font-size: 12pt;
+    margin: 0;
+}
+
+#content > .form > div > input.submit:hover {
+    cursor: pointer;
+}
+
+#content > .form > div > input.submit {
+    width: 80%;
+    height: 40px;
+    margin: 10px 10% 0;
+}
+
+#content > .form > div > div.media {
+    width: 95%;
+    position: relative;
+    margin: 10px 2.5%;
+    padding: 0 1px;
+    color: #ccc;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    background-color: #2d2d2d;
+}
+
+#content > .form > div > div.media > input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+#content > .form > div > div.media > div.media-dummy {
+    width: 100%;
+    padding: 30px 0 30px;
+    cursor: pointer;
+    text-align: center;
+}
+
+#content > .form > div > div.media > div.media-dummy > div.success {
+    display: none;
+}
+
+#content > .form > div > div.media:hover {
+    background: rgba(45, 45, 45, 0.9);
+}
+
+#content > .form > div > div.media > input:valid + div.media-dummy > div.success {
+    display: inline-block;
+}
+
+#content > .form > div > div.media > input:valid + div.media-dummy > div.default {
+    display: none;
+}
+
+#content div.board {
+    border: 24px solid darkgrey;
+    background-color: #2d2d2d;
+    color: #ccc;
+    text-align: center;
+}
+
+#content div.board:hover {
+    border-color: #2d2d2d;
+}
+
+#content div.post {
+    padding: 24px;
+    background-color: #2d2d2d;
+    color: #ccc;
+    margin: 0 0 20px 0;
+}
+
+#content div.post:last-of-type {
+    margin: 0;
+}
+
+#content a > div.post {
+    border: 24px solid darkgrey;
+}
+
+#content a > div.post:hover {
+    border-color: #2d2d2d;
+}
+
+#content div.medias > a {
+    margin-bottom: 10px;
+}
+
+#content div.medias > a.file-content, #content  div.medias > a.file-content > div {
+    width: 100px;
+}
+
+#content div.medias > a.file-content > div > h3 {
+    width: 100px;
+    height: 0;
+    max-height: 100px;
+    background-color: #ccc;
+    color: black;
+    text-align: center;
+    text-transform: uppercase;
+    padding: calc(65px - 0.5em) 0 calc(65px + 0.5em);
+}
+
+#content div.comment {
+    padding: 10px 20px 0;
+    border: 2px solid #2d2d2d;
+    border-radius: 2px;    
+}
+
+#content div.comment:nth-of-type(odd) {
+    background-color: #404040; 
+}
+
+#content table {
+    text-align: center;
+}
+
+#content .mod input {
+    width: 92%;
+}
+
+#content > .form.mod input[type=submit], #content > .form.mod {
+    width: 100%;
+}
+
+#content .login {
+    width: 40%;
+    margin: auto;
+}

@@ -15,7 +15,7 @@ lazy_static! {
 }
 
 pub fn connection() -> DbConnection {
-    POOL.get() 
+    POOL.get()
         .expect("Did not obtain valid Diesel connection from R2D2 pool")
 }
 
@@ -24,7 +24,8 @@ fn pool() -> DbPool {
 
     let url = match env::var("PG_DATABASE_URL") {
         Ok(val) => val,
-        _ => env::var("DATABASE_URL").expect("DATABASE_URL must be set in environment (or in .env file)")
+        _ => env::var("DATABASE_URL")
+            .expect("DATABASE_URL must be set in environment (or in .env file)"),
     };
 
     let manager = ConnectionManager::<ConnectionType>::new(url);

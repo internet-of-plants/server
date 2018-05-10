@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ plant.name }} Plant
+{% endblock title %}
+
+{% block content %}
+<h2>{{ plant.name }}</h2>
+<p><i>{{ plant.plant_type.name }}</i></p>
+
+{% if last_event | defined %}
+	<h3>Current status:</h3>
+	<p><b>Air temperature:</b> {{last_event.air_temperature}}ºC</p>
+	<p><b>Air humidity:</b> {{last_event.air_humidity}}%</p>
+	<p><b>Soil temperature:</b> {{last_event.soil_temperature}}ºC</p>
+	<p><b>Soil resistivity:</b> {{last_event.soil_resistivity}}%</p>
+	<p><b>Light intensity:</b> {{last_event.light}}</p>
+{% endif %}
+
+{% endblock content %}

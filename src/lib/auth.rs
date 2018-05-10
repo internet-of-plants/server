@@ -2,57 +2,82 @@ use hex::{FromHex, ToHex};
 use sodiumoxide::crypto::pwhash;
 use gotham::state::FromState;
 use gotham::middleware::session::SessionData;
-use lib::utils::{basic_hash, random_string};
+use lib::utils::{basic_hash, from_body, parse_multipart, random_string, MultipartDeserialize};
 use gotham::state::State;
+
+use models::UserView;
 
 #[derive(StateData, Serialize, Deserialize, Debug)]
 pub struct Session {
     csrf_token: String,
-    id: Option<i32>
+    user: Option<UserView>,
 }
 
 #[derive(StateData, Deserialize, Debug)]
 struct CsrfToken {
-    csrf_token: String
+    csrf_token: String,
+}
+
+impl MultipartDeserialize for CsrfToken {
+    fn from_multipart(content: &[u8], boundary: &[u8]) -> Option<Self> {
+        let values = parse_multipart(content, boundary);
+        Some(CsrfToken {
+            csrf_token: match values.get("csrf_token") {
+                Some(name) => name.to_owned(),
+                None => return None,
+            },
+        })
+    }
 }
 
 pub fn is_auth(state: &State) -> bool {
     match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session { csrf_token: _, id: Some(_) }) => true,
-        _ => false
+        Some(Session {
+            csrf_token: _,
+            user: Some(_),
+        }) => true,
+        _ => false,
     }
 }
 
 pub fn is_csrf_valid(state: &mut State) -> bool {
-    let form = __from_body!(state, CsrfToken);
+    let form = from_body::<CsrfToken>(state);
     let cookie = csrf_token(&state);
     match (form, cookie) {
-        (Some(CsrfToken { csrf_token: form }), Some(cookie)) => {
-            *cookie == form
-        },
-        _ => false
+        (Some(CsrfToken { csrf_token: form }), Some(cookie)) => *cookie == form,
+        _ => false,
     }
 }
 
 pub fn set_csrf_token(state: &mut State) {
     let session = SessionData::<Option<Session>>::borrow_mut_from(state);
     match **session {
-        Some(_) => {},
-        None => **session = Some(Session { csrf_token: random_string(30),
-                                           id: None})
+        Some(_) => {}
+        None => {
+            **session = Some(Session {
+                csrf_token: random_string(30),
+                user: None,
+            })
+        }
     }
 }
 
 pub fn csrf_token(state: &State) -> Option<&String> {
     match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session { ref csrf_token, id: _}) => Some(csrf_token),
-        None => None
+        Some(Session {
+            ref csrf_token,
+            user: _,
+        }) => Some(csrf_token),
+        None => None,
     }
 }
 
-pub fn authenticate(state: &mut State, id: i32) {
+pub fn authenticate(state: &mut State, user: UserView) {
     let session = SessionData::<Option<Session>>::borrow_mut_from(state);
-    **session = Some(Session { csrf_token: random_string(30), id: Some(id)})
+    **session = Some(Session {
+        csrf_token: random_string(30),
+        user: Some(user),
+    })
 }
 
 /// Returns the hash of the password (libsodium pwhash)
@@ -60,10 +85,11 @@ pub fn hash_password(password: &str) -> String {
     // Normalize password
     let normalized_pw = basic_hash(password).into_bytes();
 
-    pwhash::pwhash(&normalized_pw,
-                   pwhash::OPSLIMIT_INTERACTIVE,
-                   pwhash::MEMLIMIT_INTERACTIVE)
-        .unwrap()
+    pwhash::pwhash(
+        &normalized_pw,
+        pwhash::OPSLIMIT_INTERACTIVE,
+        pwhash::MEMLIMIT_INTERACTIVE,
+    ).unwrap()
         .as_ref()
         .to_hex()
 }
@@ -74,13 +100,9 @@ pub fn check_password(password: &str, hash: &str) -> bool {
     let normalized_pw = basic_hash(password).into_bytes();
 
     // Turns Hex back into byte array
-    let undigested_hash: Vec<u8> = FromHex::from_hex(hash
-        .to_owned()
-        .into_bytes())
-        .unwrap();
+    let undigested_hash: Vec<u8> = FromHex::from_hex(hash.to_owned().into_bytes()).unwrap();
 
-    let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash)
-        .unwrap();
+    let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash).unwrap();
 
     pwhash::pwhash_verify(&hash_obj, &normalized_pw)
 }
@@ -93,11 +115,23 @@ pub fn deauth(state: &mut State) {
 
 pub fn user_id(state: &State) -> Option<i32> {
     match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session { csrf_token: _, id: Some(id) }) => Some(id),
-        _ => None
+        Some(Session {
+            csrf_token: _,
+            user: Some(ref user),
+        }) => Some(user.id),
+        _ => None,
     }
 }
 
+pub fn user(state: &State) -> Option<UserView> {
+    match **SessionData::<Option<Session>>::borrow_from(state) {
+        Some(Session {
+            csrf_token: _,
+            user: Some(ref user),
+        }) => Some(user.clone()),
+        _ => None,
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -1,15 +1,20 @@
+extern crate image;
+
+extern crate proc_macro;
+
 extern crate gotham;
-extern crate serde_json;
 #[macro_use]
 extern crate gotham_derive;
 extern crate hyper;
 extern crate mime;
+extern crate serde;
+extern crate serde_json;
 
 #[macro_use]
 extern crate diesel;
+extern crate dotenv;
 extern crate r2d2;
 extern crate r2d2_diesel;
-extern crate dotenv;
 
 #[macro_use]
 extern crate serde_derive;
@@ -19,21 +24,24 @@ extern crate serde_urlencoded;
 extern crate lazy_static;
 
 #[macro_use]
+extern crate slugify;
+#[macro_use]
 extern crate tera;
 
 extern crate futures;
 
 extern crate hex;
-extern crate sodiumoxide;
 extern crate rand;
+extern crate sodiumoxide;
 
 mod schema;
 #[macro_use]
 mod lib;
 mod middlewares;
 mod router;
-mod controllers;
+#[macro_use]
 mod models;
+mod controllers;
 mod forms;
 
 use router::router;
