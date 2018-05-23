@@ -1,2 +1,5 @@
 /target
-/static
+**/*.rs.bk
+
+dependencies/ssl.crt
+dependencies/ssl.key

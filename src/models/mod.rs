@@ -7,7 +7,7 @@ mod plant_type;
 #[macro_use]
 mod event;
 
-pub use self::user::*;
+pub use self::event::*;
 pub use self::plant::*;
 pub use self::plant_type::*;
-pub use self::event::*;
+pub use self::user::*;

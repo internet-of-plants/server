@@ -1,26 +1,16 @@
-use lib::utils::{Timestamp, UID};
-use schema::users;
+use lib::{schema::users, utils::Timestamp, utils::UID};
 
-#[macro_export]
-macro_rules! UserViewSql {
-    () => ((users::id, users::username, users::email, users::timestamp));
-}
-
-#[derive(Queryable, Serialize, Deserialize, Debug, Clone)]
-pub struct UserView {
-    pub id: UID,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SignupForm {
     pub username: String,
     pub email: String,
-    pub timestamp: Timestamp,
+    pub password: String,
 }
 
-#[derive(Queryable, Serialize, Debug)]
-pub struct User {
-    pub id: UID,
-    pub username: String,
-    pub email: String,
-    pub password_hash: String,
-    pub timestamp: Timestamp,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SigninForm {
+    pub login: String,
+    pub password: String,
 }
 
 #[derive(Insertable, Debug)]
@@ -29,4 +19,22 @@ pub struct NewUser {
     pub username: String,
     pub email: String,
     pub password_hash: String,
+}
+
+#[derive(Queryable, Serialize, Deserialize, Debug, Clone)]
+pub struct User {
+    pub id: UID,
+    pub username: String,
+    pub email: String,
+    #[serde(skip)]
+    pub password_hash: String,
+    pub timestamp: Timestamp,
+}
+
+pub type UserView = User;
+
+macro_rules! UserViewSql {
+    () => {
+        users::all_columns
+    };
 }

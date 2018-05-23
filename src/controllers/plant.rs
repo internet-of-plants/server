@@ -1,96 +1,154 @@
-use gotham::state::State;
-use hyper::Response;
-use tera::Context;
-
-use models::{Event, NewPlant, PlantTypeView, PlantView};
-use forms::PlantForm;
-use lib::http::{redirect, render_template};
-use lib::db::connection;
-
-use diesel::prelude::*;
+use actix_web::{HttpRequest, HttpResponse, Json, Path};
 use diesel::insert_into;
-use schema::{events, plant_types, plants, users};
-use router::IdPath;
+use diesel::prelude::*;
 
-pub fn plant(mut state: State) -> (State, Response) {
-    assert_auth!(state);
+use State;
+use lib::{auth::user_id, error::Error, schema::events, schema::plant_types, schema::plants,
+          schema::users};
+use models::{NewPlant, Plant, PlantForm, PlantView};
 
-    let id = from_path!(state, IdPath).id;
-    let user_id = get_user_id!(state);
-
-    let plant = try_db!(
-        state,
-        plants::table
-            .inner_join(plant_types::table)
-            .inner_join(users::table)
-            .filter(plants::id.eq(id).and(users::id.eq(user_id)))
-            .select(PlantViewSql!())
-            .first::<PlantView>(&*connection())
-    );
-    let last_event = try_db_option!(
-        state,
-        events::table
-            .filter(events::plant_id.eq(plant.id))
-            .first::<Event>(&*connection())
+pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
+    let user_id = user_id(&req)?;
+    let plant_id = id.into_inner();
+    trace!(
+        req.state().log,
+        "Plant (user_id: {}): {}",
+        user_id,
+        plant_id
     );
 
-    let mut ctx = Context::new();
-    ctx.add("plant", &plant);
-    ctx.add("last_event", &last_event);
-    render_template(state, "plant.html", &mut ctx)
+    let plant = plants::table
+        .inner_join(users::table)
+        .inner_join(plant_types::table)
+        .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
+        .filter(plants::id.eq(plant_id).and(plants::user_id.eq(user_id)))
+        .select(PlantViewSql!())
+        .first::<PlantView>(&*req.state().connection()?)?;
+    info!(req.state().log, "Plant: {:?}", plant);
+    Ok(HttpResponse::Ok().json(plant))
 }
 
-pub fn plant_index(mut state: State) -> (State, Response) {
-    assert_auth!(state);
+pub fn plant_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
+    let user_id = user_id(&req)?;
+    trace!(req.state().log, "Plant (user_id: {})", user_id);
 
-    let (plant_vec, plant_type_vec) = {
-        let conn = connection();
-
-        let plant_vec = try_db!(
-            state,
-            plants::table
-                .inner_join(plant_types::table)
-                .inner_join(users::table)
-                .filter(users::id.eq(get_user_id!(state)))
-                .select(PlantViewSql!())
-                .load::<PlantView>(&*conn),
-            Vec::new()
-        );
-
-        let plant_type_vec = try_db!(
-            state,
-            plant_types::table
-                .inner_join(users::table)
-                .select(PlantTypeViewSql!())
-                .load::<PlantTypeView>(&*conn),
-            Vec::new()
-        );
-
-        (plant_vec, plant_type_vec)
-    };
-
-    let mut ctx = Context::new();
-    ctx.add("plants", &plant_vec);
-    ctx.add("plant_types", &plant_type_vec);
-    render_template(state, "plants.html", &mut ctx)
+    let plants = plants::table
+        .inner_join(users::table)
+        .inner_join(plant_types::table)
+        .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
+        .filter(plants::user_id.eq(user_id))
+        .select(PlantViewSql!())
+        .load::<PlantView>(&*req.state().connection()?)?;
+    info!(req.state().log, "Plants: {:?}", plants);
+    Ok(HttpResponse::Ok().json(plants))
 }
 
-pub fn plant_post(mut state: State) -> (State, Response) {
-    assert_auth!(state);
+pub fn plant_post(
+    (form, req): (Json<PlantForm>, HttpRequest<State>),
+) -> Result<HttpResponse, Error> {
+    let form = form.into_inner();
+    let user_id = user_id(&req)?;
+    trace!(
+        req.state().log,
+        "Create Plant (user_id: {}): {:?}",
+        user_id,
+        form
+    );
 
-    let form = from_body!(state, url_for!("plants"), PlantForm);
     let plant = NewPlant {
-        name: form.name,
+        name: filled!(form.name),
         type_id: form.type_id,
-        user_id: get_user_id!(state),
+        user_id: user_id,
     };
 
-    try_db!(
-        state,
-        insert_into(plants::table)
-            .values(&plant)
-            .execute(&*connection())
-    );
+    let plant = insert_into(plants::table)
+        .values(&plant)
+        .get_result::<Plant>(&*req.state().connection()?)?;
+    info!(req.state().log, "Plants: {:?}", plant);
+    Ok(HttpResponse::Ok().json(plant))
+}
 
-    redirect(state, url_for!("plants"))
+#[cfg(test)]
+mod tests {
+    use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
+    use build_app;
+    use futures::future::Future;
+    use lib::{utils::authenticate_tester, utils::clean_db, utils::create_plant_type};
+    use models::{PlantForm, PlantView};
+
+    fn show(srv: &mut TestServer, cookie: &str, id: i32, expected: StatusCode) {
+        let mut req = srv.client(Method::GET, &format!("/plant/{}", id));
+        opt_cookie!(req, cookie);
+
+        let r = srv.execute(req.finish().unwrap().send()).unwrap();
+        assert_eq!(r.status(), expected);
+
+        if expected == StatusCode::OK {
+            assert!(header!(r, "content-length") != "0");
+            assert_eq!(header!(r, "content-type"), "application/json");
+        } else {
+            assert_eq!(header!(r, "content-length"), "0");
+        }
+    }
+
+    fn index(srv: &mut TestServer, cookie: &str, count: usize, expected: StatusCode) {
+        let mut req = srv.client(Method::GET, "/");
+        opt_cookie!(req, cookie);
+
+        let r = srv.execute(req.finish().unwrap().send()).unwrap();
+        assert_eq!(r.status(), expected);
+
+        if count == 0 {
+            let size = if expected == StatusCode::OK { "2" } else { "0" };
+            assert_eq!(header!(r, "content-length"), size);
+        } else {
+            assert_eq!(r.json::<Vec<PlantView>>().wait().unwrap().len(), count);
+        }
+    }
+
+    fn create(srv: &mut TestServer, cookie: &str, name: &str, type_id: i32, expected: StatusCode) {
+        let body = PlantForm {
+            name: name.to_owned(),
+            type_id: type_id,
+        };
+        let mut req = srv.client(Method::POST, "/plant");
+        opt_cookie!(req, cookie);
+
+        let r = srv.execute(req.json(body).unwrap().send()).unwrap();
+        assert_eq!(r.status(), expected);
+
+        if expected == StatusCode::OK {
+            assert!(header!(r, "content-length") != "0");
+            assert_eq!(header!(r, "content-type"), "application/json");
+        } else {
+            assert_eq!(header!(r, "content-length"), "0");
+        }
+    }
+
+    #[test]
+    fn plant() {
+        clean_db();
+        let mut srv = TestServer::with_factory(build_app);
+
+        let cookie = authenticate_tester(&mut srv);
+        let id = create_plant_type(&mut srv, &cookie);
+
+        index(&mut srv, "", 0, StatusCode::UNAUTHORIZED);
+        index(&mut srv, &cookie, 0, StatusCode::OK);
+
+        create(&mut srv, "", "plant", 0, StatusCode::UNAUTHORIZED);
+        create(&mut srv, &cookie, "plant", 0, StatusCode::BAD_REQUEST);
+
+        show(&mut srv, "", 1, StatusCode::UNAUTHORIZED);
+        show(&mut srv, &cookie, 1, StatusCode::NOT_FOUND);
+        index(&mut srv, &cookie, 0, StatusCode::OK);
+
+        create(&mut srv, &cookie, "plant", id, StatusCode::OK);
+        index(&mut srv, &cookie, 1, StatusCode::OK);
+
+        create(&mut srv, &cookie, "plant", id, StatusCode::OK);
+        create(&mut srv, &cookie, "", id, StatusCode::BAD_REQUEST);
+        create(&mut srv, &cookie, "", 0, StatusCode::BAD_REQUEST);
+        index(&mut srv, &cookie, 2, StatusCode::OK);
+    }
 }

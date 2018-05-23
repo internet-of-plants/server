@@ -1,136 +1,58 @@
+use State;
+use actix_web::{HttpRequest, middleware::session::RequestSession};
 use hex::{FromHex, ToHex};
+use lib::{error::Error, utils::basic_hash};
 use sodiumoxide::crypto::pwhash;
-use gotham::state::FromState;
-use gotham::middleware::session::SessionData;
-use lib::utils::{basic_hash, from_body, parse_multipart, random_string, MultipartDeserialize};
-use gotham::state::State;
 
-use models::UserView;
-
-#[derive(StateData, Serialize, Deserialize, Debug)]
-pub struct Session {
-    csrf_token: String,
-    user: Option<UserView>,
-}
-
-#[derive(StateData, Deserialize, Debug)]
-struct CsrfToken {
-    csrf_token: String,
-}
-
-impl MultipartDeserialize for CsrfToken {
-    fn from_multipart(content: &[u8], boundary: &[u8]) -> Option<Self> {
-        let values = parse_multipart(content, boundary);
-        Some(CsrfToken {
-            csrf_token: match values.get("csrf_token") {
-                Some(name) => name.to_owned(),
-                None => return None,
-            },
-        })
+/// Return user_id stored in session cookie
+pub fn user_id(req: &HttpRequest<State>) -> Result<i32, Error> {
+    match req.session().get::<i32>("user_id") {
+        Ok(Some(v)) => Ok(v),
+        Ok(None) => Err(Error::NotAuthenticated),
+        Err(_) => Err(Error::NotAuthenticated),
     }
 }
 
-pub fn is_auth(state: &State) -> bool {
-    match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session {
-            csrf_token: _,
-            user: Some(_),
-        }) => true,
-        _ => false,
+/// Check authentication session cookie
+pub fn is_auth(req: &HttpRequest<State>) -> Result<(), Error> {
+    match req.session().get::<i32>("user_id") {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(Error::NotAuthenticated),
+        Err(_) => Err(Error::NotAuthenticated),
     }
 }
 
-pub fn is_csrf_valid(state: &mut State) -> bool {
-    let form = from_body::<CsrfToken>(state);
-    let cookie = csrf_token(&state);
-    match (form, cookie) {
-        (Some(CsrfToken { csrf_token: form }), Some(cookie)) => *cookie == form,
-        _ => false,
+/// Set session cookie
+pub fn authenticate(req: &HttpRequest<State>, user_id: i32) -> Result<(), Error> {
+    match req.session().set("user_id", user_id) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::NotAuthenticated),
     }
-}
-
-pub fn set_csrf_token(state: &mut State) {
-    let session = SessionData::<Option<Session>>::borrow_mut_from(state);
-    match **session {
-        Some(_) => {}
-        None => {
-            **session = Some(Session {
-                csrf_token: random_string(30),
-                user: None,
-            })
-        }
-    }
-}
-
-pub fn csrf_token(state: &State) -> Option<&String> {
-    match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session {
-            ref csrf_token,
-            user: _,
-        }) => Some(csrf_token),
-        None => None,
-    }
-}
-
-pub fn authenticate(state: &mut State, user: UserView) {
-    let session = SessionData::<Option<Session>>::borrow_mut_from(state);
-    **session = Some(Session {
-        csrf_token: random_string(30),
-        user: Some(user),
-    })
 }
 
 /// Returns the hash of the password (libsodium pwhash)
-pub fn hash_password(password: &str) -> String {
-    // Normalize password
+pub fn hash_password(password: &str) -> Result<String, Error> {
     let normalized_pw = basic_hash(password).into_bytes();
 
-    pwhash::pwhash(
+    Ok(pwhash::pwhash(
         &normalized_pw,
         pwhash::OPSLIMIT_INTERACTIVE,
         pwhash::MEMLIMIT_INTERACTIVE,
-    ).unwrap()
-        .as_ref()
-        .to_hex()
+    )?.as_ref()
+        .to_hex())
 }
 
 /// Returns true if password matches the hash
-pub fn check_password(password: &str, hash: &str) -> bool {
-    // Normalize password
+pub fn check_password(password: &str, hash: &str) -> Result<bool, Error> {
     let normalized_pw = basic_hash(password).into_bytes();
+    let undigested_hash: Vec<u8> = FromHex::from_hex(hash.to_owned().into_bytes())?;
 
-    // Turns Hex back into byte array
-    let undigested_hash: Vec<u8> = FromHex::from_hex(hash.to_owned().into_bytes()).unwrap();
+    let hash_obj = match pwhash::HashedPassword::from_slice(&undigested_hash) {
+        Some(v) => v,
+        None => return Err(Error::SodiumOxide(())),
+    };
 
-    let hash_obj = pwhash::HashedPassword::from_slice(&undigested_hash).unwrap();
-
-    pwhash::pwhash_verify(&hash_obj, &normalized_pw)
-}
-
-pub fn deauth(state: &mut State) {
-    match SessionData::<Option<Session>>::take_from(state).discard(state) {
-        _ => {}
-    }
-}
-
-pub fn user_id(state: &State) -> Option<i32> {
-    match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session {
-            csrf_token: _,
-            user: Some(ref user),
-        }) => Some(user.id),
-        _ => None,
-    }
-}
-
-pub fn user(state: &State) -> Option<UserView> {
-    match **SessionData::<Option<Session>>::borrow_from(state) {
-        Some(Session {
-            csrf_token: _,
-            user: Some(ref user),
-        }) => Some(user.clone()),
-        _ => None,
-    }
+    Ok(pwhash::pwhash_verify(&hash_obj, &normalized_pw))
 }
 
 #[cfg(test)]
@@ -138,72 +60,12 @@ mod tests {
     use super::*;
 
     #[test]
-    /// Integration test to assure the password authentication is working
-    fn password_handler() {
-        assert!(check_password("hello", &hash_password("hello")));
-        assert!(!check_password("hell", &hash_password("hello")));
+    fn password() {
+        assert!(check_password("hello", &hash_password("hello").unwrap()).unwrap());
+        assert!(!check_password("hell", &hash_password("hello").unwrap()).unwrap());
+        assert!(!check_password(
+            "hellooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+            &hash_password("helloooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo")
+                .unwrap()).unwrap())
     }
 }
-
-/*
-use iron::Request;
-use lib::utils::{unix_epoch, basic_hash, get_param, random_string};
-use lib::serde_json;
-
-/// Returns Result with actor_id stored in signed session (if auth, else None)
-pub fn get_actor_id(req: &mut Request) -> Option<i64> {
-    match req.session().get::<Auth>() {
-        Ok(Some(auth)) => Some(auth.actor_id),
-        _ => None
-    }
-}
-
-/// Stores actor_id and expiration in signed session
-pub fn authenticate_actor(id: i64, req: &mut Request){
-    deauth(req);
-
-    req.session().set(Auth {
-        actor_id: id,
-        expiration_date: (unix_epoch()
-                          + get_config::<u64>("SESSION_DURATION") * 60)
-    }).unwrap();
-
-    req.session().set(CsrfToken {
-        token: generate_csrf_token()
-    }).unwrap();
-}
-
-/// Clear signed session
-pub fn deauth(req: &mut Request) {
-    req.session().clear().unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    /// Integration test to assure the cookies are being properly encoded/decoded
-    fn session_storage() {
-        let auth = Auth {
-            actor_id: 1,
-            expiration_date: unix_epoch()
-        };
-        let csrf_token  = CsrfToken {
-            token: "3".to_owned()
-        };
-
-        {
-            let raw = auth.clone().into_raw();
-            let from_raw = Auth::from_raw(raw).unwrap();
-            assert_eq!(auth, from_raw);
-        }
-
-        {
-            let raw = csrf_token.clone().into_raw();
-            let from_raw = CsrfToken::from_raw(raw).unwrap();
-            assert_eq!(csrf_token, from_raw);
-        }
-    }
-}
-*/

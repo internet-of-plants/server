@@ -1,24 +1,12 @@
+use base64::{decode, DecodeError};
 use hex::ToHex;
+use image::{load_from_memory, GenericImage, ImageError, ImageOutputFormat, Nearest};
+use rand::{RngCore, os::OsRng};
 use sodiumoxide::crypto::hash;
-use rand::RngCore;
-use rand::os::OsRng;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::collections::HashMap;
-use std::sync::RwLock;
-use std::str::from_utf8;
-use gotham::state::{FromState, State};
-use serde::Deserialize;
-use serde_urlencoded::from_str;
-use hyper::header::ContentType;
-use hyper::Headers;
-use middlewares::body::{BodyData, Multipart, UrlEncoded};
-use mime;
+use std::fs::File;
 
-pub trait MultipartDeserialize {
-    fn from_multipart(content: &[u8], boundary: &[u8]) -> Option<Self>
-    where
-        Self: Sized;
-}
+use config::{IMAGE_HEIGHT, IMAGE_PATH, IMAGE_WIDTH, THUMB_HEIGHT, THUMB_PATH, THUMB_WIDTH};
+use lib::error::Error;
 
 pub type UID = i32;
 pub type BigUID = i64;
@@ -29,25 +17,24 @@ pub type AnalogRead = i16;
 pub type DeviceTimestamp = i32;
 pub type Timestamp = i64;
 
-pub enum RawMultipartValue<'a> {
-    Text(String),
-    File((String, &'a [u8])),
-    Invalid,
-}
-pub use self::RawMultipartValue::*;
+/// Resize image according to config, create thumb, save them
+pub fn save_image(filename: &str, bytes: &[u8]) -> Result<(), ImageError> {
+    let mut image = load_from_memory(bytes)?;
 
-type RouteTable = RwLock<HashMap<String, String>>;
-lazy_static! {
-    pub static ref REVERSE_ROUTE_TABLE: RouteTable = RwLock::new(HashMap::new());
-}
-
-/// Returns the number of seconds since UNIX_EPOCH (1970)
-pub fn unix_epoch() -> u64 {
-    // Returns 0 if now() is before UNIX_EPOCH (1970)
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(v) => v.as_secs(),
-        Err(_) => 0,
+    if image.width() > IMAGE_WIDTH || image.height() > IMAGE_HEIGHT {
+        image = image.resize(IMAGE_WIDTH, IMAGE_HEIGHT, Nearest);
     }
+    let thumb = image.thumbnail(THUMB_WIDTH, THUMB_HEIGHT);
+
+    let thumb_filename = format!("{}/{}.jpg", THUMB_PATH, filename);
+    let filename = format!("{}/{}.jpg", IMAGE_PATH, filename);
+
+    let mut file = File::create(filename)?;
+    image.write_to(&mut file, ImageOutputFormat::JPEG(120))?;
+
+    file = File::create(thumb_filename)?;
+    thumb.write_to(&mut file, ImageOutputFormat::JPEG(120))?;
+    Ok(())
 }
 
 /// Returns the hash of argument
@@ -56,14 +43,156 @@ pub fn basic_hash(src: &str) -> String {
 }
 
 /// Returns randomly generated string with specified size
-pub fn random_string(len: usize) -> String {
-    let mut rng = OsRng::new().unwrap();
+pub fn random_string(len: usize) -> Result<String, Error> {
+    let mut rng = OsRng::new()?;
     let mut hash = String::new();
     while hash.len() < len {
         hash.push_str(&basic_hash(&rng.next_u32().to_string()));
     }
 
-    hash[..len].to_owned()
+    Ok(hash[..len].to_owned())
+}
+
+/// Decode base64 image data from browsers to binary
+pub fn decode_b64_image(image: &str) -> Result<Vec<u8>, Error> {
+    let find = "base64";
+    let start = "data:image/";
+    let (_, data) = match (image.find(find), image.find(start)) {
+        (Some(index), Some(_)) if index + find.len() + 1 < image.len() => {
+            image.split_at(index + find.len() + 1)
+        }
+        _ => return Err(Error::Base64(DecodeError::InvalidByte(0, 0))),
+    };
+    Ok(decode(data)?)
+}
+
+#[cfg(test)]
+/// Get cookie String from TestRequest
+pub fn extract_cookie(r: &::actix_web::client::ClientResponse) -> String {
+    use actix_web::{HttpMessage, http::header::HeaderValue};
+    r.headers()
+        .get("set-cookie")
+        .unwrap_or(&HeaderValue::from_str("s=").unwrap())
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+
+#[cfg(test)]
+/// Authenticate user (create if not existant) and return cookie String
+pub fn authenticate_tester(srv: &mut ::actix_web::test::TestServer) -> String {
+    use actix_web::http::{Method, StatusCode};
+    use models::{SigninForm, SignupForm};
+    let body = SigninForm {
+        login: "tester".to_owned(),
+        password: "password".to_owned(),
+    };
+    let req = srv.client(Method::POST, "/signin").json(body).unwrap();
+    let mut r = srv.execute(req.send()).unwrap();
+
+    if r.status() == StatusCode::UNAUTHORIZED {
+        let body = SignupForm {
+            username: "tester".to_owned(),
+            email: "tester@example.com".to_owned(),
+            password: "password".to_owned(),
+        };
+        let req = srv.client(Method::POST, "/signup").json(body).unwrap();
+        r = srv.execute(req.send()).unwrap();
+    }
+
+    extract_cookie(&r)
+}
+
+#[cfg(test)]
+/// Create plant type and return its id
+pub fn create_plant_type(srv: &mut ::actix_web::test::TestServer, cookie: &str) -> i32 {
+    use actix_web::HttpMessage;
+    use actix_web::http::{Cookie, Method};
+    use futures::future::Future;
+    use models::{PlantType, PlantTypeForm};
+    let body = PlantTypeForm {
+        name: "plant_typer".to_owned(),
+        image: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=".to_owned(),
+    };
+    let req = srv.client(Method::POST, "/plant_type")
+        .cookie(Cookie::parse(cookie).unwrap())
+        .json(body)
+        .unwrap();
+    let r = srv.execute(req.send()).unwrap();
+    r.json::<PlantType>().wait().unwrap().id
+}
+
+#[cfg(test)]
+/// Create plant and return its id
+pub fn create_plant(srv: &mut ::actix_web::test::TestServer, cookie: &str) -> i32 {
+    use actix_web::HttpMessage;
+    use actix_web::http::{Cookie, Method};
+    use futures::future::Future;
+    use models::{Plant, PlantForm};
+    let plant_type_id = create_plant_type(srv, &cookie);
+    let body = PlantForm {
+        name: "planter".to_owned(),
+        type_id: plant_type_id,
+    };
+    let req = srv.client(Method::POST, "/plant")
+        .cookie(Cookie::parse(cookie).unwrap())
+        .json(body)
+        .unwrap();
+    let r = srv.execute(req.send()).unwrap();
+    r.json::<Plant>().wait().unwrap().id
+}
+
+#[cfg(test)]
+pub fn clean_db() {
+    use diesel::{self, RunQueryDsl};
+    use lib::db::{connection, pool};
+    use lib::schema::*;
+
+    let p = pool();
+    diesel::delete(events::table)
+        .execute(&*connection(&p).unwrap())
+        .unwrap();
+    diesel::delete(plants::table)
+        .execute(&*connection(&p).unwrap())
+        .unwrap();
+    diesel::delete(plant_types::table)
+        .execute(&*connection(&p).unwrap())
+        .unwrap();
+    diesel::delete(users::table)
+        .execute(&*connection(&p).unwrap())
+        .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn decode_b64_image() {
+        let image = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+        assert!(super::decode_b64_image(image).is_ok());
+        assert!(super::decode_b64_image("").is_err());
+        assert!(super::decode_b64_image("data:image/base64").is_err());
+        assert!(super::decode_b64_image("base64").is_err());
+        assert!(super::decode_b64_image("base64aa").is_err());
+        assert!(super::decode_b64_image("a").is_err());
+        assert!(super::decode_b64_image("^").is_err());
+    }
+
+    #[test]
+    fn save_image() {
+        let image = super::decode_b64_image(
+            "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
+        ).unwrap();
+
+        let filename = "__test_save_image";
+        assert!(super::save_image(filename, &image).is_ok());
+        assert!(Path::new(&format!("image/{}.jpg", filename)).exists());
+        assert!(Path::new(&format!("thumb/{}.jpg", filename)).exists());
+
+        assert!(super::save_image(filename, &[0]).is_err());
+        assert!(super::save_image(filename, &[]).is_err());
+    }
 }
 
 fn extract_value_multipart<'a>(

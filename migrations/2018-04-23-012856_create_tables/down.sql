@@ -1,4 +1,3 @@
-DROP TABLE events;
-DROP TABLE plants;
-DROP TABLE plant_types;
-DROP TABLE users;
+DROP TRIGGER last_event_cache ON events;
+DROP FUNCTION cache_last_event;
+DROP TABLE events, plants, plant_types, users;

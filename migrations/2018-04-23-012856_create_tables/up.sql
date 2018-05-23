@@ -11,6 +11,8 @@ CREATE TABLE users (
 CREATE INDEX users_username_index on users using hash(username);
 INSERT INTO users (username, email, password_hash) VALUES ('Deleted', 'deleted@example.com', '');
 
+INSERT INTO users (username, email, password_hash) VALUES ('Deleted', 'deleted@example.com', '');
+
 CREATE TABLE plant_types (
     id        SERIAL PRIMARY KEY,
     name      VARCHAR(255) NOT NULL,
@@ -25,11 +27,12 @@ CREATE TABLE plant_types (
 CREATE INDEX plant_types_slug_index on plant_types using hash(slug);
 
 CREATE TABLE plants (
-    id        SERIAL PRIMARY KEY,
-    name      VARCHAR(255) NOT NULL,
-    type_id   INTEGER      NOT NULL,
-    user_id   INTEGER      NOT NULL,
-    timestamp BIGINT       NOT NULL DEFAULT extract(epoch from now()),
+    id            SERIAL PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    type_id       INTEGER      NOT NULL,
+    user_id       INTEGER      NOT NULL,
+    last_event_id BIGINT,
+    timestamp     BIGINT       NOT NULL DEFAULT extract(epoch from now()),
     CHECK (name <> ''),
     FOREIGN KEY (type_id) REFERENCES plant_types (id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -46,5 +49,16 @@ CREATE TABLE events (
     device_timestamp         INTEGER  NOT NULL,
     timestamp                BIGINT   NOT NULL DEFAULT extract(epoch from now()),
     FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE,
-    CHECK (air_humidity_percentage > 0 AND light > 0 AND device_timestamp > 0)
 );
+
+ALTER TABLE plants ADD FOREIGN KEY (last_event_id) REFERENCES events (id) ON DELETE SET NULL;
+
+CREATE FUNCTION cache_last_event() RETURNS trigger AS $$ BEGIN
+UPDATE plants
+SET last_event_id = NEW.id
+WHERE plants.id = NEW.plant_id;
+RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER last_event_cache AFTER INSERT ON events
+    FOR EACH ROW EXECUTE PROCEDURE cache_last_event();

@@ -18,6 +18,7 @@ table! {
         name -> Varchar,
         type_id -> Int4,
         user_id -> Int4,
+        last_event_id -> Nullable<Int8>,
         timestamp -> Int8,
     }
 }
@@ -43,7 +44,6 @@ table! {
     }
 }
 
-joinable!(events -> plants (plant_id));
 joinable!(plant_types -> users (user_id));
 joinable!(plants -> plant_types (type_id));
 joinable!(plants -> users (user_id));
