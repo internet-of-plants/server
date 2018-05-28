@@ -20,15 +20,13 @@ pub fn user((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpRespo
     let user = users::table
         .filter(users::username.eq(username))
         .select(UserViewSql!())
-        .first::<UserView>(&*req.state().connection()?)?;
+        .first::<UserView>(conn!(req.state().pool))?;
     info!(req.state().log, "User: {:?}", user);
 
     Ok(HttpResponse::Ok().json(user))
 }
 
-pub fn signup_post(
-    (form, req): (Json<SignupForm>, HttpRequest<State>),
-) -> Result<HttpResponse, Error> {
+pub fn signup((form, req): (Json<SignupForm>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let form = form.into_inner();
     trace!(req.state().log, "Signup: {}", form.username);
 
@@ -45,7 +43,7 @@ pub fn signup_post(
 
     let user = insert_into(users::table)
         .values(&user)
-        .get_result::<User>(&*req.state().connection()?)?;
+        .get_result::<User>(conn!(req.state().pool))?;
     info!(req.state().log, "Created User: {:?}", user);
 
     authenticate(&req, user.id)?;
@@ -54,9 +52,7 @@ pub fn signup_post(
     Ok(HttpResponse::Ok().finish())
 }
 
-pub fn signin_post(
-    (form, req): (Json<SigninForm>, HttpRequest<State>),
-) -> Result<HttpResponse, Error> {
+pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let form = form.into_inner();
     trace!(req.state().log, "Signin: {}", form.login);
 
@@ -71,7 +67,7 @@ pub fn signin_post(
                 .eq(form.login.clone())
                 .or(users::username.eq(form.login)),
         )
-        .first::<UserView>(&*req.state().connection()?)
+        .first::<UserView>(conn!(req.state().pool))
     {
         Ok(u) => u,
         Err(NotFound) => {
@@ -103,7 +99,7 @@ pub fn logout(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
 mod tests {
     use actix_web::{http::Method, http::StatusCode, test::TestServer};
     use build_app;
-    use lib::{utils::clean_db, utils::extract_cookie};
+    use lib::{db::test_pool, utils::extract_cookie};
     use models::{SigninForm, SignupForm};
 
     fn authenticated(srv: &mut TestServer, cookie: &str) {
@@ -175,12 +171,13 @@ mod tests {
 
     #[test]
     fn user() {
-        clean_db();
-        let mut srv = TestServer::with_factory(build_app);
-
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
         not_authenticated(&mut srv, "");
-
         show(&mut srv, "", "test", StatusCode::UNAUTHORIZED);
+
+        // Conflict rolls-back test transaction, so we have to start pool again (and authenticate)
+        // TODO: this should be fixed
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
         let cookie = signup(
             &mut srv,
             "test",
@@ -189,8 +186,11 @@ mod tests {
             StatusCode::OK,
         );
         show(&mut srv, &cookie, "test", StatusCode::OK);
+        signin(&mut srv, "test", "password", StatusCode::OK);
+        signin(&mut srv, "test@example.com", "password", StatusCode::OK);
 
         show(&mut srv, &cookie, "test2", StatusCode::NOT_FOUND);
+
         signup(
             &mut srv,
             "test2",
@@ -198,15 +198,12 @@ mod tests {
             "password",
             StatusCode::CONFLICT,
         );
+
+        // Conflict rolls-back test transaction, so we have to start pool again (and authenticate)
+        // TODO: this should be fixed
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
         show(&mut srv, &cookie, "test2", StatusCode::NOT_FOUND);
 
-        signup(
-            &mut srv,
-            "test",
-            "test@example.com2",
-            "password",
-            StatusCode::CONFLICT,
-        );
         show(&mut srv, &cookie, "test2", StatusCode::NOT_FOUND);
 
         signup(
@@ -216,6 +213,7 @@ mod tests {
             "password",
             StatusCode::OK,
         );
+        signin(&mut srv, "test2", "password", StatusCode::OK);
         show(&mut srv, &cookie, "test2", StatusCode::OK);
 
         signup(&mut srv, "", "aa", "aa", StatusCode::BAD_REQUEST);
@@ -225,13 +223,18 @@ mod tests {
         logout(&mut srv, &cookie);
         logout(&mut srv, "");
 
-        signin(&mut srv, "test", "password", StatusCode::OK);
-        signin(&mut srv, "test@example.com", "password", StatusCode::OK);
         signin(&mut srv, "test", "passwor", StatusCode::UNAUTHORIZED);
         signin(&mut srv, "tes", "password", StatusCode::UNAUTHORIZED);
         signin(&mut srv, "test", "", StatusCode::UNAUTHORIZED);
         signin(&mut srv, "", "password", StatusCode::UNAUTHORIZED);
-        signin(&mut srv, "test2", "password", StatusCode::OK);
         signin(&mut srv, "test3", "password", StatusCode::UNAUTHORIZED);
+
+        signup(
+            &mut srv,
+            "test",
+            "test@example.com2",
+            "password",
+            StatusCode::CONFLICT,
+        );
     }
 }

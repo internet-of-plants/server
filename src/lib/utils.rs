@@ -24,7 +24,15 @@ pub fn save_image(filename: &str, bytes: &[u8]) -> Result<(), ImageError> {
     if image.width() > IMAGE_WIDTH || image.height() > IMAGE_HEIGHT {
         image = image.resize(IMAGE_WIDTH, IMAGE_HEIGHT, Nearest);
     }
-    let thumb = image.thumbnail(THUMB_WIDTH, THUMB_HEIGHT);
+    let thumb = if image.width() < THUMB_WIDTH && image.height() < THUMB_HEIGHT {
+        image.thumbnail(image.width(), image.height())
+    } else if image.width() < THUMB_WIDTH {
+        image.thumbnail(image.width(), THUMB_HEIGHT)
+    } else if image.height() < THUMB_HEIGHT {
+        image.thumbnail(THUMB_WIDTH, image.height())
+    } else {
+        image.thumbnail(THUMB_WIDTH, THUMB_HEIGHT)
+    };
 
     let thumb_filename = format!("{}/{}.jpg", THUMB_PATH, filename);
     let filename = format!("{}/{}.jpg", IMAGE_PATH, filename);
@@ -112,7 +120,7 @@ pub fn create_plant_type(srv: &mut ::actix_web::test::TestServer, cookie: &str) 
     use models::{PlantType, PlantTypeForm};
     let body = PlantTypeForm {
         name: "plant_typer".to_owned(),
-        image: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=".to_owned(),
+        image: ::config::TEST_IMAGE.to_owned(),
     };
     let req = srv.client(Method::POST, "/plant_type")
         .cookie(Cookie::parse(cookie).unwrap())
@@ -143,33 +151,14 @@ pub fn create_plant(srv: &mut ::actix_web::test::TestServer, cookie: &str) -> i3
 }
 
 #[cfg(test)]
-pub fn clean_db() {
-    use diesel::{self, RunQueryDsl};
-    use lib::db::{connection, pool};
-    use lib::schema::*;
-
-    let p = pool();
-    diesel::delete(events::table)
-        .execute(&*connection(&p).unwrap())
-        .unwrap();
-    diesel::delete(plants::table)
-        .execute(&*connection(&p).unwrap())
-        .unwrap();
-    diesel::delete(plant_types::table)
-        .execute(&*connection(&p).unwrap())
-        .unwrap();
-    diesel::delete(users::table)
-        .execute(&*connection(&p).unwrap())
-        .unwrap();
-}
-
-#[cfg(test)]
 mod tests {
+    use config::{IMAGE_PATH, THUMB_PATH};
+    use std::fs::remove_file;
     use std::path::Path;
 
     #[test]
     fn decode_b64_image() {
-        let image = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+        let image = ::config::TEST_IMAGE;
         assert!(super::decode_b64_image(image).is_ok());
         assert!(super::decode_b64_image("").is_err());
         assert!(super::decode_b64_image("data:image/base64").is_err());
@@ -179,220 +168,27 @@ mod tests {
         assert!(super::decode_b64_image("^").is_err());
     }
 
+    struct FileRemover<'a>(pub &'a str);
+    impl<'a> Drop for FileRemover<'a> {
+        fn drop(&mut self) {
+            let _ = remove_file(self.0);
+        }
+    }
+
     #[test]
     fn save_image() {
-        let image = super::decode_b64_image(
-            "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
-        ).unwrap();
+        let image = super::decode_b64_image(::config::TEST_IMAGE).unwrap();
 
         let filename = "__test_save_image";
+        let image_path = format!("{}/{}.jpg", IMAGE_PATH, filename);
+        let thumb_path = format!("{}/{}.jpg", THUMB_PATH, filename);
+        let (_f, _t) = (FileRemover(&image_path), FileRemover(&thumb_path));
+
         assert!(super::save_image(filename, &image).is_ok());
-        assert!(Path::new(&format!("image/{}.jpg", filename)).exists());
-        assert!(Path::new(&format!("thumb/{}.jpg", filename)).exists());
+        assert!(Path::new(&image_path).exists());
+        assert!(Path::new(&thumb_path).exists());
 
         assert!(super::save_image(filename, &[0]).is_err());
         assert!(super::save_image(filename, &[]).is_err());
-    }
-}
-
-fn extract_value_multipart<'a>(
-    mut content: &'a [u8],
-    pattern: &'a [u8],
-) -> (&'a [u8], String, bool) {
-    let mut value = String::new();
-    if content.len() > pattern.len() && &content[..pattern.len()] == pattern {
-        content = &content[pattern.len()..];
-        for c in content {
-            if c == &('"' as u8) {
-                break;
-            }
-            value.push(*c as char);
-        }
-        content = &content[value.len() + 1..];
-        (content, value, true)
-    } else {
-        (content, value, false)
-    }
-}
-
-pub fn parse_multipart_file(content: &[u8]) -> (String, RawMultipartValue) {
-    let start = "\r\nContent-Disposition: form-data; name=\"".as_bytes();
-    let filename = "; filename=\"".as_bytes();
-    let image_header = "Content-Type: image/".as_bytes();
-
-    // Content-Disposition: form-data; name="<name>"
-    let (content, key, _) = extract_value_multipart(content, start);
-
-    // Content-Disposition: form-data; name="..."; filename="<filename>"
-    let (mut content, value, is_file) = extract_value_multipart(content, filename);
-    if !is_file {
-        return (key, Invalid);
-    }
-
-    skip_newline!(content);
-    // Content-Type
-    if content.len() > image_header.len() && &content[..image_header.len()] == image_header {
-        // Content-Type: image/
-        content = &content[image_header.len()..];
-
-        // Skip the file type: png, jpeg...
-        while content.len() > 0 && content[0] > 'a' as u8 && content[0] < 'z' as u8 {
-            content = &content[1..];
-        }
-        skip_newline!(content);
-        skip_newline!(content, end);
-        return (key, File((value, content)));
-    } else {
-        return (key, Invalid);
-    }
-}
-
-pub fn parse_multipart_part(content: &[u8]) -> (String, RawMultipartValue) {
-    if content == "--\r\n".as_bytes() {
-        return ("invalid".to_owned(), Invalid);
-    }
-
-    let start = "\r\nContent-Disposition: form-data; name=\"".as_bytes();
-    let filename = "; filename=\"".as_bytes();
-    let image_header = "Content-Type: image/".as_bytes();
-
-    // Content-Disposition: form-data; name="<name>"
-    let (content, key, _) = extract_value_multipart(content, start);
-
-    // Content-Disposition: form-data; name="..."; filename="<filename>"
-    let (mut content, value, is_file) = extract_value_multipart(content, filename);
-    if is_file {
-        skip_newline!(content);
-        // Content-Type
-        if content.len() > image_header.len() && &content[..image_header.len()] == image_header {
-            // Content-Type: image/
-            content = &content[image_header.len()..];
-
-            // Skip the file type: png, jpeg...
-            while content.len() > 0 && content[0] > 'a' as u8 && content[0] < 'z' as u8 {
-                content = &content[1..];
-            }
-            skip_newline!(content);
-            skip_newline!(content, end);
-            return (key, File((value, content)));
-        } else {
-            return (key, Invalid);
-        }
-    }
-
-    skip_newline!(content);
-    skip_newline!(content, end);
-
-    if let Ok(content) = from_utf8(content) {
-        (key, Text(content.to_owned()))
-    } else {
-        (key, Text("".to_owned()))
-    }
-}
-
-pub fn parse_multipart(content: &[u8], boundary: &[u8]) -> HashMap<String, String> {
-    let mut values: HashMap<String, String> = HashMap::new();
-    let mut index = 0;
-    let mut last_item = 0;
-
-    while index < content.len() {
-        if content.len() < index + boundary.len() {
-            let (key, value) = parse_multipart_part(&content[last_item..]);
-            match value {
-                File((filename, _)) => {
-                    let _ = values.insert(key, filename);
-                }
-                Text(value) => {
-                    let _ = values.insert(key, value);
-                }
-                Invalid => {}
-            }
-            index = content.len();
-        } else if &content[index..index + boundary.len()] == boundary {
-            let content = &content[last_item..index];
-            index += boundary.len();
-            last_item = index;
-
-            if content.len() == 0 {
-                continue;
-            }
-
-            let (key, value) = parse_multipart_part(content);
-            match value {
-                File((filename, _)) => {
-                    let _ = values.insert(key, filename);
-                }
-                Text(value) => {
-                    let _ = values.insert(key, value);
-                }
-                Invalid => {}
-            }
-        } else {
-            index += 1;
-        }
-    }
-    values
-}
-
-pub fn parse_multipart_files<'a>(
-    content: &'a [u8],
-    boundary: &'a [u8],
-) -> HashMap<String, &'a [u8]> {
-    let mut values: HashMap<String, &'a [u8]> = HashMap::new();
-    let mut index = 0;
-    let mut last_item = 0;
-
-    while index < content.len() {
-        if content.len() > index + boundary.len()
-            && &content[index..index + boundary.len()] == boundary
-        {
-            let content = &content[last_item..index];
-            index += boundary.len();
-            last_item = index;
-
-            if content.len() == 0 {
-                continue;
-            }
-
-            let (key, file) = parse_multipart_file(content);
-            match file {
-                File((_, file)) => {
-                    let _ = values.insert(key, file);
-                }
-                _ => {}
-            }
-        } else {
-            index += 1;
-        }
-    }
-    values
-}
-
-pub fn from_body<'a, T: MultipartDeserialize + Deserialize<'a>>(state: &'a mut State) -> Option<T> {
-    let boundary = multipart_boundary(state);
-
-    match (BodyData::try_borrow_from(state), boundary) {
-        (Some(&BodyData(UrlEncoded(ref raw))), None) => match from_str::<T>(raw) {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        },
-        (Some(&BodyData(Multipart(ref raw))), Some(ref boundary)) => {
-            T::from_multipart(raw, boundary.as_bytes())
-        }
-        _ => None,
-    }
-}
-
-pub fn multipart_boundary(state: &State) -> Option<String> {
-    if let Some(content_type) = Headers::borrow_from(&state).get::<ContentType>() {
-        let content_type = content_type.as_ref();
-        let form_data = format!("{}; boundary=", mime::MULTIPART_FORM_DATA.as_ref());
-        if content_type.len() > form_data.len() && &content_type[..form_data.len()] == form_data {
-            Some(format!("--{}", &content_type[form_data.len()..]))
-        } else {
-            None
-        }
-    } else {
-        None
     }
 }

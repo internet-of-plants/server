@@ -20,7 +20,7 @@ pub fn event_index((path, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpR
     let _ = plants::table
         .find(plant_id)
         .select(plants::id)
-        .first::<i32>(&*req.state().connection()?)?;
+        .first::<i32>(conn!(req.state().pool))?;
 
     let events = events::table
         .inner_join(plants::table.on(events::plant_id.eq(plants::id)))
@@ -30,7 +30,7 @@ pub fn event_index((path, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpR
                 .and(plants::user_id.eq(user_id)),
         )
         .select(EventViewSql!())
-        .load::<EventView>(&*req.state().connection()?)?;
+        .load::<EventView>(conn!(req.state().pool))?;
     info!(req.state().log, "Events: {:?}", events);
     Ok(HttpResponse::Ok().json(events))
 }
@@ -52,7 +52,7 @@ pub fn event_post(
 
     let event = insert_into(events::table)
         .values(&event)
-        .get_result::<Event>(&*req.state().connection()?)?;
+        .get_result::<Event>(conn!(req.state().pool))?;
     info!(req.state().log, "Created event: {:?}", event);
     Ok(HttpResponse::Ok().finish())
 }
@@ -62,7 +62,7 @@ mod tests {
     use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
     use build_app;
     use futures::future::Future;
-    use lib::{utils::authenticate_tester, utils::clean_db, utils::create_plant};
+    use lib::{db::test_pool, utils::authenticate_tester, utils::create_plant};
     use models::{EventForm, EventView};
 
     fn index(
@@ -94,8 +94,7 @@ mod tests {
 
     #[test]
     fn event() {
-        clean_db();
-        let mut srv = TestServer::with_factory(build_app);
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
 
         let cookie = authenticate_tester(&mut srv);
         let id = create_plant(&mut srv, &cookie);

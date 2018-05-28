@@ -59,7 +59,7 @@ mod controllers;
 
 use config::HOST;
 use controllers::*;
-use lib::{db::DbConnection, db::DbPool, db::connection, db::pool, error::Error};
+use lib::db::{pool, DbPool};
 
 #[cfg(release)]
 use config::LOG_PATH;
@@ -67,29 +67,30 @@ use config::LOG_PATH;
 lazy_static! {
     /// During release uses log file, dev uses terminal, test ignore logs
     pub static ref LOG: RwLock<SlogLogger> = {
-        #[cfg(all(release, not(test)))]
-        let decorator = {
-            use slog_term::PlainDecorator;
-            use std::fs::OpenOptions;
-            let file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(false)
-                .open(LOG_PATH)
-                .unwrap();
-            PlainDecorator::new(file);
-        };
-
-        #[cfg(not(any(release, test)))]
-        let decorator = {
-            use slog_term::TermDecorator;
-            TermDecorator::new().build()
-        };
-
         #[cfg(not(test))]
-        let drain = FullFormat::new(decorator).build().fuse();
-        #[cfg(not(test))]
-        let drain = Async::new(drain).build().fuse();
+        let drain = {
+            #[cfg(release)]
+            let decorator = {
+                use slog_term::PlainDecorator;
+                use std::fs::OpenOptions;
+                let file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(false)
+                    .open(LOG_PATH)
+                    .unwrap();
+                PlainDecorator::new(file);
+            };
+
+            #[cfg(not(release))]
+            let decorator = {
+                use slog_term::TermDecorator;
+                TermDecorator::new().build()
+            };
+
+            let drain = FullFormat::new(decorator).build().fuse();
+            Async::new(drain).build().fuse()
+        };
 
         #[cfg(test)]
         let drain = slog::Discard;
@@ -103,36 +104,29 @@ pub struct State {
     pub log: SlogLogger,
 }
 
-impl State {
-    pub fn connection(&self) -> Result<DbConnection, Error> {
-        connection(&self.pool)
-    }
-}
-
 /// Generate server app instance
-fn build_app() -> App<State> {
-    // TODO: use actual key
-    let cookie_backend = CookieSessionBackend::private(&[0; 32])
-        .name("s")
-        .secure(true);
-    let session_storage = SessionStorage::new(cookie_backend);
+fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
+    move || {
+        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(true);
+        let session_storage = SessionStorage::new(cookie_backend);
 
-    App::with_state(State {
-        pool: pool(),
-        log: LOG.read().unwrap().clone(),
-    }).middleware(session_storage)
-        .middleware(ActixLogger::new("%t %a %r %s %b %D %{User-Agent}i"))
-        .resource("/", route!(Method::GET, plant_index))
-        .resource("/plant", route!(Method::POST, plant_post))
-        .resource("/plant/{id}", route!(Method::GET, plant))
-        .resource("/plant_type", route!(Method::POST, plant_type_post))
-        .resource("/plant_type/{slug}", route!(Method::GET, plant_type))
-        .resource("/user/{username}", route!(Method::GET, user))
-        .resource("/signup", route!(Method::POST, signup_post))
-        .resource("/signin", route!(Method::POST, signin_post))
-        .resource("/logout", route!(Method::POST, logout))
-        .resource("/plant/{id}/events", route!(Method::GET, event_index))
-        .resource("/event", route!(Method::POST, event_post))
+        App::with_state(State {
+            pool: pool.clone(),
+            log: LOG.read().unwrap().clone(),
+        }).middleware(session_storage)
+            .middleware(ActixLogger::new("%t %a %r %s %b %D %{User-Agent}i"))
+            .resource("/", route!(Method::GET, plant_index))
+            .resource("/plant", route!(Method::POST, plant_post))
+            .resource("/plant/{id}", route!(Method::GET, plant))
+            .resource("/plant_type", route!(Method::POST, plant_type_post))
+            .resource("/plant_type/{slug}", route!(Method::GET, plant_type))
+            .resource("/user/{username}", route!(Method::GET, user))
+            .resource("/signup", route!(Method::POST, signup))
+            .resource("/signin", route!(Method::POST, signin))
+            .resource("/logout", route!(Method::POST, logout))
+            .resource("/plant/{id}/events", route!(Method::GET, event_index))
+            .resource("/event", route!(Method::POST, event_post))
+    }
 }
 
 fn main() {
@@ -152,7 +146,8 @@ fn main() {
         .set_certificate_chain_file("dependencies/ssl.crt")
         .unwrap();
 
-    server::new(build_app)
+    // TODO: use actual key
+    server::new(build_app(&[0; 32], pool()))
         .bind_ssl(HOST, builder)
         .unwrap()
         .start();

@@ -1,4 +1,4 @@
-use diesel::pg::*;
+use diesel::PgConnection;
 use dotenv::dotenv;
 use r2d2::{Pool, PooledConnection};
 use r2d2_diesel::ConnectionManager;
@@ -20,18 +20,31 @@ pub fn connection(pool: &DbPool) -> Result<DbConnection, Error> {
 pub fn pool() -> DbPool {
     dotenv().ok();
 
-    #[cfg(not(test))]
     let url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in environment (or in .env file)");
-
-    #[cfg(test)]
-    let url = env::var("DATABASE_TEST_URL")
-        .expect("DATABASE_TEST_URL must be set in environment (or in .env file)");
-
     let manager = ConnectionManager::<ConnectionType>::new(url);
     Pool::builder()
         .build(manager)
         .expect("Failed to create pool.")
+}
+
+/// Create new connection pool to test db
+#[cfg(test)]
+pub fn test_pool() -> DbPool {
+    use diesel::Connection;
+    dotenv().ok();
+
+    let url = env::var("DATABASE_TEST_URL")
+        .expect("DATABASE_TEST_URL must be set in environment (or in .env file)");
+    let manager = ConnectionManager::<ConnectionType>::new(url);
+    let pool = Pool::builder()
+        .max_size(1)
+        .build(manager)
+        .expect("Failed to create pool.");
+    (&*connection(&pool).unwrap())
+        .begin_test_transaction()
+        .unwrap();
+    pool
 }
 
 #[cfg(test)]
@@ -42,5 +55,6 @@ mod tests {
     /// Assure pool creation and connection retrieval is correct
     fn db() {
         &*connection(&pool()).unwrap();
+        &*connection(&test_pool()).unwrap();
     }
 }

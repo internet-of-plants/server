@@ -23,7 +23,7 @@ pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse,
         .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
         .filter(plants::id.eq(plant_id).and(plants::user_id.eq(user_id)))
         .select(PlantViewSql!())
-        .first::<PlantView>(&*req.state().connection()?)?;
+        .first::<PlantView>(conn!(req.state().pool))?;
     info!(req.state().log, "Plant: {:?}", plant);
     Ok(HttpResponse::Ok().json(plant))
 }
@@ -38,7 +38,7 @@ pub fn plant_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
         .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
         .filter(plants::user_id.eq(user_id))
         .select(PlantViewSql!())
-        .load::<PlantView>(&*req.state().connection()?)?;
+        .load::<PlantView>(conn!(req.state().pool))?;
     info!(req.state().log, "Plants: {:?}", plants);
     Ok(HttpResponse::Ok().json(plants))
 }
@@ -63,7 +63,7 @@ pub fn plant_post(
 
     let plant = insert_into(plants::table)
         .values(&plant)
-        .get_result::<Plant>(&*req.state().connection()?)?;
+        .get_result::<Plant>(conn!(req.state().pool))?;
     info!(req.state().log, "Plants: {:?}", plant);
     Ok(HttpResponse::Ok().json(plant))
 }
@@ -73,7 +73,7 @@ mod tests {
     use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
     use build_app;
     use futures::future::Future;
-    use lib::{utils::authenticate_tester, utils::clean_db, utils::create_plant_type};
+    use lib::{db::test_pool, utils::authenticate_tester, utils::create_plant_type};
     use models::{PlantForm, PlantView};
 
     fn show(srv: &mut TestServer, cookie: &str, id: i32, expected: StatusCode) {
@@ -127,17 +127,20 @@ mod tests {
 
     #[test]
     fn plant() {
-        clean_db();
-        let mut srv = TestServer::with_factory(build_app);
-
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
         let cookie = authenticate_tester(&mut srv);
-        let id = create_plant_type(&mut srv, &cookie);
 
         index(&mut srv, "", 0, StatusCode::UNAUTHORIZED);
         index(&mut srv, &cookie, 0, StatusCode::OK);
 
         create(&mut srv, "", "plant", 0, StatusCode::UNAUTHORIZED);
         create(&mut srv, &cookie, "plant", 0, StatusCode::BAD_REQUEST);
+
+        // Conflict rolls-back test transaction, so we have to start pool again (and authenticate)
+        // TODO: this should be fixed
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
+        let cookie = authenticate_tester(&mut srv);
+        let id = create_plant_type(&mut srv, &cookie);
 
         show(&mut srv, "", 1, StatusCode::UNAUTHORIZED);
         show(&mut srv, &cookie, 1, StatusCode::NOT_FOUND);
@@ -150,5 +153,6 @@ mod tests {
         create(&mut srv, &cookie, "", id, StatusCode::BAD_REQUEST);
         create(&mut srv, &cookie, "", 0, StatusCode::BAD_REQUEST);
         index(&mut srv, &cookie, 2, StatusCode::OK);
+        create(&mut srv, &cookie, "plant", 0, StatusCode::BAD_REQUEST);
     }
 }

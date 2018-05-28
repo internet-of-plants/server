@@ -41,16 +41,24 @@ macro_rules! filled {
     }};
 }
 
+#[macro_export]
+/// Extract DB connection from pool
+macro_rules! conn {
+    ($pool:expr) => {
+        &*(::lib::db::connection(&$pool)?)
+    };
+}
+
 #[cfg(test)]
 #[macro_export]
 /// Set cookie optionally
 macro_rules! opt_cookie {
-    ($req:expr, $cookie:expr) => ({
+    ($req:expr, $cookie:expr) => {{
         use actix_web::http::Cookie;
         if let Ok(cookie) = Cookie::parse($cookie) {
             $req.cookie(cookie);
         }
-    }_;
+    }};
 }
 
 #[cfg(test)]

@@ -26,7 +26,7 @@ pub fn plant_type((path, req): (Path<String>, HttpRequest<State>)) -> Result<Htt
         .inner_join(users::table.on(plant_types::user_id.eq(users::id)))
         .filter(plant_types::slug.eq(slug))
         .select(PlantTypeViewSql!())
-        .first::<PlantTypeView>(&*req.state().connection()?)?;
+        .first::<PlantTypeView>(conn!(req.state().pool))?;
     info!(req.state().log, "Plant Type: {:?}", plant_type);
 
     Ok(HttpResponse::Ok().json(plant_type))
@@ -56,15 +56,15 @@ pub fn plant_type_post(
 
     let plant_type = insert_into(plant_types::table)
         .values(&plant_type)
-        .get_result::<PlantType>(&*req.state().connection()?)?;
+        .get_result::<PlantType>(conn!(req.state().pool))?;
     info!(req.state().log, "Plant Type: {:?}", plant_type);
 
     #[cfg(not(test))]
     {
         if let Err(err) = save_image(&plant_type.filename, &_image) {
             // Image-less plant_type will exist if ? returns some error
-            delete(plant_types::table.find(plant_type.id)).execute(&*req.state().connection()?)?;
-            return Err(err);
+            delete(plant_types::table.find(plant_type.id)).execute(conn!(req.state().pool))?;
+            return Err(Error::Image(err));
         }
         info!(
             req.state().log,
@@ -80,7 +80,7 @@ pub fn plant_type_post(
 mod tests {
     use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
     use build_app;
-    use lib::{utils::authenticate_tester, utils::clean_db};
+    use lib::{db::test_pool, utils::authenticate_tester};
     use models::PlantTypeForm;
 
     fn create(srv: &mut TestServer, cookie: &str, name: &str, image: &str, expected: StatusCode) {
@@ -120,29 +120,32 @@ mod tests {
 
     #[test]
     fn plant_type() {
-        clean_db();
-        let mut srv = TestServer::with_factory(build_app);
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
 
         let cookie = authenticate_tester(&mut srv);
-        let image = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+        let image = ::config::TEST_IMAGE;
 
-        create(&mut srv, "", "plant-type", image, StatusCode::UNAUTHORIZED);
+        create(&mut srv, "", "planttype", image, StatusCode::UNAUTHORIZED);
 
-        show(&mut srv, &cookie, "plant-type", StatusCode::NOT_FOUND);
-        show(&mut srv, "", "plant-type", StatusCode::NOT_FOUND);
+        show(&mut srv, &cookie, "planttype", StatusCode::NOT_FOUND);
+        show(&mut srv, "", "planttype", StatusCode::NOT_FOUND);
 
-        create(&mut srv, &cookie, "plant-type", image, StatusCode::OK);
+        create(&mut srv, &cookie, "planttype", "", StatusCode::BAD_REQUEST);
+        create(&mut srv, &cookie, "planttype", "a", StatusCode::BAD_REQUEST);
+        create(&mut srv, &cookie, "planttype", "^", StatusCode::BAD_REQUEST);
+        create(&mut srv, &cookie, "planttype", image, StatusCode::OK);
 
-        show(&mut srv, &cookie, "plant-type", StatusCode::OK);
-        show(&mut srv, "", "plant-type", StatusCode::OK);
+        show(&mut srv, &cookie, "planttype", StatusCode::OK);
+        show(&mut srv, "", "planttype", StatusCode::OK);
 
-        create(&mut srv, &cookie, "plant-type", image, StatusCode::CONFLICT);
-        create(&mut srv, &cookie, "plant-type2", image, StatusCode::OK);
+        create(&mut srv, &cookie, "planttype", image, StatusCode::CONFLICT);
+
+        // Conflict rolls-back test transaction, so we have to start pool again (and authenticate)
+        // TODO: this should be fixed
+        let mut srv = TestServer::with_factory(build_app(&[0; 32], test_pool()));
+        let cookie = authenticate_tester(&mut srv);
+        create(&mut srv, &cookie, "planttype2", image, StatusCode::OK);
+        show(&mut srv, &cookie, "planttype2", StatusCode::OK);
         create(&mut srv, &cookie, "", image, StatusCode::BAD_REQUEST);
-        create(&mut srv, &cookie, "plant-typ", "", StatusCode::BAD_REQUEST);
-        create(&mut srv, &cookie, "plant-typ", "a", StatusCode::BAD_REQUEST);
-        create(&mut srv, &cookie, "plant-typ", "^", StatusCode::BAD_REQUEST);
-
-        show(&mut srv, &cookie, "plant-type2", StatusCode::OK);
     }
 }
