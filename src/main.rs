@@ -57,7 +57,7 @@ mod models;
 mod config;
 mod controllers;
 
-use config::{HOST, REQUEST_SIZE_LIMIT, STATIC_PATH};
+use config::{HOST, REQUEST_SIZE_LIMIT, SECRET_KEY, STATIC_PATH};
 use controllers::*;
 use lib::db::{pool, DbPool};
 
@@ -107,7 +107,7 @@ pub struct State {
 /// Generate server app instance
 fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
     move || {
-        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(false); // TODO: TLS .secure(true);
+        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(true);
         let session_storage = SessionStorage::new(cookie_backend);
 
         App::with_state(State {
@@ -162,12 +162,12 @@ fn main() {
     */
 
     // TODO: use actual key
-    server::new(build_app(&[0; 32], pool()))
+    server::new(build_app(&SECRET_KEY, pool()))
         //.bind_ssl(HOST, builder)
-        .bind(HOST)
+        .bind(HOST.as_str())
         .unwrap()
         .start();
-    println!("Listening to {}", HOST);
+    println!("Listening to {}", HOST.as_str());
 
     exit(sys.run());
 }

@@ -1,16 +1,24 @@
+use lib::utils::random_string;
 use std::env::var;
+
+lazy_static! {
+    pub static ref SECRET_KEY: [u8; 32] = {
+        let mut key: [u8; 32] = Default::default();
+        key.copy_from_slice(&random_string(32).unwrap().as_bytes()[..32]);
+        key
+    };
+    pub static ref HOST: String = match (var("HOST"), var("PORT")) {
+        (Ok(ref host), Ok(ref port)) if port == "80" => host.to_owned(),
+        (Ok(ref host), Ok(ref port)) => format!("{}:{}", host, port),
+        _ => "127.0.0.1:3000".to_owned(),
+    };
+}
 
 #[cfg(release)]
 pub const LOG_PATH: &'static str = "target/log";
 
 // Bytes
 pub const REQUEST_SIZE_LIMIT: usize = 5_000_000;
-
-pub const HOST: &'static str = match (var("HOST"), var("PORT")) {
-    (Some(host), Some(port)) if port == 80 => host,
-    (Some(host), Some(port)) => format!("{}:{}", host, port),
-    _ => "127.0.0.1:3000";
-}
 
 pub const FILENAME_SIZE: usize = 20;
 
