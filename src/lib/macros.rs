@@ -25,7 +25,7 @@ macro_rules! route {
     ($method:expr, $func:expr) => {
         |r| {
             r.name(stringify!($func));
-            r.method($method).with($func);
+            r.method($method).with($func)
         }
     };
 }

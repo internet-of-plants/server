@@ -21,7 +21,7 @@ pub fn user((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpRespo
         .filter(users::username.eq(username))
         .select(UserViewSql!())
         .first::<UserView>(conn!(req.state().pool))?;
-    info!(req.state().log, "User: {:?}", user);
+    debug!(req.state().log, "User: {:?}", user);
 
     Ok(HttpResponse::Ok().json(user))
 }
@@ -31,7 +31,7 @@ pub fn signup((form, req): (Json<SignupForm>, HttpRequest<State>)) -> Result<Htt
     trace!(req.state().log, "Signup: {}", form.username);
 
     if is_auth(&req).is_ok() {
-        debug!(req.state().log, "Already authenticated");
+        warn!(req.state().log, "Already authenticated");
         return Ok(HttpResponse::Ok().finish());
     }
 
@@ -44,12 +44,12 @@ pub fn signup((form, req): (Json<SignupForm>, HttpRequest<State>)) -> Result<Htt
     let user = insert_into(users::table)
         .values(&user)
         .get_result::<User>(conn!(req.state().pool))?;
-    info!(req.state().log, "Created User: {:?}", user);
+    debug!(req.state().log, "Created User: {:?}", user);
 
     authenticate(&req, user.id)?;
-    info!(req.state().log, "Authenticated: {}", user.id);
+    debug!(req.state().log, "Authenticated: {}", user.id);
 
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().json(user))
 }
 
 pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
@@ -57,7 +57,7 @@ pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<Htt
     trace!(req.state().log, "Signin: {}", form.login);
 
     if is_auth(&req).is_ok() {
-        debug!(req.state().log, "Already authenticated");
+        warn!(req.state().log, "Already authenticated");
         return Ok(HttpResponse::Ok().finish());
     }
 
@@ -77,13 +77,13 @@ pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<Htt
         }
         Err(err) => Err(Error::Diesel(err))?,
     };
-    info!(req.state().log, "Signin User: {:?}", user);
+    debug!(req.state().log, "Signin User: {:?}", user);
 
     if check_password(&form.password, &user.password_hash)? {
         authenticate(&req, user.id)?;
-        info!(req.state().log, "Authenticated: {}", user.id);
+        debug!(req.state().log, "Authenticated: {}", user.id);
 
-        Ok(HttpResponse::Ok().finish())
+        Ok(HttpResponse::Ok().json(user))
     } else {
         Err(Error::InvalidCredentials)
     }

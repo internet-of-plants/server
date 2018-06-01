@@ -1,9 +1,18 @@
-pub const HOST: &'static str = "127.0.0.1:3000";
-
-pub const FILENAME_SIZE: usize = 20;
+use std::env::var;
 
 #[cfg(release)]
 pub const LOG_PATH: &'static str = "target/log";
+
+// Bytes
+pub const REQUEST_SIZE_LIMIT: usize = 5_000_000;
+
+pub const HOST: &'static str = match (var("HOST"), var("PORT")) {
+    (Some(host), Some(port)) if port == 80 => host,
+    (Some(host), Some(port)) => format!("{}:{}", host, port),
+    _ => "127.0.0.1:3000";
+}
+
+pub const FILENAME_SIZE: usize = 20;
 
 pub const IMAGE_WIDTH: u32 = 350;
 pub const IMAGE_HEIGHT: u32 = 450;
@@ -11,6 +20,7 @@ pub const IMAGE_HEIGHT: u32 = 450;
 pub const THUMB_WIDTH: u32 = 200;
 pub const THUMB_HEIGHT: u32 = 200;
 
+pub const STATIC_PATH: &'static str = "src/static/";
 pub const IMAGE_PATH: &'static str = "src/static/images";
 pub const THUMB_PATH: &'static str = "src/static/thumbs";
 

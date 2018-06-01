@@ -26,7 +26,7 @@ pub struct PlantType {
     pub timestamp: Timestamp,
 }
 
-#[derive(Queryable, Serialize, Debug)]
+#[derive(Queryable, Serialize, Deserialize, Debug)]
 pub struct PlantTypeView {
     pub id: UID,
     pub name: String,

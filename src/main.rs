@@ -14,7 +14,7 @@ extern crate slog_term;
 
 extern crate actix;
 extern crate actix_web;
-extern crate openssl;
+//extern crate openssl;
 
 #[macro_use]
 extern crate diesel;
@@ -36,10 +36,10 @@ extern crate slugify;
 extern crate image;
 
 use actix::System;
-use actix_web::middleware::Logger as ActixLogger;
 use actix_web::middleware::session::{CookieSessionBackend, SessionStorage};
-use actix_web::{server, App, http::Method};
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use actix_web::middleware::{Logger as ActixLogger, cors::Cors};
+use actix_web::{server, App, fs::StaticFiles, http::Method};
+//use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use slog::Logger as SlogLogger;
 use std::{env, process::exit, sync::RwLock};
 
@@ -57,7 +57,7 @@ mod models;
 mod config;
 mod controllers;
 
-use config::HOST;
+use config::{HOST, REQUEST_SIZE_LIMIT, STATIC_PATH};
 use controllers::*;
 use lib::db::{pool, DbPool};
 
@@ -107,7 +107,7 @@ pub struct State {
 /// Generate server app instance
 fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
     move || {
-        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(true);
+        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(false); // TODO: TLS .secure(true);
         let session_storage = SessionStorage::new(cookie_backend);
 
         App::with_state(State {
@@ -115,17 +115,30 @@ fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
             log: LOG.read().unwrap().clone(),
         }).middleware(session_storage)
             .middleware(ActixLogger::new("%t %a %r %s %b %D %{User-Agent}i"))
-            .resource("/", route!(Method::GET, plant_index))
-            .resource("/plant", route!(Method::POST, plant_post))
-            .resource("/plant/{id}", route!(Method::GET, plant))
-            .resource("/plant_type", route!(Method::POST, plant_type_post))
-            .resource("/plant_type/{slug}", route!(Method::GET, plant_type))
-            .resource("/user/{username}", route!(Method::GET, user))
-            .resource("/signup", route!(Method::POST, signup))
-            .resource("/signin", route!(Method::POST, signin))
-            .resource("/logout", route!(Method::POST, logout))
-            .resource("/plant/{id}/events", route!(Method::GET, event_index))
-            .resource("/event", route!(Method::POST, event_post))
+            .handler("/static", StaticFiles::new(STATIC_PATH))
+            .configure(|app| {
+                Cors::for_app(app)
+                    .supports_credentials()
+                    .resource("/plant", route!(Method::POST, plant_post))
+                    .resource("/plant/{id}", route!(Method::GET, plant))
+                    .resource("/plants", route!(Method::GET, plant_index))
+                    .resource("/plant_type", |r| {
+                        r.name("plant_type_post");
+                        r.method(Method::POST)
+                            .with(plant_type_post)
+                            .0
+                            .limit(REQUEST_SIZE_LIMIT);
+                    })
+                    .resource("/plant_type/{slug}", route!(Method::GET, plant_type))
+                    .resource("/plant_types", route!(Method::GET, plant_type_index))
+                    .resource("/user/{username}", route!(Method::GET, user))
+                    .resource("/signup", route!(Method::POST, signup))
+                    .resource("/signin", route!(Method::POST, signin))
+                    .resource("/logout", route!(Method::POST, logout))
+                    .resource("/plant/{id}/events", route!(Method::GET, event_index))
+                    .resource("/event", route!(Method::POST, event_post))
+                    .register()
+            })
     }
 }
 
@@ -138,6 +151,7 @@ fn main() {
 
     let sys = System::new("iop");
 
+    /*
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
     builder
         .set_private_key_file("dependencies/ssl.key", SslFiletype::PEM)
@@ -145,10 +159,12 @@ fn main() {
     builder
         .set_certificate_chain_file("dependencies/ssl.crt")
         .unwrap();
+    */
 
     // TODO: use actual key
     server::new(build_app(&[0; 32], pool()))
-        .bind_ssl(HOST, builder)
+        //.bind_ssl(HOST, builder)
+        .bind(HOST)
         .unwrap()
         .start();
     println!("Listening to {}", HOST);

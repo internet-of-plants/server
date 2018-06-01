@@ -1,6 +1,6 @@
 use base64::{decode, DecodeError};
 use hex::ToHex;
-use image::{load_from_memory, GenericImage, ImageError, ImageOutputFormat, Nearest};
+use image::{load_from_memory, GenericImage, ImageError, ImageOutputFormat, Triangle};
 use rand::{RngCore, os::OsRng};
 use sodiumoxide::crypto::hash;
 use std::fs::File;
@@ -22,17 +22,9 @@ pub fn save_image(filename: &str, bytes: &[u8]) -> Result<(), ImageError> {
     let mut image = load_from_memory(bytes)?;
 
     if image.width() > IMAGE_WIDTH || image.height() > IMAGE_HEIGHT {
-        image = image.resize(IMAGE_WIDTH, IMAGE_HEIGHT, Nearest);
+        image = image.resize_to_fill(IMAGE_WIDTH, IMAGE_HEIGHT, Triangle);
     }
-    let thumb = if image.width() < THUMB_WIDTH && image.height() < THUMB_HEIGHT {
-        image.thumbnail(image.width(), image.height())
-    } else if image.width() < THUMB_WIDTH {
-        image.thumbnail(image.width(), THUMB_HEIGHT)
-    } else if image.height() < THUMB_HEIGHT {
-        image.thumbnail(THUMB_WIDTH, image.height())
-    } else {
-        image.thumbnail(THUMB_WIDTH, THUMB_HEIGHT)
-    };
+    let thumb = image.resize_to_fill(THUMB_WIDTH, THUMB_HEIGHT, Triangle);
 
     let thumb_filename = format!("{}/{}.jpg", THUMB_PATH, filename);
     let filename = format!("{}/{}.jpg", IMAGE_PATH, filename);

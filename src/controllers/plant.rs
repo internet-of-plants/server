@@ -24,13 +24,13 @@ pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse,
         .filter(plants::id.eq(plant_id).and(plants::user_id.eq(user_id)))
         .select(PlantViewSql!())
         .first::<PlantView>(conn!(req.state().pool))?;
-    info!(req.state().log, "Plant: {:?}", plant);
+    debug!(req.state().log, "Plant: {:?}", plant);
     Ok(HttpResponse::Ok().json(plant))
 }
 
 pub fn plant_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
     let user_id = user_id(&req)?;
-    trace!(req.state().log, "Plant (user_id: {})", user_id);
+    trace!(req.state().log, "Plants (user_id: {})", user_id);
 
     let plants = plants::table
         .inner_join(users::table)
@@ -39,7 +39,7 @@ pub fn plant_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
         .filter(plants::user_id.eq(user_id))
         .select(PlantViewSql!())
         .load::<PlantView>(conn!(req.state().pool))?;
-    info!(req.state().log, "Plants: {:?}", plants);
+    debug!(req.state().log, "Plants: {:?}", plants);
     Ok(HttpResponse::Ok().json(plants))
 }
 
@@ -64,7 +64,7 @@ pub fn plant_post(
     let plant = insert_into(plants::table)
         .values(&plant)
         .get_result::<Plant>(conn!(req.state().pool))?;
-    info!(req.state().log, "Plants: {:?}", plant);
+    debug!(req.state().log, "Plants: {:?}", plant);
     Ok(HttpResponse::Ok().json(plant))
 }
 
@@ -92,7 +92,7 @@ mod tests {
     }
 
     fn index(srv: &mut TestServer, cookie: &str, count: usize, expected: StatusCode) {
-        let mut req = srv.client(Method::GET, "/");
+        let mut req = srv.client(Method::GET, "/plants");
         opt_cookie!(req, cookie);
 
         let r = srv.execute(req.finish().unwrap().send()).unwrap();

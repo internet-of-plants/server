@@ -31,7 +31,7 @@ pub fn event_index((path, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpR
         )
         .select(EventViewSql!())
         .load::<EventView>(conn!(req.state().pool))?;
-    info!(req.state().log, "Events: {:?}", events);
+    debug!(req.state().log, "Events: {:?}", events);
     Ok(HttpResponse::Ok().json(events))
 }
 
@@ -53,7 +53,7 @@ pub fn event_post(
     let event = insert_into(events::table)
         .values(&event)
         .get_result::<Event>(conn!(req.state().pool))?;
-    info!(req.state().log, "Created event: {:?}", event);
+    debug!(req.state().log, "Created event: {:?}", event);
     Ok(HttpResponse::Ok().finish())
 }
 
