@@ -2,6 +2,8 @@ language: rust
 rust:
     - stable
 before_script:
+    - sudo add-apt-repository ppa:chris-lea/libsodium
+    - sudo apt-get update
     - sudo apt-get install -y libsodium-dev
     - cargo install diesel_cli
     - source .env
