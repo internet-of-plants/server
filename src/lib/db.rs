@@ -18,6 +18,7 @@ pub fn connection(pool: &DbPool) -> Result<DbConnection, Error> {
 
 /// Create new connection pool
 pub fn pool() -> DbPool {
+    #[cfg(not(release))]
     dotenv().ok();
 
     let url = env::var("DATABASE_URL")
@@ -32,6 +33,7 @@ pub fn pool() -> DbPool {
 #[cfg(test)]
 pub fn test_pool() -> DbPool {
     use diesel::Connection;
+
     dotenv().ok();
 
     let url = env::var("DATABASE_TEST_URL")
