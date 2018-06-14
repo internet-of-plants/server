@@ -11,8 +11,6 @@ CREATE TABLE users (
 CREATE INDEX users_username_index on users using hash(username);
 INSERT INTO users (username, email, password_hash) VALUES ('Deleted', 'deleted@example.com', '');
 
-INSERT INTO users (username, email, password_hash) VALUES ('Deleted', 'deleted@example.com', '');
-
 CREATE TABLE plant_types (
     id        SERIAL PRIMARY KEY,
     name      VARCHAR(255) NOT NULL,
@@ -48,7 +46,7 @@ CREATE TABLE events (
     light                    SMALLINT NOT NULL,
     device_timestamp         INTEGER  NOT NULL,
     timestamp                BIGINT   NOT NULL DEFAULT extract(epoch from now()),
-    FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE,
+    FOREIGN KEY (plant_id) REFERENCES plants (id) ON DELETE CASCADE
 );
 
 ALTER TABLE plants ADD FOREIGN KEY (last_event_id) REFERENCES events (id) ON DELETE SET NULL;

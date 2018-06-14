@@ -48,4 +48,9 @@ joinable!(plant_types -> users (user_id));
 joinable!(plants -> plant_types (type_id));
 joinable!(plants -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(events, plants, plant_types, users,);
+allow_tables_to_appear_in_same_query!(
+    events,
+    plants,
+    plant_types,
+    users,
+);
