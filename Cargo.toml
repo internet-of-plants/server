@@ -8,8 +8,7 @@ dotenv = "0.11"
 
 [dependencies]
 actix = "0.5"
-actix-web = { version = "0.6", features = ["alpn"] }
-openssl = { version = "0.10", features = ["v110", "v102"] }
+actix-web = { version = "0.6" }
 
 diesel = { version = "1.0", features = ["postgres"] }
 r2d2 = "0.8"
