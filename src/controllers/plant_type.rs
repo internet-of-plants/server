@@ -3,7 +3,6 @@ use diesel::insert_into;
 use diesel::prelude::*;
 use slugify::slugify;
 
-use State;
 use config::FILENAME_SIZE;
 #[cfg(not(test))]
 use diesel::delete;
@@ -12,6 +11,7 @@ use lib::utils::save_image;
 use lib::{auth::user_id, error::Error, schema::plant_types, schema::users,
           utils::decode_b64_image, utils::random_string};
 use models::{NewPlantType, PlantType, PlantTypeForm, PlantTypeView};
+use State;
 
 pub fn plant_type((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let slug = path.into_inner();
@@ -89,7 +89,7 @@ pub fn plant_type_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> 
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
+    use actix_web::{http::Method, http::StatusCode, test::TestServer, HttpMessage};
     use base64::encode;
     use build_app;
     use futures::future::Future;

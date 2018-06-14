@@ -1,11 +1,11 @@
-use actix_web::{HttpRequest, HttpResponse, Json, Path, middleware::session::RequestSession};
-use diesel::{insert_into, NotFound, prelude::*};
+use actix_web::{middleware::session::RequestSession, HttpRequest, HttpResponse, Json, Path};
+use diesel::{insert_into, prelude::*, NotFound};
 use slugify::slugify;
 
-use State;
 use lib::auth::{authenticate, check_password, hash_password, is_auth, user_id};
 use lib::{error::Error, schema::users};
 use models::{NewUser, SigninForm, SignupForm, User, UserView};
+use State;
 
 pub fn user((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     is_auth(&req)?;

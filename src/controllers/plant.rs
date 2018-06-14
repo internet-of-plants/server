@@ -2,10 +2,10 @@ use actix_web::{HttpRequest, HttpResponse, Json, Path};
 use diesel::insert_into;
 use diesel::prelude::*;
 
-use State;
 use lib::{auth::user_id, error::Error, schema::events, schema::plant_types, schema::plants,
           schema::users};
 use models::{NewPlant, Plant, PlantForm, PlantView};
+use State;
 
 pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let user_id = user_id(&req)?;
@@ -70,7 +70,7 @@ pub fn plant_post(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{HttpMessage, http::Method, http::StatusCode, test::TestServer};
+    use actix_web::{http::Method, http::StatusCode, test::TestServer, HttpMessage};
     use build_app;
     use futures::future::Future;
     use lib::{db::test_pool, utils::authenticate_tester, utils::create_plant_type};

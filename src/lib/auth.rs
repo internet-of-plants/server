@@ -1,8 +1,8 @@
-use State;
-use actix_web::{HttpRequest, middleware::session::RequestSession};
+use actix_web::{middleware::session::RequestSession, HttpRequest};
 use hex::{FromHex, ToHex};
 use lib::{error::Error, utils::basic_hash};
 use sodiumoxide::crypto::pwhash;
+use State;
 
 /// Return user_id stored in session cookie
 pub fn user_id(req: &HttpRequest<State>) -> Result<i32, Error> {

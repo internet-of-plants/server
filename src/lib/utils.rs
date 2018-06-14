@@ -1,7 +1,7 @@
 use base64::{decode, DecodeError};
 use hex::ToHex;
 use image::{load_from_memory, GenericImage, ImageError, ImageOutputFormat, Triangle};
-use rand::{RngCore, os::OsRng};
+use rand::{os::OsRng, RngCore};
 use sodiumoxide::crypto::hash;
 use std::fs::File;
 
@@ -69,7 +69,7 @@ pub fn decode_b64_image(image: &str) -> Result<Vec<u8>, Error> {
 #[cfg(test)]
 /// Get cookie String from TestRequest
 pub fn extract_cookie(r: &::actix_web::client::ClientResponse) -> String {
-    use actix_web::{HttpMessage, http::header::HeaderValue};
+    use actix_web::{http::header::HeaderValue, HttpMessage};
     r.headers()
         .get("set-cookie")
         .unwrap_or(&HeaderValue::from_str("s=").unwrap())
@@ -106,8 +106,8 @@ pub fn authenticate_tester(srv: &mut ::actix_web::test::TestServer) -> String {
 #[cfg(test)]
 /// Create plant type and return its id
 pub fn create_plant_type(srv: &mut ::actix_web::test::TestServer, cookie: &str) -> i32 {
-    use actix_web::HttpMessage;
     use actix_web::http::{Cookie, Method};
+    use actix_web::HttpMessage;
     use futures::future::Future;
     use models::{PlantType, PlantTypeForm};
     let body = PlantTypeForm {
@@ -125,8 +125,8 @@ pub fn create_plant_type(srv: &mut ::actix_web::test::TestServer, cookie: &str) 
 #[cfg(test)]
 /// Create plant and return its id
 pub fn create_plant(srv: &mut ::actix_web::test::TestServer, cookie: &str) -> i32 {
-    use actix_web::HttpMessage;
     use actix_web::http::{Cookie, Method};
+    use actix_web::HttpMessage;
     use futures::future::Future;
     use models::{Plant, PlantForm};
     let plant_type_id = create_plant_type(srv, &cookie);

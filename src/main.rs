@@ -18,6 +18,7 @@ extern crate actix_web;
 
 #[macro_use]
 extern crate diesel;
+#[cfg(not(release))]
 extern crate dotenv;
 extern crate r2d2;
 extern crate r2d2_diesel;
@@ -37,8 +38,8 @@ extern crate image;
 
 use actix::System;
 use actix_web::middleware::session::{CookieSessionBackend, SessionStorage};
-use actix_web::middleware::{Logger as ActixLogger, cors::Cors};
-use actix_web::{server, App, fs::StaticFiles, http::Method};
+use actix_web::middleware::{cors::Cors, Logger as ActixLogger};
+use actix_web::{fs::StaticFiles, http::Method, server, App};
 //use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use slog::Logger as SlogLogger;
 use std::{env, process::exit, sync::RwLock};
