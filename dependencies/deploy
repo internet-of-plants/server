@@ -1,0 +1,41 @@
+#!/bin/bash
+
+export DATABASE_URL=postgres://iop:iop@localhost/iop
+source .config
+
+if [[ -z "$AUTH_TOKEN" ]]; then
+	echo "Please set the authentication token used by the CI"
+	exit
+fi
+
+if [[ -z "$SECRET_KEY" ]]; then
+	sh env
+elif [[ -z "$HOST" ]]; then
+	sh env
+elif [[ -z "$PORT" ]]; then
+	sh env
+elif [[ -z "$WATCHER_PORT" ]]; then
+	sh env
+fi
+
+source .config
+
+while true; do
+	git checkout deploy
+	cp ./ ../last_state -r
+
+	git fetch origin deploy
+	git reset --hard origin/deploy
+
+	diesel migration run
+	if [[ $? -ne 0 ]]; then
+		rm -rf ./* ./.*
+		mv ../last_state ./ -rf
+	else
+		rm ../last_state -rf
+	fi
+
+	cargo build --bin deploy-watcher --release &
+	cargo run --bin iop --release &
+	cargo run --bin deploy-watcher --release
+done

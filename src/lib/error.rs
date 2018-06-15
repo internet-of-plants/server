@@ -8,7 +8,7 @@ use r2d2::Error as R2d2Error;
 use rand::Error as RandError;
 use std::{error::Error as StdError, fmt::Display, fmt::Formatter, fmt::Result as FmtResult};
 
-use LOG;
+use lib::utils::LOG;
 
 #[derive(Debug)]
 pub enum Error {

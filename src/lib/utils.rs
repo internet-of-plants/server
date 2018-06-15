@@ -1,12 +1,19 @@
+use actix::System;
+use actix_web::middleware::session::{CookieSessionBackend, SessionStorage};
+use actix_web::middleware::{cors::Cors, Logger as ActixLogger};
+use actix_web::{fs::StaticFiles, http::Method, server, App};
 use base64::{decode, DecodeError};
 use hex::ToHex;
 use image::{load_from_memory, GenericImage, ImageError, ImageOutputFormat, Triangle};
 use rand::{os::OsRng, RngCore};
+use slog::Logger as SlogLogger;
 use sodiumoxide::crypto::hash;
-use std::fs::File;
+use std::{fs::File, sync::RwLock};
 
-use config::{IMAGE_HEIGHT, IMAGE_PATH, IMAGE_WIDTH, THUMB_HEIGHT, THUMB_PATH, THUMB_WIDTH};
-use lib::error::Error;
+use config::{HOST, IMAGE_HEIGHT, IMAGE_PATH, IMAGE_WIDTH, REQUEST_SIZE_LIMIT, SECRET_KEY,
+             STATIC_PATH, THUMB_HEIGHT, THUMB_PATH, THUMB_WIDTH};
+use controllers::*;
+use lib::{db::pool, db::DbPool, error::Error};
 
 pub type UID = i32;
 pub type BigUID = i64;
@@ -16,6 +23,101 @@ pub type AnalogRead = i16;
 
 pub type DeviceTimestamp = i32;
 pub type Timestamp = i64;
+
+lazy_static! {
+    /// During release uses log file, dev uses terminal, test ignore logs
+    pub static ref LOG: RwLock<SlogLogger> = {
+        #[cfg(not(test))]
+        let drain = {
+            #[cfg(release)]
+            let decorator = {
+                use slog_term::PlainDecorator;
+                use std::fs::OpenOptions;
+                use config::LOG_PATH;
+                let file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(false)
+                    .open(LOG_PATH)
+                    .unwrap();
+                PlainDecorator::new(file);
+            };
+
+            #[cfg(not(release))]
+            let decorator = {
+                use slog_term::TermDecorator;
+                TermDecorator::new().build()
+            };
+
+            use slog_async::Async;
+            use slog_term::FullFormat;
+            use slog::Drain;
+            let drain = FullFormat::new(decorator).build().fuse();
+            Async::new(drain).build().fuse()
+        };
+
+        #[cfg(test)]
+        let drain = ::slog::Discard;
+
+        RwLock::new(SlogLogger::root(drain, o!()))
+    };
+}
+
+pub struct State {
+    pub pool: DbPool,
+    pub log: SlogLogger,
+}
+
+/// Start server
+pub fn start() {
+    let sys = System::new("iop");
+
+    server::new(build_app(&SECRET_KEY, pool()))
+        .bind(HOST.as_str())
+        .unwrap()
+        .start();
+    println!("Listening to {}", HOST.as_str());
+
+    let _ = sys.run();
+}
+
+/// Generate server app instance
+fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
+    move || {
+        let cookie_backend = CookieSessionBackend::private(key).name("s").secure(true);
+        let session_storage = SessionStorage::new(cookie_backend);
+
+        App::with_state(State {
+            pool: pool.clone(),
+            log: LOG.read().unwrap().clone(),
+        }).middleware(session_storage)
+            .middleware(ActixLogger::new("%t %a %r %s %b %D %{User-Agent}i"))
+            .handler("/static", StaticFiles::new(STATIC_PATH))
+            .configure(|app| {
+                Cors::for_app(app)
+                    .supports_credentials()
+                    .resource("/plant", route!(Method::POST, plant_post))
+                    .resource("/plant/{id}", route!(Method::GET, plant))
+                    .resource("/plants", route!(Method::GET, plant_index))
+                    .resource("/plant_type", |r| {
+                        r.name("plant_type_post");
+                        r.method(Method::POST)
+                            .with(plant_type_post)
+                            .0
+                            .limit(REQUEST_SIZE_LIMIT);
+                    })
+                    .resource("/plant_type/{slug}", route!(Method::GET, plant_type))
+                    .resource("/plant_types", route!(Method::GET, plant_type_index))
+                    .resource("/user/{username}", route!(Method::GET, user))
+                    .resource("/signup", route!(Method::POST, signup))
+                    .resource("/signin", route!(Method::POST, signin))
+                    .resource("/logout", route!(Method::POST, logout))
+                    .resource("/plant/{id}/events", route!(Method::GET, event_index))
+                    .resource("/event", route!(Method::POST, event_post))
+                    .register()
+            })
+    }
+}
 
 /// Resize image according to config, create thumb, save them
 pub fn save_image(filename: &str, bytes: &[u8]) -> Result<(), ImageError> {

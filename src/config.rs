@@ -4,7 +4,12 @@ use std::env::var;
 lazy_static! {
     pub static ref SECRET_KEY: [u8; 32] = {
         let mut key: [u8; 32] = Default::default();
-        key.copy_from_slice(&random_string(32).unwrap().as_bytes()[..32]);
+        let string = if let Ok(ref secret_key) = var("SECRET_KEY") {
+            secret_key.clone()
+        } else {
+            random_string(32).unwrap()
+        };
+        key.copy_from_slice(&string.as_bytes()[..32]);
         key
     };
     pub static ref HOST: String = match (var("HOST"), var("PORT")) {

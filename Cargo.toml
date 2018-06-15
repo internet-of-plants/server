@@ -3,6 +3,18 @@ name = "server_iop"
 version = "0.3.0"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 
+[lib]
+name = "iop"
+path = "src/mod.rs"
+
+[[bin]]
+name = "iop"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "deploy-watcher"
+path = "dependencies/watcher.rs"
+
 [dependencies]
 actix = "0.5"
 actix-web = "0.6"

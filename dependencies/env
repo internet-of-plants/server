@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "export HOST=0.0.0.0" > .config
+echo "export PORT=3000" >> .config
+echo "export WATCHER_PORT=4000" >> .config
+
+key=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
+echo "export SECRET_KEY=$key" >> .config

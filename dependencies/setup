@@ -1,0 +1,15 @@
+sh env
+
+sudo apt-get update -y
+sudo apt-get install -y libsodium-dev redis postgresql-10 curl git
+
+curl https://sh.rustup.rs -sSf | sh
+
+sudo cp pg_hba.conf /etc/postgresql/10/main/pg_hba.conf
+sudo su - postgres -c "psql -c \"CREATE USER iop WITH PASSWORD 'iop';\""
+
+export DATABASE_URL=postgres://iop:iop@localhost/iop
+cargo install diesel_cli
+diesel setup
+
+sh networking

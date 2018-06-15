@@ -3,25 +3,19 @@ use diesel::insert_into;
 use diesel::prelude::*;
 
 use lib::{auth::user_id, error::Error, schema::events, schema::plant_types, schema::plants,
-          schema::users};
+          schema::users, utils::State};
 use models::{NewPlant, Plant, PlantForm, PlantView};
-use State;
 
 pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
-    let user_id = user_id(&req)?;
+    let uid = user_id(&req)?;
     let plant_id = id.into_inner();
-    trace!(
-        req.state().log,
-        "Plant (user_id: {}): {}",
-        user_id,
-        plant_id
-    );
+    trace!(req.state().log, "Plant (user_id: {}): {}", uid, plant_id);
 
     let plant = plants::table
         .inner_join(users::table)
         .inner_join(plant_types::table)
         .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
-        .filter(plants::id.eq(plant_id).and(plants::user_id.eq(user_id)))
+        .filter(plants::id.eq(plant_id).and(plants::user_id.eq(uid)))
         .select(PlantViewSql!())
         .first::<PlantView>(conn!(req.state().pool))?;
     debug!(req.state().log, "Plant: {:?}", plant);
@@ -29,14 +23,14 @@ pub fn plant((id, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse,
 }
 
 pub fn plant_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
-    let user_id = user_id(&req)?;
-    trace!(req.state().log, "Plants (user_id: {})", user_id);
+    let uid = user_id(&req)?;
+    trace!(req.state().log, "Plants (user_id: {})", uid);
 
     let plants = plants::table
         .inner_join(users::table)
         .inner_join(plant_types::table)
         .left_join(events::table.on(plants::last_event_id.eq(events::id.nullable())))
-        .filter(plants::user_id.eq(user_id))
+        .filter(plants::user_id.eq(uid))
         .select(PlantViewSql!())
         .load::<PlantView>(conn!(req.state().pool))?;
     debug!(req.state().log, "Plants: {:?}", plants);
@@ -47,18 +41,18 @@ pub fn plant_post(
     (form, req): (Json<PlantForm>, HttpRequest<State>),
 ) -> Result<HttpResponse, Error> {
     let form = form.into_inner();
-    let user_id = user_id(&req)?;
+    let uid = user_id(&req)?;
     trace!(
         req.state().log,
         "Create Plant (user_id: {}): {:?}",
-        user_id,
+        uid,
         form
     );
 
     let plant = NewPlant {
         name: filled!(form.name),
         type_id: form.type_id,
-        user_id: user_id,
+        user_id: uid,
     };
 
     let plant = insert_into(plants::table)

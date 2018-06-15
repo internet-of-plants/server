@@ -2,9 +2,8 @@ use actix_web::{HttpRequest, HttpResponse, Json, Path};
 use diesel::insert_into;
 use diesel::prelude::*;
 
-use lib::{auth::user_id, error::Error, schema::events, schema::plants};
+use lib::{auth::user_id, error::Error, schema::events, schema::plants, utils::State};
 use models::{Event, EventForm, EventView, NewEvent};
-use State;
 
 pub fn event_index((path, req): (Path<i32>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let user_id = user_id(&req)?;

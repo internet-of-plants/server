@@ -3,3 +3,4 @@
 
 dependencies/ssl.crt
 dependencies/ssl.key
+.config

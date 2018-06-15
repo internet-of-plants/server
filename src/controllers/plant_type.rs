@@ -9,9 +9,8 @@ use diesel::delete;
 #[cfg(not(test))]
 use lib::utils::save_image;
 use lib::{auth::user_id, error::Error, schema::plant_types, schema::users,
-          utils::decode_b64_image, utils::random_string};
+          utils::decode_b64_image, utils::random_string, utils::State};
 use models::{NewPlantType, PlantType, PlantTypeForm, PlantTypeView};
-use State;
 
 pub fn plant_type((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let slug = path.into_inner();

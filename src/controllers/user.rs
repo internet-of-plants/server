@@ -1,11 +1,11 @@
-use actix_web::{middleware::session::RequestSession, HttpRequest, HttpResponse, Json, Path};
+use actix_web::{middleware::session::RequestSession, HttpRequest, HttpResponse, Json, Path,
+                Responder};
 use diesel::{insert_into, prelude::*, NotFound};
 use slugify::slugify;
 
 use lib::auth::{authenticate, check_password, hash_password, is_auth, user_id};
-use lib::{error::Error, schema::users};
+use lib::{error::Error, schema::users, utils::State};
 use models::{NewUser, SigninForm, SignupForm, User, UserView};
-use State;
 
 pub fn user((path, req): (Path<String>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     is_auth(&req)?;
@@ -32,7 +32,13 @@ pub fn signup((form, req): (Json<SignupForm>, HttpRequest<State>)) -> Result<Htt
 
     if is_auth(&req).is_ok() {
         warn!(req.state().log, "Already authenticated");
-        return Ok(HttpResponse::Ok().finish());
+
+        let user = users::table
+            .find(user_id(&req)?)
+            .first::<User>(conn!(req.state().pool))?;
+        debug!(req.state().log, "User: {:?}", user);
+
+        return Ok(HttpResponse::Ok().json(user));
     }
 
     let user = NewUser {
@@ -55,11 +61,6 @@ pub fn signup((form, req): (Json<SignupForm>, HttpRequest<State>)) -> Result<Htt
 pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<HttpResponse, Error> {
     let form = form.into_inner();
     trace!(req.state().log, "Signin: {}", form.login);
-
-    if is_auth(&req).is_ok() {
-        warn!(req.state().log, "Already authenticated");
-        return Ok(HttpResponse::Ok().finish());
-    }
 
     let user = match users::table
         .filter(
@@ -89,10 +90,10 @@ pub fn signin((form, req): (Json<SigninForm>, HttpRequest<State>)) -> Result<Htt
     }
 }
 
-pub fn logout(req: HttpRequest<State>) -> Result<HttpResponse, Error> {
+pub fn logout(req: HttpRequest<State>) -> impl Responder {
     trace!(req.state().log, "Logout: {:?}", user_id(&req));
     req.session().clear();
-    Ok(HttpResponse::Ok().finish())
+    ""
 }
 
 #[cfg(test)]
