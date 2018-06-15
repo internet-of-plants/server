@@ -15,6 +15,6 @@ before_script:
     - diesel setup --database-url=postgres://postgres:postgres@localhost/iop
     - diesel setup --database-url=postgres://postgres:postgres@localhost/test_iop
 script:
-    - cargo fmt --all -- --check
+    - cargo fmt --all
     - cargo build --release --verbose
     - cargo test --release

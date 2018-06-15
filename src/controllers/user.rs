@@ -99,8 +99,7 @@ pub fn logout(req: HttpRequest<State>) -> impl Responder {
 #[cfg(test)]
 mod tests {
     use actix_web::{http::Method, http::StatusCode, test::TestServer};
-    use build_app;
-    use lib::{db::test_pool, utils::extract_cookie};
+    use lib::{db::test_pool, utils::build_app, utils::extract_cookie};
     use models::{SigninForm, SignupForm};
 
     fn authenticated(srv: &mut TestServer, cookie: &str) {

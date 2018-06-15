@@ -82,7 +82,7 @@ pub fn start() {
 }
 
 /// Generate server app instance
-fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
+pub fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State> {
     move || {
         let cookie_backend = CookieSessionBackend::private(key).name("s").secure(true);
         let session_storage = SessionStorage::new(cookie_backend);

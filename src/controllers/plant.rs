@@ -65,9 +65,9 @@ pub fn plant_post(
 #[cfg(test)]
 mod tests {
     use actix_web::{http::Method, http::StatusCode, test::TestServer, HttpMessage};
-    use build_app;
     use futures::future::Future;
-    use lib::{db::test_pool, utils::authenticate_tester, utils::create_plant_type};
+    use lib::{db::test_pool, utils::authenticate_tester, utils::build_app,
+              utils::create_plant_type};
     use models::{PlantForm, PlantView};
 
     fn show(srv: &mut TestServer, cookie: &str, id: i32, expected: StatusCode) {

@@ -90,9 +90,8 @@ pub fn plant_type_index(req: HttpRequest<State>) -> Result<HttpResponse, Error> 
 mod tests {
     use actix_web::{http::Method, http::StatusCode, test::TestServer, HttpMessage};
     use base64::encode;
-    use build_app;
     use futures::future::Future;
-    use lib::{db::test_pool, utils::authenticate_tester};
+    use lib::{db::test_pool, utils::authenticate_tester, utils::build_app};
     use models::{PlantTypeForm, PlantTypeView};
 
     fn create(srv: &mut TestServer, cookie: &str, name: &str, image: &str, expected: StatusCode) {
