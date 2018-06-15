@@ -3,16 +3,14 @@ name = "server_iop"
 version = "0.3.0"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 
-[dev-dependencies]
-dotenv = "0.11"
-
 [dependencies]
 actix = "0.5"
-actix-web = { version = "0.6" }
+actix-web = "0.6"
 
 diesel = { version = "1.0", features = ["postgres"] }
 r2d2 = "0.8"
 r2d2-diesel = "1.0"
+dotenv = "0.11"
 
 hex = "0.2"
 sodiumoxide = "0.0.16"

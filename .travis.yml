@@ -10,13 +10,11 @@ before_script:
     - sudo apt-get update -y
     - sudo apt-get install -y libsodium-dev openssl
     - cargo install diesel_cli
-    - rustup install nightly
     - rustup component add rustfmt-preview
     - psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" -U postgres
     - diesel setup --database-url=postgres://postgres:postgres@localhost/iop
     - diesel setup --database-url=postgres://postgres:postgres@localhost/test_iop
 script:
-    cargo fmt --all -- --check
-    cargo +nightly clippy
-    cargo build --release --verbose
-    cargo test --release
+    - cargo fmt --all -- --check
+    - cargo build --release --verbose
+    - cargo test --release

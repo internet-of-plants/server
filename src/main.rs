@@ -1,4 +1,4 @@
-extern crate base64;
+#![cfg_attr(release, deny(warnings))]
 
 #[cfg(test)]
 extern crate futures;
@@ -15,6 +15,8 @@ extern crate slog_term;
 extern crate actix;
 extern crate actix_web;
 //extern crate openssl;
+
+extern crate base64;
 
 #[macro_use]
 extern crate diesel;
