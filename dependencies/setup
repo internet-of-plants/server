@@ -3,8 +3,7 @@
 sh dependencies/env
 
 sudo apt-get update -y
-sudo apt-get install -y build-essential gcc libsodium-dev postgresql-10 curl
-libpq-dev
+sudo apt-get install -y build-essential gcc libsodium-dev postgresql-10 curl libpq-dev make pkg-config
 sudo apt-get autoremove -y
 
 curl https://sh.rustup.rs -sSf | sh -s -- -y

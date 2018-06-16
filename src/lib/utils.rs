@@ -96,6 +96,7 @@ pub fn build_app(key: &'static [u8; 32], pool: DbPool) -> impl Fn() -> App<State
             .configure(|app| {
                 Cors::for_app(app)
                     .supports_credentials()
+                    .resource("/", |r| r.f(|_| "Hello"))
                     .resource("/plant", route!(Method::POST, plant_post))
                     .resource("/plant/{id}", route!(Method::GET, plant))
                     .resource("/plants", route!(Method::GET, plant_index))
