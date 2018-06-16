@@ -4,7 +4,7 @@ export DATABASE_URL=postgres://iop:iop@localhost/iop
 source .config
 
 if [[ -z "$AUTH_TOKEN" ]]; then
-	echo "Please set the authentication token used by the CI"
+	echo "Please set the authentication token (AUTH_TOKEN env var) used by the CI"
 	exit
 fi
 
@@ -35,7 +35,9 @@ while true; do
 		rm ../last_state -rf
 	fi
 
-	cargo build --bin deploy-watcher --release &
+	cargo build --bin iop --release
+	cargo build --bin deploy-watcher --release
+	killall -q iop
 	cargo run --bin iop --release &
 	cargo run --bin deploy-watcher --release
 done

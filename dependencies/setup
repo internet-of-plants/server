@@ -1,15 +1,22 @@
-sh env
+#!/bin/bash
+
+sh dependencies/env
 
 sudo apt-get update -y
-sudo apt-get install -y libsodium-dev redis postgresql-10 curl git
+sudo apt-get install -y build-essential gcc libsodium-dev postgresql-10 curl
+libpq-dev
+sudo apt-get autoremove -y
 
-curl https://sh.rustup.rs -sSf | sh
+curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-sudo cp pg_hba.conf /etc/postgresql/10/main/pg_hba.conf
+sudo cp dependencies/pg_hba.conf /etc/postgresql/10/main/pg_hba.conf
 sudo su - postgres -c "psql -c \"CREATE USER iop WITH PASSWORD 'iop';\""
+sudo su - postgres -c "psql -c \"ALTER USER iop WITH SUPERUSER;\""
 
 export DATABASE_URL=postgres://iop:iop@localhost/iop
-cargo install diesel_cli
+if [[ -z "$(which diesel)" ]]; then
+	cargo install diesel_cli --no-default-features --features "postgres"
+fi
 diesel setup
 
-sh networking
+sh dependencies/networking
