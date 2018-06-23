@@ -1,6 +1,5 @@
 #!/bin/bash
 
-sh dependencies/env
 export LANG=C.UTF-8
 
 sudo apt-get update -y

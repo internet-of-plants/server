@@ -12,10 +12,14 @@ lazy_static! {
         key.copy_from_slice(&string.as_bytes()[..32]);
         key
     };
-    pub static ref HOST: String = match (var("HOST"), var("PORT")) {
-        (Ok(ref host), Ok(ref port)) if port == "80" => host.to_owned(),
-        (Ok(ref host), Ok(ref port)) => format!("{}:{}", host, port),
-        _ => "127.0.0.1:3000".to_owned(),
+    pub static ref A: String = {
+        println!("{}", var("PORT").unwrap());
+        String::new()
+    };
+    pub static ref HOST: String = match var("PORT") {
+        Ok(ref port) if port == "80" => "0.0.0.0".to_owned(),
+        Ok(ref port) => format!("0.0.0.0:{}", port),
+        _ => "0.0.0.0:3000".to_owned(),
     };
 }
 
