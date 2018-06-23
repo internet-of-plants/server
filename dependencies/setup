@@ -1,12 +1,15 @@
 #!/bin/bash
 
 sh dependencies/env
+export LANG=C.UTF-8
 
 sudo apt-get update -y
 sudo apt-get install -y build-essential gcc libsodium-dev postgresql-10 curl libpq-dev make pkg-config
 sudo apt-get autoremove -y
 
-curl https://sh.rustup.rs -sSf | sh -s -- -y
+if [[ -z "$(which rustup)" ]]; then
+	curl https://sh.rustup.rs -sSf | sh -s -- -y
+fi
 
 sudo cp dependencies/pg_hba.conf /etc/postgresql/10/main/pg_hba.conf
 sudo su - postgres -c "psql -c \"CREATE USER iop WITH PASSWORD 'iop';\""
@@ -18,4 +21,4 @@ if [[ -z "$(which diesel)" ]]; then
 fi
 diesel setup
 
-sh dependencies/networking
+sudo sh dependencies/networking

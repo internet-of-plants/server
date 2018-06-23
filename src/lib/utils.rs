@@ -76,7 +76,6 @@ pub fn start() {
         .bind(HOST.as_str())
         .unwrap()
         .start();
-    println!("Listening to {}", HOST.as_str());
 
     let _ = sys.run();
 }
