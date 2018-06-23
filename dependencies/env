@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "export PORT=3000" >> .config
+echo "export PORT=80" >> .config
 echo "export WATCHER_PORT=4000" >> .config
 
 key=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | fold -w 32 | head -n 1)
