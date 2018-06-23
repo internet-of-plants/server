@@ -1,6 +1,5 @@
 #!/bin/bash
 
-echo "export HOST=0.0.0.0" > .config
 echo "export PORT=3000" >> .config
 echo "export WATCHER_PORT=4000" >> .config
 

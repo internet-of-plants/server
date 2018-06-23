@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export DATABASE_URL=postgres://iop:iop@localhost/iop
+export LANG=C.UTF-8
 source .config
 
 if [[ -z "$AUTH_TOKEN" ]]; then
