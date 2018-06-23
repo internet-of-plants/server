@@ -13,11 +13,7 @@ lazy_static! {
         key
     };
     pub static ref HOST: String = match var("PORT") {
-        Ok(ref port) if port == "80" => "0.0.0.0".to_owned(),
-        Ok(ref port) => {
-            println!("P: {}", port);
-            format!("0.0.0.0:{}", port),
-        }
+        Ok(ref port) => format!("0.0.0.0:{}", port),
         _ => "0.0.0.0:3000".to_owned(),
     };
 }

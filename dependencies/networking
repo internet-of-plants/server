@@ -5,8 +5,8 @@ iptables -P INPUT DROP
 iptables -A INPUT -i lo -p all -j ACCEPT
 iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
-# We should block 3000 (or redirect to 443) in the future
-iptables -A INPUT -p tcp -m tcp --dport 3000 -j ACCEPT
+# We should block 80 (or redirect to 443) in the future
+iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
 iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
 # Watcher
 iptables -A INPUT -p tcp -m tcp --dport 4000 -j ACCEPT
