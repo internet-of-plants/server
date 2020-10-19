@@ -12,7 +12,7 @@ Ubuntu (all devops scripts assume ubuntu), Postgres, rust (+ cargo)
 
 ## Setup local environment
 
-*This scripts install postgresql, creates a database named iop and sets 'postgres' psql user's password to 'postgres' (only used in localhost)*
+*This scripts install postgresql, creates a database named iop and sets 'postgres' psql user's password to 'postgres' (only available at 127.0.0.1)*
 
 `./tools/install-dependencies.sh`
 

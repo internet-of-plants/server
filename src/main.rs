@@ -139,8 +139,8 @@ async fn main() {
     #[cfg(not(debug_assertions))]
     let server = server
         .tls()
-        .cert_path("/root/iop/cert.pem")
-        .key_path("/root/iop/privkey.pem");
+        .cert_path("cert.pem")
+        .key_path("privkey.pem");
 
     server.run(([0, 0, 0, 0], 4001)).await;
 }

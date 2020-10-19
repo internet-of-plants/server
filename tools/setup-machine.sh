@@ -51,18 +51,23 @@ if [ !-z "$DOMAIN" ]; then
   CRON=$(crontab -l 2>/dev/null | grep '/root/iop/renew-cert.sh')
   echo "$CRON"
   if [ -z "$CRON" ]; then
-  	echo "Add certbot to cron"
-  	(crontab -l 2>/dev/null; echo "52 0,12 * * * root /root/iop/renew-cert.sh") | crontab -
+    echo "Add certbot to cron"
+    (crontab -l 2>/dev/null; echo "52 0,12 * * * root /root/iop/renew-cert.sh >> /root/iop/run-server-cron.log 2>&1") | crontab -
   fi
 fi
 
 sudo -i -u postgres psql -c "CREATE DATABASE iop;" postgres;
 sudo -i -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" postgres;
 
+# Create user that will actually run the server
+sudo useradd iop
+touch /iop/monitor.log
+chown iop /iop/monitor.log
+
 # Add run-server.sh to crontab to run on reboot
 CRON=$(crontab -l 2>/dev/null | grep '/root/iop/run-server.cron.log')
 echo "$CRON"
 if [ -z "$CRON" ]; then
-	echo "Add server to cron"
-	(crontab -l 2>/dev/null; echo "@reboot /root/iop/run-server.sh >> /root/iop/run-server.cron.log 2>&1") | crontab -
+  echo "Add server to cron"
+  (crontab -l 2>/dev/null; echo "@reboot /root/iop/run-server.sh >> /root/iop/run-server.cron.log 2>&1") | crontab -
 fi
