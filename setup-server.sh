@@ -9,18 +9,18 @@ fi
 
 
 if [ -z "$DOMAIN" ]; then
-	echo "Please provide the domain name to setup the server onto (through ssh)"
-	echo "It must be a domain name, since we make a HTTPs cert for it (otherwise things will break)"
-	echo "./setup-server.sh example.com"
-	exit
+  echo "Please provide the domain name to setup the server onto (through ssh)"
+  echo "It must be a domain name, since we make a HTTPs cert for it (otherwise things will break)"
+  echo "./setup-server.sh example.com"
+  exit
 fi
 
 
 PUBKEY=$(ssh -o 'StrictHostKeyChecking no' root@$DOMAIN cat /etc/ssh/ssh_host_dsa_key.pub)
 PUBKEY_IS_THERE=$(cat ~/.ssh/known_hosts | grep "$PUBKEY")
 if [ -z "$PUBKEY_IS_THERE" ]; then
-	echo "Adding pubkey to known hosts"
-	echo $PUBKEY >> ~/.ssh/known_hosts
+  echo "Adding pubkey to known hosts"
+  echo $PUBKEY >> ~/.ssh/known_hosts
 fi
 
 # Setup dependencies and database

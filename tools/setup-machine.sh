@@ -7,10 +7,12 @@ if [ -z "$DOMAIN" ]; then
   echo "./setup-machine.sh example.com"
 
   echo ""
-  read -r -p "Are you sure you want to continue without setting up a https certificate? [y/N] " RESPONSE
-  case "$RESPONSE" in [yY]);;
-    *); exit;;
-  esac
+  read -p "Are you sure you want to continue without setting up a https certificate? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Ok, leaving"
+    exit
+  fi
 fi
 
 sudo sysctl vm.swappiness=10
@@ -35,18 +37,15 @@ sudo apt-get -q -y update < /dev/null
 sudo apt-get -q -y install postgresql postgresql-contrib snap < /dev/null;
 
 # Setup certbot
-if [ !-z "$DOMAIN" ]; then
+if [ ! -z "$DOMAIN" ]; then
   sudo snap install core < /dev/null
   sudo snap refresh core < /dev/null
   sudo apt-get -q -y remove certbot < /dev/null
   sudo snap install --classic certbot
   sudo ln -s /snap/bin/certbot /usr/bin/certbot
   sudo certbot certonly --standalone --register-unsafely-without-email --non-interactive --domain $DOMAIN --agree-tos
-  sudo ln -s /etc/letsencrypt/live/$DOMAIN/privkey.pem /root/iop/privkey.pem
-  sudo ln -s /etc/letsencrypt/live/$DOMAIN/cert.pem /root/iop/cert.pem
-
-  # Test it
-  sudo certbot renew --dry-run
+  sudo ln -s /etc/letsencrypt/live/$DOMAIN/privkey.pem /root/privkey.pem
+  sudo ln -s /etc/letsencrypt/live/$DOMAIN/fullchain.pem /root/cert.pem
 
   CRON=$(crontab -l 2>/dev/null | grep '/root/iop/renew-cert.sh')
   echo "$CRON"
@@ -61,8 +60,9 @@ sudo -i -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" post
 
 # Create user that will actually run the server
 sudo useradd iop
-touch /iop/monitor.log
-chown iop /iop/monitor.log
+mkdir -p /root/iop
+touch /root/iop/monitor.log
+chown iop /root/iop/monitor.log
 
 # Add run-server.sh to crontab to run on reboot
 CRON=$(crontab -l 2>/dev/null | grep '/root/iop/run-server.cron.log')

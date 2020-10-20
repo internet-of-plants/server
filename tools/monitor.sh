@@ -11,17 +11,19 @@ echo $FOLDER
 mkdir -p $FOLDER/migrations
 
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
-cp $SCRIPTPATH/cert.pem $FOLDER/
-cp $SCRIPTPATH/privkey.pem $FOLDER/
+cp /root/cert.pem $FOLDER/
+cp /root/privkey.pem $FOLDER/
 cp $SCRIPTPATH/iop-monitor-server $FOLDER/
 sudo chmod 500 $FOLDER/iop-monitor-server
 sudo chmod 400 $FOLDER/cert.pem
 sudo chmod 400 $FOLDER/privkey.pem
-sudo chmod 400 $FOLDER/migrations
+sudo chmod 400 $FOLDER/migrations/*
+sudo chmod 500 $FOLDER/migrations
 sudo chmod 500 $FOLDER
 sudo chown iop.iop $FOLDER/iop-monitor-server
 sudo chown iop.iop $FOLDER/cert.pem
 sudo chown iop.iop $FOLDER/privkey.pem
+sudo chown iop.iop $FOLDER/migrations/*
 sudo chown iop.iop $FOLDER/migrations
 sudo chown iop.iop $FOLDER
 

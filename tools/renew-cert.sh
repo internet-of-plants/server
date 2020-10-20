@@ -11,4 +11,8 @@ cat $SCRIPTPATH/certbot.log | grep "No renewals were attempted."
 if [ $? -eq 0 ]; then
   screen -S monitor-iop -X quit
   $SCRIPTPATH/run-server.sh >> $SCRIPTPATH/run-server.cron.log 2>&1
+
+  # Just some other thing running in the same server that will use this certificate
+  screen -S monitor -X quit
+  $SCRIPTPATH/../run-server.sh >> $SCRIPTPATH/../run-server.cron.log 2>&1
 fi
