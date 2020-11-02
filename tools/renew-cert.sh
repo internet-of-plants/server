@@ -4,15 +4,22 @@ sudo apt-get -q -y --fix-missing update < /dev/null
 sudo apt-get -q -y --with-new-pkgs upgrade < /dev/null
 sudo apt-get -q -y autoremove < /dev/null
 
-SCRIPTPATH="$(cd "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
+SCRIPTPATH="$(cd "$(dirname "$0")" > /dev/null 2>&1; pwd -P)"
 
-sudo certbot renew > $SCRIPTPATH/certbot.log
-cat $SCRIPTPATH/certbot.log | grep "No renewals were attempted."
-if [ $? -eq 0 ]; then
+sudo certbot renew > /var/log/iop/certbot.log
+cat /var/log/iop/certbot.log | grep "No renewals were attempted."
+if [ "$?" -eq "0" ]; then
   screen -S monitor-iop -X quit
-  $SCRIPTPATH/run-server.sh >> $SCRIPTPATH/run-server.cron.log 2>&1
+  screen -S startiopserver -X quit
 
-  # Just some other thing running in the same server that will use this certificate
+  CRON=$(ssh root@$DOMAIN "crontab -l | grep /opt/iop/run-server.sh")
+  COMMAND=${CRON#@reboot }
+  ssh root@$DOMAIN "screen -dmS startiopserver $COMMAND"
+
+  # Some other stuff running in the same server, although unrelated
   screen -S monitor -X quit
-  $SCRIPTPATH/../run-server.sh >> $SCRIPTPATH/../run-server.cron.log 2>&1
+  screen -S startserver -X quit
+  CRON=$(ssh root@$DOMAIN "crontab -l | grep /root/run-server.sh")
+  COMMAND=${CRON#@reboot }
+  ssh root@$DOMAIN "screen -dmS startserver $COMMAND"
 fi

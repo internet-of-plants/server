@@ -28,7 +28,7 @@ async fn main() {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var(
             "RUST_LOG",
-            "iop_monitor_server=info,warp=info,event=info,now=info,timer=info",
+            "server=info,warp=info,event=info,now=info,timer=info",
         );
     }
 

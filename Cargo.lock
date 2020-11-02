@@ -645,25 +645,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iop-monitor-server"
-version = "0.1.0"
-dependencies = [
- "bcrypt",
- "codegen",
- "derive_more",
- "http",
- "log 0.4.11",
- "names",
- "pretty_env_logger",
- "rand 0.7.3",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "warp",
-]
-
-[[package]]
 name = "iovec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1435,6 +1416,25 @@ dependencies = [
  "itoa",
  "serde",
  "url",
+]
+
+[[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "bcrypt",
+ "codegen",
+ "derive_more",
+ "http",
+ "log 0.4.11",
+ "names",
+ "pretty_env_logger",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "warp",
 ]
 
 [[package]]

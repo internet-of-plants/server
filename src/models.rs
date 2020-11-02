@@ -38,23 +38,25 @@ pub struct Plant {
     pub created_at: i64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Deserialize)]
 pub struct NewEvent {
-    pub air_temperature_celsius: i16,
-    pub air_humidity_percentage: i16,
+    pub air_temperature_celsius: f32,
+    pub air_humidity_percentage: f32,
+    pub air_heat_index_celsius: f32,
     pub soil_resistivity_raw: i16,
-    pub soil_temperature_celsius: i16,
+    pub soil_temperature_celsius: f32,
     #[serde(with  = "crate::utils::string")]
     pub plant_id: i64,
 }
 
-#[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(FromRow, Debug, Clone, PartialEq, Serialize)]
 pub struct Event {
     pub id: i64,
-    pub air_temperature_celsius: i16,
-    pub air_humidity_percentage: i16,
+    pub air_temperature_celsius: f32,
+    pub air_humidity_percentage: f32,
+    pub air_heat_index_celsius: f32,
     pub soil_resistivity_raw: i16,
-    pub soil_temperature_celsius: i16,
+    pub soil_temperature_celsius: f32,
     #[serde(with  = "crate::utils::string")]
     pub plant_id: i64,
     pub created_at: i64,
@@ -90,14 +92,14 @@ pub struct ErrorDump {
     pub created_at: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Status {
     pub plant: Plant,
     pub event: Option<Event>,
     pub now: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StatusHistory {
     pub plant: Plant,
     pub now: u64,

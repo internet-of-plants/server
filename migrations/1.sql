@@ -25,9 +25,10 @@ CREATE TABLE IF NOT EXISTS plants (
 
 CREATE TABLE IF NOT EXISTS events (
     id BIGSERIAL PRIMARY KEY,
-    air_temperature_celsius SMALLINT NOT NULL,
-    air_humidity_percentage SMALLINT NOT NULL,
-    soil_temperature_celsius SMALLINT NOT NULL,
+    air_temperature_celsius FLOAT(4) NOT NULL,
+    air_humidity_percentage FLOAT(4) NOT NULL,
+    air_heat_index_celsius FLOAT(4) NOT NULL,
+    soil_temperature_celsius FLOAT(4) NOT NULL,
     soil_resistivity_raw SMALLINT NOT NULL,
     plant_id BIGINT NOT NULL,
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()),

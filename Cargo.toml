@@ -1,8 +1,9 @@
 [package]
-name = "iop-monitor-server"
+name = "server"
 version = "0.1.0"
 authors = ["Paulo <paulosanz@poli.ufrj.br>"]
 edition = "2018"
+description = "Internet of Plants - Monitor Server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
