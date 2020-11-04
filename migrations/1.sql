@@ -15,6 +15,7 @@ CREATE INDEX IF NOT EXISTS users_email ON users (email);
 
 CREATE TABLE IF NOT EXISTS plants (
     id BIGINT PRIMARY KEY NOT NULL,
+    mac CHAR(12) NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     owner_id BIGINT NOT NULL,

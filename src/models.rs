@@ -63,6 +63,11 @@ pub struct Event {
 }
 
 #[derive(FromRow, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Mac {
+    pub mac: String,
+}
+
+#[derive(FromRow, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Id {
     pub id: i64,
 }

@@ -87,11 +87,27 @@ pub async fn owns(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<()
 }
 
 #[exec_time]
-pub async fn new(pool: &'static Pool, user_id: i64) -> Result<i64> {
+pub async fn put(pool: &'static Pool, user_id: i64, mac_address: String) -> Result<i64> {
+    let plant: Option<Id> = sqlx::query_as("SELECT ip
+                                            FROM plants
+                                            WHERE mac = $1
+                                                  AND owner_id = $2")
+        .bind(&mac_address)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+
+    if let Some(Id { id }) = plant {
+        return Ok(id);
+    }
+
     let name = utils::random_name();
+    // This can theoretically conflict, but it will just return 500
+    // So in the one in a million time this happens the client just retries
     let id: i64 = i64::saturating_abs(rand::random());
-    sqlx::query("INSERT INTO plants (id, name, owner_id) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO plants (id, mac, name, owner_id) VALUES ($1, $2, $3, $4)")
         .bind(id)
+        .bind(&mac_address)
         .bind(&name)
         .bind(user_id)
         .execute(pool)

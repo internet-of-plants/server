@@ -1,6 +1,6 @@
 # Internet of Plants Monitor Server
 
-This is the main server all iot devices `iop-embedded` talk to. It also informs and obeys `iop-monitor-client`. To display what is going on with the iot devices and manage them.
+This is the main server all iot devices `embedded` talk to. It also informs and obeys `iop-monitor-client`. To display what is going on with the iot devices and manage them.
 
 It produces data in json, and acts on POST/PUT/DELETE requests, updating the system accordingly. Each user has their account with their plants. The plants receive constant events, so you can keep track of the system. It currently is tied to a specific set of events that makes sense to narrow our study.
 
