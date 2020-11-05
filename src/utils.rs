@@ -329,3 +329,23 @@ pub mod string {
         String::deserialize(deserializer)?.parse().map_err(de::Error::custom)
     }
 }
+
+pub mod float {
+    use serde::{Serializer, Deserialize, Deserializer};
+
+    pub fn serialize<S>(value: &Option<f32>, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        if let Some(value) = value {
+            serializer.serialize_f32(*value)
+        } else {
+            serializer.serialize_f32(0.)
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<f32, D::Error>
+        where D: Deserializer<'de>
+    {
+        Ok(Option::<f32>::deserialize(deserializer)?.unwrap_or(0.))
+    }
+}

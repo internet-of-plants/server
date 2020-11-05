@@ -40,10 +40,14 @@ pub struct Plant {
 
 #[derive(Debug, Copy, Clone, PartialEq, Deserialize)]
 pub struct NewEvent {
+    #[serde(with = "crate::utils::float")]
     pub air_temperature_celsius: f32,
+    #[serde(with = "crate::utils::float")]
     pub air_humidity_percentage: f32,
+    #[serde(with = "crate::utils::float")]
     pub air_heat_index_celsius: f32,
     pub soil_resistivity_raw: i16,
+    #[serde(with = "crate::utils::float")]
     pub soil_temperature_celsius: f32,
     #[serde(with  = "crate::utils::string")]
     pub plant_id: i64,

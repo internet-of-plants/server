@@ -4,8 +4,6 @@ This is the main server all iot devices `embedded` talk to. It also informs and 
 
 It produces data in json, and acts on POST/PUT/DELETE requests, updating the system accordingly. Each user has their account with their plants. The plants receive constant events, so you can keep track of the system. It currently is tied to a specific set of events that makes sense to narrow our study.
 
-Create a new plant, open it in a new tab (click the card). Now hardcode your credentials (yes this is bad) in the embedded code and the `plant_id`, and it will sign itself up. We will have to think about a better way of signing up without plaint-text credentials or even as hardcoded data, ideally the plant signs itself up and stores its id in the EEPROM. The credentials should be a pre-generated token stored automatically on the embedded system somehow.
-
 ## Dependencies
 
 Ubuntu (all devops scripts assume ubuntu), Postgres, rust (+ cargo)
