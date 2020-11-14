@@ -84,12 +84,9 @@ pub struct RequestHistory {
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ErrorReport {
-    pub id: i64,
     #[serde(with  = "crate::utils::string")]
     pub plant_id: i64,
     pub error: String,
-    pub is_solved: bool,
-    pub created_at: i64,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
