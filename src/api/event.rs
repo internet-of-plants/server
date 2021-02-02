@@ -1,15 +1,17 @@
 use crate::prelude::*;
-use codegen::{exec_time, cache};
+use codegen::{cache, exec_time};
 
 #[exec_time]
 pub async fn new(pool: &'static Pool, user_id: i64, event: NewEvent) -> Result<()> {
-    api::plant::owns(pool, user_id, event.plant_id).await?;
-    sqlx::query("INSERT INTO events (air_temperature_celsius, air_humidity_percentage, soil_resistivity_raw, soil_temperature_celsius, plant_id) VALUES ($1, $2, $3, $4, $5)")
+    let plant_id = api::plant::put(pool, user_id, event.mac).await?;
+    // TODO: log error if something is NaN
+    sqlx::query("INSERT INTO events (air_temperature_celsius, air_humidity_percentage, air_heat_index_celsius, soil_resistivity_raw, soil_temperature_celsius, plant_id) VALUES ($1, $2, $3, $4, $5, $6)")
         .bind(event.air_temperature_celsius)
         .bind(event.air_humidity_percentage)
+        .bind(event.air_heat_index_celsius)
         .bind(event.soil_resistivity_raw)
         .bind(event.soil_temperature_celsius)
-        .bind(event.plant_id)
+        .bind(plant_id)
         .execute(pool)
         .await?;
     Ok(())

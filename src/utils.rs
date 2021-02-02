@@ -70,12 +70,12 @@ pub async fn run_migrations(url: &str) {
             files.push(number);
         }
     }
-    files.sort();
+    files.sort_unstable();
     connection.close().await.unwrap();
 
     for file in files {
-        let connection = sqlx::PgConnection::connect(url).await.unwrap();
-        let mut transaction = connection.begin().await.unwrap();
+        let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
+        let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
         info!("Running migration {}.sql", file);
         let path = Path::new("migrations").join(format!("{}.sql", file));
         let strings = fs::read_to_string(path).await.unwrap();
@@ -297,6 +297,7 @@ pub fn random_string(size: usize) -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(size)
+        .map(char::from)
         .collect()
 }
 
@@ -312,29 +313,51 @@ pub mod string {
     use std::fmt::Display;
     use std::str::FromStr;
 
-    use serde::{de, Serializer, Deserialize, Deserializer};
+    use serde::{de, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-        where T: Display,
-              S: Serializer
+    where
+        T: Display,
+        S: Serializer,
     {
         serializer.collect_str(value)
     }
 
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-        where T: FromStr,
-              T::Err: Display,
-              D: Deserializer<'de>
+    where
+        T: FromStr,
+        T::Err: Display,
+        D: Deserializer<'de>,
     {
-        String::deserialize(deserializer)?.parse().map_err(de::Error::custom)
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(de::Error::custom)
+    }
+}
+
+pub mod maybe_string {
+    use std::fmt::Display;
+
+    use serde::Serializer;
+
+    pub fn serialize<T, S>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: Display,
+        S: Serializer,
+    {
+        match value {
+            Some(value) => serializer.collect_str(value),
+            None => serializer.serialize_none(),
+        }
     }
 }
 
 pub mod float {
-    use serde::{Serializer, Deserialize, Deserializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<f32>, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         if let Some(value) = value {
             serializer.serialize_f32(*value)
@@ -344,7 +367,8 @@ pub mod float {
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<f32, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         Ok(Option::<f32>::deserialize(deserializer)?.unwrap_or(0.))
     }

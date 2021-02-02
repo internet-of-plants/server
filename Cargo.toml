@@ -8,20 +8,24 @@ description = "Internet of Plants - Monitor Server"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-warp = { version = "0.2", features = ["tls"] }
-tokio = { version = "0.2", features = ["macros", "rt-core", "time"] }
+warp = { version = "0.3", features = ["tls", "multipart"] }
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
+bytes = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs"] }
 http = "0.2"
 
+md5 = "0.7"
+
 derive_more = "0.99"
-sqlx = { version = "0.3.5", default-features = false, features = [ "runtime-tokio", "macros", "postgres" ] }
+sqlx = { git = "https://github.com/launchbadge/sqlx", default-features = false, features = [ "runtime-tokio-rustls", "macros", "postgres" ] }
 
 pretty_env_logger = "0.4"
 log = "0.4"
 
-serde = {version = "1.0", features = ["derive"] }
+serde = {version = "1", features = ["derive"] }
 serde_json = "1"
 
-rand = "0.7"
+rand = "0.8"
 
 codegen = { path = "./codegen" }
 

@@ -1,7 +1,7 @@
-use std::convert::Infallible;
 use derive_more::{Display, From};
-use log::{error, warn};
 use http::StatusCode;
+use log::{error, warn};
+use std::convert::Infallible;
 use warp::Rejection;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -10,16 +10,23 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     Sqlx(sqlx::error::Error),
     Bcrypt(bcrypt::BcryptError),
+    IO(std::io::Error),
+    Fmt(std::fmt::Error),
     Forbidden,
     BadData,
     NothingFound,
+    Warp(warp::Error),
 }
 
 impl Error {
     pub async fn handle(rejection: Rejection) -> Result<impl warp::Reply, Infallible> {
         let status = if let Some(error) = rejection.find::<Self>() {
             match error {
-                error @ Self::Sqlx(_) | error @ Self::Bcrypt(_) => {
+                error @ Self::Sqlx(_)
+                | error @ Self::Bcrypt(_)
+                | error @ Self::Warp(_)
+                | error @ Self::IO(_)
+                | error @ Self::Fmt(_) => {
                     error!("{:?} {}", error, error);
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
@@ -37,7 +44,7 @@ impl Error {
                 }
             }
         } else {
-            error!("Unknown internal server error: {:?}", rejection); 
+            error!("Unknown internal server error: {:?}", rejection);
             StatusCode::INTERNAL_SERVER_ERROR
         };
         Ok(warp::reply::with_status(status, status))
@@ -45,11 +52,4 @@ impl Error {
 }
 
 impl std::error::Error for Error {}
-
 impl warp::reject::Reject for Error {}
-
-impl From<Error> for Rejection {
-    fn from(err: Error) -> Self {
-        warp::reject::custom(err)
-    }
-}

@@ -9,8 +9,8 @@ SCRIPTPATH="$(cd "$(dirname "$0")" > /dev/null 2>&1; pwd -P)"
 sudo certbot renew > /var/log/iop/certbot.log
 cat /var/log/iop/certbot.log | grep "No renewals were attempted."
 if [ "$?" -eq "0" ]; then
-  screen -S monitor-iop -X quit
   screen -S startiopserver -X quit
+  screen -S monitor-iop -X quit
 
   CRON=$(crontab -l | grep /opt/iop/run-server.sh)
   COMMAND=${CRON#@reboot }

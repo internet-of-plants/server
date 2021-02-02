@@ -14,6 +14,7 @@ pub struct NewUser {
 pub struct Login {
     pub email: String,
     pub password: String,
+    pub mac: Option<String>,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
@@ -27,18 +28,16 @@ pub struct User {
 
 #[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Plant {
-    // i64 isn't really supported at json level, since it's actually f64
-    // we generally don't care, but here we set id with rand::random, so sometimes
-    // it breaks the json representation as a number
-    #[serde(with  = "crate::utils::string")]
+    #[serde(with = "crate::utils::string")]
     pub id: i64,
     pub name: String,
+    pub mac_address: String,
     pub description: Option<String>,
     pub owner_id: i64,
     pub created_at: i64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct NewEvent {
     #[serde(with = "crate::utils::float")]
     pub air_temperature_celsius: f32,
@@ -49,8 +48,8 @@ pub struct NewEvent {
     pub soil_resistivity_raw: i16,
     #[serde(with = "crate::utils::float")]
     pub soil_temperature_celsius: f32,
-    #[serde(with  = "crate::utils::string")]
-    pub plant_id: i64,
+    pub firmware_hash: String,
+    pub mac: String,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Serialize)]
@@ -61,7 +60,7 @@ pub struct Event {
     pub air_heat_index_celsius: f32,
     pub soil_resistivity_raw: i16,
     pub soil_temperature_celsius: f32,
-    #[serde(with  = "crate::utils::string")]
+    #[serde(with = "crate::utils::string")]
     pub plant_id: i64,
     pub created_at: i64,
 }
@@ -79,22 +78,44 @@ pub struct Id {
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct RequestHistory {
     pub id: i64,
-    pub since_secs_ago: u64
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct ErrorReport {
-    #[serde(with  = "crate::utils::string")]
-    pub plant_id: i64,
-    pub error: String,
+    pub since_secs_ago: u64,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ErrorDump {
+pub struct Update {
     pub id: i64,
-    #[serde(with  = "crate::utils::string")]
+    #[serde(with = "crate::utils::maybe_string")]
+    pub plant_id: Option<i64>,
+    pub file_hash: String,
+    pub file_name: String,
+    pub created_at: i64,
+}
+
+#[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DeviceLog {
+    pub id: i64,
     pub plant_id: i64,
-    pub error: String,
+    pub log: String,
+    pub created_at: i64,
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct NewDevicePanic {
+    pub mac: String,
+    pub file: String,
+    pub line: u32,
+    pub func: String,
+    pub msg: String,
+}
+
+#[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DevicePanic {
+    pub id: i64,
+    pub plant_id: i64,
+    pub file: String,
+    pub line: u32,
+    pub func: String,
+    pub msg: String,
     pub created_at: i64,
 }
 

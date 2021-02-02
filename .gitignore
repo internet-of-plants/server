@@ -3,3 +3,4 @@ target
 .*.swp
 .*.swo
 run.log
+workspace.code-workspace

@@ -1,6 +1,8 @@
-pub mod error;
-pub mod plant;
+pub mod device_log;
+pub mod device_panic;
 pub mod event;
+pub mod plant;
+pub mod update;
 pub mod user;
 
 use crate::prelude::*;
