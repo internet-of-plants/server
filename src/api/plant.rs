@@ -6,7 +6,7 @@ use std::time::Duration;
 #[cache]
 pub async fn get_plain(pool: &'static Pool, plant_id: i64) -> Result<Plant> {
     let plant: Option<Plant> = sqlx::query_as(
-        "SELECT id, name, mac_address, description, owner_id, created_at
+        "SELECT id, name, mac, description, owner_id, created_at
         FROM plants
         WHERE id = $1",
     )
@@ -42,7 +42,7 @@ pub async fn history(
 
     let since = now - since.as_secs();
     let events: Vec<Event> = sqlx::query_as(
-        "SELECT id, air_temperature_celsius, air_humidity_percentage, soil_resistivity_raw, soil_temperature_celsius, plant_id, created_at
+        "SELECT id, air_temperature_celsius, air_humidity_percentage, air_heat_index_celsius, soil_resistivity_raw, soil_temperature_celsius, plant_id, created_at
         FROM events
         WHERE plant_id = $1
               AND created_at > $2

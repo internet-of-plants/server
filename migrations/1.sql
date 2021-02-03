@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS events (
     air_temperature_celsius FLOAT(8) NOT NULL,
     air_humidity_percentage FLOAT(8) NOT NULL,
     air_heat_index_celsius FLOAT(8) NOT NULL,
-    soil_temperature_celsius FLOAT(8) NOT NULL,
+    soil_temperfture_celsius FLOAT(8) NOT NULL,
     soil_resistivity_raw SMALLINT NOT NULL,
     plant_id BIGINT NOT NULL,
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()),

@@ -21,12 +21,13 @@ pub async fn new(pool: &'static Pool, user_id: i64, event: NewEvent) -> Result<(
 #[cache(valid_for = 30)]
 pub async fn last_event(pool: &'static Pool, plant_id: i64) -> Result<Option<Event>> {
     let event: Option<Event> = sqlx::query_as(
-        "SELECT id, air_temperature_celsius, air_humidity_percentage, soil_resistivity_raw, soil_temperature_celsius, plant_id, created_at
+        "SELECT id, air_temperature_celsius, air_humidity_percentage, air_heat_index_celsius, soil_resistivity_raw, soil_temperature_celsius, plant_id, created_at
         FROM events
         WHERE plant_id = $1
         ORDER BY created_at DESC")
         .bind(plant_id)
         .fetch_optional(pool)
         .await?;
+    debug!("Last Event: {:?}", event);
     Ok(event)
 }

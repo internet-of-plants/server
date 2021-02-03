@@ -17,8 +17,6 @@ pub mod prelude {
     pub use warp::{http::StatusCode, Filter, Rejection, Reply};
 }
 
-use http::HeaderMap;
-
 #[tokio::main]
 async fn main() {
     //#[cfg(debug_assertions)]
@@ -28,7 +26,7 @@ async fn main() {
 
     //#[cfg(debug_assertions)]
     if std::env::var("RUST_LOG").is_err() {
-        let val = "server=debug,tracing=info,warp=debug,event=info,now=info,timer=info";
+        let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
         std::env::set_var("RUST_LOG", val);
     }
 
@@ -61,7 +59,6 @@ async fn main() {
     let log = warp::log::custom(utils::http_log);
 
     let routes = warp::any()
-        .and(warp::header::headers_cloned().map(|headers: HeaderMap| panic!("{:?}", headers))).untuple_one()
         .and(
             warp::path("user").and(
                 warp::path("login")
@@ -180,7 +177,6 @@ async fn main() {
                 .and_then(controllers::update::get)))
             */
         .with(log)
-        /*
         .with(
             warp::cors()
                 .allow_origins(vec![
@@ -191,7 +187,6 @@ async fn main() {
                 .allow_headers(vec!["Authorization", "Content-Type"])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
         )
-        */
         .recover(Error::handle);
 
     let server = warp::serve(routes);

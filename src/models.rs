@@ -31,7 +31,7 @@ pub struct Plant {
     #[serde(with = "crate::utils::string")]
     pub id: i64,
     pub name: String,
-    pub mac_address: String,
+    pub mac: String,
     pub description: Option<String>,
     pub owner_id: i64,
     pub created_at: i64,
