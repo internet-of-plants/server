@@ -180,7 +180,7 @@ async fn main() {
         .with(
             warp::cors()
                 .allow_origins(vec![
-                    "http://localhost:3002",
+                    "http://localhost:8080",
                     "https://internet-of-plants.github.io",
                 ])
                 .allow_credentials(false)
