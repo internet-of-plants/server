@@ -3,10 +3,10 @@ use bytes::Bytes;
 use controllers::Result;
 
 pub async fn new(
-    mac_address: String,
     pool: &'static Pool,
     user_id: i64,
     log: Bytes,
+    mac_address: String,
 ) -> Result<impl Reply> {
     let log = String::from_utf8_lossy(log.as_ref()).into_owned();
     let plant_id = api::plant::put(pool, user_id, mac_address).await?;

@@ -63,9 +63,22 @@ pub async fn new(
     Ok(StatusCode::OK)
 }
 
-pub async fn get(mac_address: String, pool: &'static Pool, user_id: i64) -> Result<impl Reply> {
-    let plant_id = api::plant::put(pool, user_id, mac_address).await?;
+pub async fn get(pool: &'static Pool, user_id: i64, headers: warp::http::HeaderMap) -> Result<impl Reply> {
+    //let chip_ip = headers.get("x-ESP8266-Chip-ID");
+    let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::Forbidden)?.to_str().map_err(|_|Error::Forbidden)?;
+    //let ap_mac = headers.get("x-ESP8266-AP-MAC");
+    //let free_space = headers.get("x-ESP8266-free-space");
+    //let sketch_size = headers.get("x-ESP8266-sketch-size");
+    let md5 = headers.get("x-ESP8266-sketch-md5").ok_or(Error::Forbidden)?.to_str().map_err(|_|Error::Forbidden)?;
+    //let chip_size = headers.get("x-ESP8266-chip-size");
+    //let sdk_version = headers.get("x-ESP8266-sdk-version");
+
+    let plant_id = api::plant::put(pool, user_id, mac_address.to_owned()).await?;
     let update = api::update::get(pool, user_id, plant_id).await?;
+    if update.file_hash == md5 {
+        return Err(Error::NothingFound.into());
+    }
+
     Ok(tokio::fs::read(update.file_name)
         .await
         .map_err(Error::from)?)

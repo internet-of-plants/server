@@ -47,7 +47,7 @@ pub async fn new(pool: &'static Pool, user: &NewUser) -> Result<()> {
 }
 
 #[exec_time]
-pub async fn login(pool: &'static Pool, client: Login) -> Result<String> {
+pub async fn login(pool: &'static Pool, client: Login, mac: Option<String>) -> Result<String> {
     let hash: Option<(i64, String)> = sqlx::query_as(
         "SELECT id, password_hash
         FROM users
@@ -68,7 +68,7 @@ pub async fn login(pool: &'static Pool, client: Login) -> Result<String> {
 
     match (hash, is_auth) {
         (Some((user_id, _)), true) => {
-            let plant_id = match client.mac {
+            let plant_id = match mac {
                 Some(mac) => Some(api::plant::put(pool, user_id, mac).await?),
                 None => None,
             };

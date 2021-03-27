@@ -6,8 +6,8 @@ pub async fn solve(pool: &'static Pool, user_id: i64, Id { id }: Id) -> Result<i
     Ok(StatusCode::OK)
 }
 
-pub async fn new(pool: &'static Pool, user_id: i64, error: NewDevicePanic) -> Result<impl Reply> {
-    api::device_panic::new(pool, user_id, error).await?;
+pub async fn new(pool: &'static Pool, user_id: i64, error: NewDevicePanic, mac: String) -> Result<impl Reply> {
+    api::device_panic::new(pool, user_id, error, mac).await?;
     Ok(StatusCode::OK)
 }
 

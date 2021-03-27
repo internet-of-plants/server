@@ -14,7 +14,6 @@ pub struct NewUser {
 pub struct Login {
     pub email: String,
     pub password: String,
-    pub mac: Option<String>,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
@@ -48,8 +47,6 @@ pub struct NewEvent {
     pub soil_resistivity_raw: i16,
     #[serde(with = "crate::utils::float")]
     pub soil_temperature_celsius: f32,
-    pub firmware_hash: String,
-    pub mac: String,
 }
 
 #[derive(FromRow, Debug, Clone, PartialEq, Serialize)]
@@ -101,7 +98,6 @@ pub struct DeviceLog {
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NewDevicePanic {
-    pub mac: String,
     pub file: String,
     pub line: u32,
     pub func: String,
