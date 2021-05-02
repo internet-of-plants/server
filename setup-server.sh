@@ -15,13 +15,14 @@ if [ -z "$DOMAIN" ]; then
   exit
 fi
 
+echo "Deploying to domain: $DOMAIN"
 
-PUBKEY=$(ssh -o 'StrictHostKeyChecking no' root@$DOMAIN cat /etc/ssh/ssh_host_dsa_key.pub)
-PUBKEY_IS_THERE=$(cat ~/.ssh/known_hosts | grep "$PUBKEY")
-if [ -z "$PUBKEY_IS_THERE" ]; then
-  echo "Adding pubkey to known hosts"
-  echo $PUBKEY >> ~/.ssh/known_hosts
-fi
+#PUBKEY=$(ssh -o 'StrictHostKeyChecking no' root@$DOMAIN cat /etc/ssh/ssh_host_dsa_key.pub)
+#PUBKEY_IS_THERE=$(cat ~/.ssh/known_hosts | grep "$PUBKEY")
+#if [ -z "$PUBKEY_IS_THERE" ]; then
+#  echo "Adding pubkey to known hosts"
+#  echo $PUBKEY >> ~/.ssh/known_hosts
+#fi
 
 # Setup dependencies and database
 ssh root@$DOMAIN "bash -s" < $SCRIPTPATH/tools/setup-machine.sh $DOMAIN

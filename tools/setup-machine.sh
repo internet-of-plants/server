@@ -15,7 +15,7 @@ if [ -z "$DOMAIN" ]; then
   fi
 fi
 
-# Setup swapfile
+echo "Setup swapfile"
 sudo fallocate -l 5G /swapfile-iop
 sudo chmod 600 /swapfile-iop
 sudo mkswap /swapfile-iop
@@ -23,20 +23,21 @@ sudo swapon /swapfile-iop
 sudo sysctl vm.swappiness=10
 echo '/swapfile-iop none swap sw 0 0' | sudo tee -a /etc/fstab
 
-# Setup firewall
+echo "Setup firewall"
 ufw disable
 ufw default deny
 ufw allow 22/tcp
 ufw allow 80/tcp
-ufw allow 4000/tcp # this is just so we don't break my other stuff running in the same server
+ufw allow 443/tcp
 ufw allow 4001/tcp
 ufw --force enable
 
+echo "Install ubuntu dependencies needed"
 sudo apt-get -q -y update < /dev/null
 sudo apt-get -q -y install postgresql postgresql-contrib snap firejail < /dev/null;
 
-# Setup certbot
 if [ ! -z "$DOMAIN" ]; then
+  echo "Setup certbot"
   sudo snap install core < /dev/null
   sudo snap refresh core < /dev/null
   sudo apt-get -q -y remove certbot < /dev/null
@@ -54,13 +55,16 @@ if [ ! -z "$DOMAIN" ]; then
   fi
 fi
 
+echo "Create postgresql credentials"
 sudo -i -u postgres psql -c "CREATE DATABASE iop;" postgres;
 sudo -i -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" postgres;
 
 # Create user that will actually run the server
+echo "Creating user iop"
 sudo useradd iop
 mkdir -p /var/log/iop
 
+echo "Setting filesystem permissions"
 touch /var/log/iop/certbot.log
 chmod 660 /var/log/iop/certbot.log
 chown iop.root /var/log/iop/certbot.log
@@ -75,7 +79,6 @@ chown iop.root /var/log/iop/run-server.cron.log
 
 chmod 770 /var/log/iop
 chown iop.root /var/log/iop
-
 
 mkdir -p /opt/iop
 

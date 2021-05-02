@@ -17,7 +17,7 @@ http = "0.2"
 md5 = "0.7"
 
 derive_more = "0.99"
-sqlx = { git = "https://github.com/launchbadge/sqlx", default-features = false, features = [ "runtime-tokio-rustls", "macros", "postgres" ] }
+sqlx = { git = "https://github.com/launchbadge/sqlx", default-features = false, features = [ "runtime-tokio-native-tls", "macros", "postgres" ] }
 
 pretty_env_logger = "0.4"
 log = "0.4"
