@@ -28,7 +28,8 @@ pub async fn new(pool: &'static Pool, user_id: i64, device_panic: NewDevicePanic
         .bind(plant_id)
         .bind(user_id)
         .bind(&device_panic.file)
-        .bind(device_panic.line)
+        // If we have more than 2 billion lines in a file we are in trouble
+        .bind(device_panic.line as i32)
         .bind(&device_panic.func)
         .bind(&device_panic.msg)
         .execute(pool)

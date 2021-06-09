@@ -18,6 +18,6 @@ pub async fn new(_pool: &'static Pool, _user: NewUser) -> Result<impl Reply> {
 }
 
 pub async fn login(pool: &'static Pool, user: Login, mac: Option<String>) -> Result<impl Reply> {
-    info!("Login: {:?}", user);
+    info!("Login: {:?}, {:?}", user, mac);
     Ok(api::user::login(pool, user, mac).await?)
 }

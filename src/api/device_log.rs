@@ -20,6 +20,7 @@ pub async fn index(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<V
 
 #[exec_time]
 pub async fn new(pool: &'static Pool, user_id: i64, plant_id: i64, log: String) -> Result<()> {
+    info!("Creating log (user_id: {}, plant_id: {}): {}", user_id, plant_id, log);
     sqlx::query("INSERT INTO device_logs (plant_id, owner_id, log) VALUES ($1, $2, $3)")
         .bind(plant_id)
         .bind(user_id)

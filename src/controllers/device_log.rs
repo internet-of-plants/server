@@ -8,7 +8,7 @@ pub async fn new(
     log: Bytes,
     mac_address: String,
 ) -> Result<impl Reply> {
-    let log = String::from_utf8_lossy(log.as_ref()).into_owned();
+    let log = String::from_utf8_lossy(log.as_ref()).trim().to_owned();
     let plant_id = api::plant::put(pool, user_id, mac_address).await?;
     api::device_log::new(pool, user_id, plant_id, log).await?;
     Ok(StatusCode::OK)
