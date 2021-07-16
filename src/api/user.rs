@@ -74,6 +74,7 @@ pub async fn login(pool: &'static Pool, client: Login, mac: Option<String>) -> R
             };
 
             let token = utils::random_string(64);
+            debug!("Token: {}", token);
             sqlx::query(
                 "INSERT INTO authentications (user_id, plant_id, token) VALUES ($1, $2, $3)",
             )

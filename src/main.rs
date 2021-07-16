@@ -106,7 +106,7 @@ async fn main() {
                 .and(auth)
                 .and(warp::body::content_length_limit(1024))
                 .and(warp::body::json())
-                .and(warp::filters::header::header("MAC_ADDRESS"))
+                .and(warp::header::headers_cloned())
                 .and_then(controllers::event::new))
             .or(warp::path("panic")
                 .and(warp::path("index")
@@ -159,8 +159,8 @@ async fn main() {
                     .and(warp::post())
                     .and(pool)
                     .and(auth)
-                    // 4 MB max size
-                    .and(warp::filters::multipart::form().max_length(1024 * 1024 * 4))
+                    // 1 MB max size
+                    .and(warp::filters::multipart::form().max_length(1024 * 1024))
                     .and_then(controllers::update::new)))
                 /*
                 .or(warp::path("index")

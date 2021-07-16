@@ -15,6 +15,7 @@ pub enum Error {
     Forbidden,
     BadData,
     NothingFound,
+    CorruptBinary,
     Warp(warp::Error),
 }
 
@@ -37,6 +38,10 @@ impl Error {
                 Self::BadData => {
                     warn!("Bad Data");
                     StatusCode::BAD_REQUEST
+                }
+                Self::CorruptBinary => {
+                    warn!("Corrupt Binary");
+                    StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Self::NothingFound => {
                     warn!("Nothing Found");

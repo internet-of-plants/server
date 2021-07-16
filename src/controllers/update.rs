@@ -11,7 +11,6 @@ pub async fn new(
     user_id: i64,
     form: FormData,
 ) -> Result<impl Reply> {
-    // TODO: this can use up to 4MB of memory, easy DOS target
     let parts: Vec<Part> = form.try_collect().await.map_err(Error::Warp)?;
     let part = match parts.into_iter().next() {
         Some(part) => part,
@@ -79,7 +78,21 @@ pub async fn get(pool: &'static Pool, user_id: i64, headers: warp::http::HeaderM
         return Err(Error::NothingFound.into());
     }
 
-    Ok(tokio::fs::read(update.file_name)
-        .await
-        .map_err(Error::from)?)
+    let content = tokio::fs::read(update.file_name).await.map_err(Error::from)?;
+    let md5 = md5::compute(&content);
+    let md5 = &*md5;
+    let mut file_hash = String::with_capacity(md5.len() * 2);
+    for byte in md5 {
+        write!(file_hash, "{:02X}", byte).map_err(Error::from)?;
+    }
+    if file_hash != update.file_hash {
+        error!("Binary md5 didn't match the expected: {} != {}", file_hash, update.file_hash);
+        return Err(Error::CorruptBinary)?;
+    }
+    Ok(http::Response::builder()
+        .header("Content-Type", "application/octet-stream")
+        .header("Content-Length", content.len().to_string())
+        .header("Content-Disposition", format!("attachment; filename={}.bin", file_hash))
+        .header("x-MD5", file_hash)
+        .body(hyper::Body::from(content)))
 }

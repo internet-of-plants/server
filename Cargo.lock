@@ -1448,6 +1448,7 @@ dependencies = [
  "derive_more",
  "futures",
  "http",
+ "hyper",
  "log",
  "md5",
  "names",
