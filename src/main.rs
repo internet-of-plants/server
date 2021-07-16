@@ -24,9 +24,10 @@ async fn main() {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    //#[cfg(debug_assertions)]
     if std::env::var("RUST_LOG").is_err() {
-        //let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
+        #[cfg(not(debug_assertions))]
+        let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
+        #[cfg(debug_assertions)]
         let val = "server=trace,tracing=trace,hyper=trace,warp=trace,event=trace,now=trace,timer=trace";
         std::env::set_var("RUST_LOG", val);
     }
