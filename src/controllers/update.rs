@@ -64,11 +64,11 @@ pub async fn new(
 
 pub async fn get(pool: &'static Pool, user_id: i64, headers: warp::http::HeaderMap) -> Result<impl Reply> {
     //let chip_ip = headers.get("x-ESP8266-Chip-ID");
-    let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::Forbidden)?.to_str().map_err(|_|Error::Forbidden)?;
+    let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
     //let ap_mac = headers.get("x-ESP8266-AP-MAC");
     //let free_space = headers.get("x-ESP8266-free-space");
     //let sketch_size = headers.get("x-ESP8266-sketch-size");
-    let md5 = headers.get("x-ESP8266-sketch-md5").ok_or(Error::Forbidden)?.to_str().map_err(|_|Error::Forbidden)?;
+    let md5 = headers.get("x-ESP8266-sketch-md5").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 

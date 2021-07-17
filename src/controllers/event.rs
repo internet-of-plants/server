@@ -4,7 +4,8 @@ use controllers::Result;
 
 #[exec_time]
 pub async fn new(pool: &'static Pool, user_id: i64, event: NewEvent, headers: warp::http::HeaderMap) -> Result<impl Reply> {
-    let mac = headers.get("MAC_ADDRESS").ok_or(Error::Forbidden)?.to_str().map_err(|_|Error::BadData)?.to_string();
+    debug!("{:?}", headers);
+    let mac = headers.get("MAC_ADDRESS").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::BadData)?.to_string();
     let version = headers.get("VERSION").ok_or(Error::BadData)?.to_str().map_err(|_|Error::BadData)?.to_string();
     let time_running: u16 = headers.get("TIME_RUNNING").ok_or(Error::BadData)?.to_str().map_err(|_|Error::BadData)?.parse().map_err(|_|Error::BadData)?;
     let vcc: u16 = headers.get("VCC").ok_or(Error::BadData)?.to_str().map_err(|_|Error::BadData)?.parse().map_err(|_|Error::BadData)?;
