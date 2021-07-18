@@ -25,9 +25,9 @@ async fn main() {
     }
 
     if std::env::var("RUST_LOG").is_err() {
-        #[cfg(not(debug_assertions))]
-        let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
-        #[cfg(debug_assertions)]
+        //#[cfg(not(debug_assertions))]
+        //let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
+        //#[cfg(debug_assertions)]
         let val = "server=trace,tracing=trace,hyper=trace,warp=trace,event=trace,now=trace,timer=trace";
         std::env::set_var("RUST_LOG", val);
     }
@@ -189,7 +189,7 @@ async fn main() {
                     "https://internet-of-plants.github.io",
                 ])
                 .allow_credentials(false)
-                .allow_headers(vec!["Authorization", "Content-Type"])
+                .allow_headers(vec!["Authorization", "Content-Type", "MAC_ADDRESS", "VERSION", "TIME_RUNNIGN", "VCC", "FREE_HEAP", "FREE_STACK", "BIGGEST_FREE_HEAP_BLOCK"])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
         )
         .recover(Error::handle);

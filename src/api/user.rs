@@ -4,6 +4,7 @@ use codegen::{cache, exec_time};
 #[exec_time]
 #[cache(valid_for = 3600)]
 pub async fn authenticate(pool: &'static Pool, token: String) -> Result<i64> {
+    debug!("Token: {}", token);
     let id: Option<Id> = sqlx::query_as(
         "SELECT users.id
         FROM users
