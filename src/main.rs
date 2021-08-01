@@ -189,7 +189,7 @@ async fn main() {
                     "https://internet-of-plants.github.io",
                 ])
                 .allow_credentials(false)
-                .allow_headers(vec!["Authorization", "Content-Type", "MAC_ADDRESS", "VERSION", "TIME_RUNNIGN", "VCC", "FREE_HEAP", "FREE_STACK", "BIGGEST_FREE_HEAP_BLOCK"])
+                .allow_headers(vec!["Authorization", "Content-Type", "MAC_ADDRESS", "DRIVER", "VERSION", "TIME_RUNNING", "VCC", "FREE_HEAP", "FREE_STACK", "BIGGEST_FREE_HEAP_BLOCK"])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
         )
         .recover(Error::handle);
