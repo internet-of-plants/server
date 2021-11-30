@@ -39,6 +39,12 @@ async fn main() {
     let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
     utils::run_migrations(url).await;
 
+    #[cfg(debug_assertions)]
+    let allowed_origin = vec!["http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1:4001", "http://localhost:4001"];
+
+    #[cfg(not(debug_assertions))]
+    let allowed_origin = vec!["https://internet-of-plants.github.io", "https://iop-monitor-server.tk:4001"];
+
     let pool = Pool::connect(url).await.expect("Unable to connect to database");
     let pool: &'static Pool = Box::leak(Box::new(pool));
     let pool = warp::any().map(move || pool);
@@ -183,13 +189,7 @@ async fn main() {
         .with(log)
         .with(
             warp::cors()
-                // TODO: is this a problem?
-                .allow_origins(vec![
-                    "http://127.0.0.1:8080",
-                    "http://localhost:8080",
-                    "https://internet-of-plants.github.io",
-                    "https://iop-monitor-server.tk:4001",
-                ])
+                .allow_origins(allowed_origin)
                 .allow_credentials(false)
                 .allow_headers(vec!["Authorization", "Content-Type", "MAC_ADDRESS", "DRIVER", "VERSION", "TIME_RUNNING", "VCC", "FREE_HEAP", "FREE_STACK", "BIGGEST_FREE_HEAP_BLOCK"])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
