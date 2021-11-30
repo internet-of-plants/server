@@ -48,9 +48,4 @@ scp $SCRIPTPATH/../migrations/* root@$DOMAIN:/opt/iop/migrations/
 ssh root@$DOMAIN "chmod 420 /opt/iop/migrations/*"
 ssh root@$DOMAIN "chown iop.root /opt/iop/migrations/*"
 
-ssh root@$DOMAIN "screen -S monitor-iop -X quit"
-ssh root@$DOMAIN "screen -S startiopserver -X quit"
-
-CRON=$(ssh root@$DOMAIN "crontab -l | grep /opt/iop/run-server.sh")
-COMMAND=${CRON#@reboot }
-ssh root@$DOMAIN "screen -dmS startiopserver $COMMAND"
+ssh root@$DOMAIN "reboot"

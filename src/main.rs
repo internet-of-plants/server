@@ -183,6 +183,7 @@ async fn main() {
         .with(log)
         .with(
             warp::cors()
+                // TODO: is this a problem?
                 .allow_origins(vec![
                     "http://127.0.0.1:8080",
                     "http://localhost:8080",

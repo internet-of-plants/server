@@ -16,12 +16,12 @@ if [ -z "$DOMAIN" ]; then
 fi
 
 echo "Setup swapfile"
-sudo fallocate -l 5G /swapfile-iop
-sudo chmod 600 /swapfile-iop
-sudo mkswap /swapfile-iop
-sudo swapon /swapfile-iop
-sudo sysctl vm.swappiness=10
-echo '/swapfile-iop none swap sw 0 0' | sudo tee -a /etc/fstab
+fallocate -l 5G /swapfile-iop
+chmod 600 /swapfile-iop
+mkswap /swapfile-iop
+swapon /swapfile-iop
+sysctl vm.swappiness=10
+echo '/swapfile-iop none swap sw 0 0' | tee -a /etc/fstab
 
 echo "Setup firewall"
 ufw disable
@@ -33,19 +33,19 @@ ufw allow 4001/tcp
 ufw --force enable
 
 echo "Install ubuntu dependencies needed"
-sudo apt-get -q -y update < /dev/null
-sudo apt-get -q -y install postgresql postgresql-contrib snap firejail < /dev/null;
+apt-get -q -y update < /dev/null
+apt-get -q -y install postgresql postgresql-contrib snap firejail < /dev/null;
 
 if [ ! -z "$DOMAIN" ]; then
   echo "Setup certbot"
-  sudo snap install core < /dev/null
-  sudo snap refresh core < /dev/null
-  sudo apt-get -q -y remove certbot < /dev/null
-  sudo snap install --classic certbot
-  sudo ln -s /snap/bin/certbot /usr/bin/certbot
-  sudo certbot certonly --standalone --register-unsafely-without-email --non-interactive --domain $DOMAIN --agree-tos
-  sudo ln -s /etc/letsencrypt/live/$DOMAIN/privkey.pem /root/privkey.pem
-  sudo ln -s /etc/letsencrypt/live/$DOMAIN/fullchain.pem /root/cert.pem
+  snap install core < /dev/null
+  snap refresh core < /dev/null
+  apt-get -q -y remove certbot < /dev/null
+  snap install --classic certbot
+  ln -s /snap/bin/certbot /usr/bin/certbot
+  certbot certonly --standalone --register-unsafely-without-email --non-interactive --domain $DOMAIN --agree-tos
+  ln -s /etc/letsencrypt/live/$DOMAIN/privkey.pem /root/privkey.pem
+  ln -s /etc/letsencrypt/live/$DOMAIN/fullchain.pem /root/cert.pem
 
   CRON=$(crontab -l 2>/dev/null | grep '/opt/iop/renew-cert.sh')
   echo "$CRON"
@@ -61,7 +61,7 @@ sudo -i -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';" post
 
 # Create user that will actually run the server
 echo "Creating user iop"
-sudo useradd iop
+useradd iop
 mkdir -p /var/log/iop
 
 echo "Setting filesystem permissions"
