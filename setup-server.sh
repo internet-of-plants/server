@@ -29,5 +29,3 @@ ssh root@$DOMAIN "bash -s" < $SCRIPTPATH/tools/setup-machine.sh $DOMAIN
 
 # Deploy actual server
 $SCRIPTPATH/tools/deploy.sh $DOMAIN
-
-ssh root@$DOMAIN "reboot"
