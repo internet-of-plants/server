@@ -188,6 +188,7 @@ async fn main() {
                     "http://127.0.0.1:8080",
                     "http://localhost:8080",
                     "https://internet-of-plants.github.io",
+                    "https://iop-monitor-server.tk:4001",
                 ])
                 .allow_credentials(false)
                 .allow_headers(vec!["Authorization", "Content-Type", "MAC_ADDRESS", "DRIVER", "VERSION", "TIME_RUNNING", "VCC", "FREE_HEAP", "FREE_STACK", "BIGGEST_FREE_HEAP_BLOCK"])
