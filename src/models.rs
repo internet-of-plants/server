@@ -137,9 +137,11 @@ pub struct DeviceStat {
     pub version: String,
     pub time_running: u64,
     pub vcc: u16,
-    pub free_heap: u64,
+    pub free_dram: u64,
+    pub free_iram: u64,
     pub free_stack: u32,
-    pub biggest_free_heap_block: u64
+    pub biggest_dram_block: u64,
+    pub biggest_iram_block: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
