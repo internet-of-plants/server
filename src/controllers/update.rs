@@ -1,30 +1,26 @@
 use crate::prelude::*;
-use bytes::BufMut;
+use bytes::{BufMut, Buf};
 use controllers::Result;
-use futures::TryStreamExt;
+use futures::{TryStreamExt, StreamExt};
 use std::fmt::Write;
-use warp::filters::multipart::{FormData, Part};
+use warp::filters::multipart::FormData;
 
 pub async fn new(
     plant_id: i64,
     pool: &'static Pool,
-    user_id: i64,
-    form: FormData,
+    auth: Auth,
+    mut form: FormData,
 ) -> Result<impl Reply> {
-    let parts: Vec<Part> = form.try_collect().await.map_err(Error::Warp)?;
-    let part = match parts.into_iter().next() {
-        Some(part) => part,
-        None => {
-            warn!("Expected one file");
-            return Err(Error::BadData.into());
-        }
-    };
+    api::plant::owns(pool, auth.user_id, plant_id).await?;
+
+    let mut version = form.next().await.ok_or(Error::BadData)?.map_err(Error::Warp)?;
+    let file = form.next().await.ok_or(Error::BadData)?.map_err(Error::Warp)?;
 
     // Creates binary folders if non-existent
     // If user lacks permission to create folder the binary save will fail too (this would be critical)
     let _ = tokio::fs::create_dir("bins").await;
 
-    let binary = part
+    let binary = file
         .stream()
         .try_fold(Vec::new(), |mut vec, data| {
             vec.put(data);
@@ -40,59 +36,69 @@ pub async fn new(
     }
 
     let now = api::now(pool).await?;
-    let filename = format!("bins/{}-{}-{}.bin", user_id, now, file_hash);
+    let mut version = version.data().await.ok_or(Error::BadData)?.map_err(Error::Warp)?;
+    let buf_version = version.copy_to_bytes(version.remaining());
+    let version = std::str::from_utf8(buf_version.as_ref()).map_err(Error::Utf8)?.to_uppercase();
+    let filename = format!("bins/{}-{}-{}-{}-{}.bin", version, auth.user_id, plant_id, now, file_hash);
     let mut file = tokio::fs::File::create(&filename)
         .await
         .map_err(Error::from)?;
-    // TODO: we should just use a stream to save the file
+    // TODO: we should consider streaming the file, but we need the md5 hash do we trust the client for that?
     // TODO: fs + db is not atomic, shutdowns or panics can mess things up, we need a task to clean leaked binaries
-    // TODO: using an external file has problems, detaching it from the db, is it the right choice?
+    // TODO: using the filesystem has problems, consider a CDN, also the files are small
+    // TODO: maybe insert directly in the DB to allow for atomicity and to have everything attached in one place, no loose ends
     file.write_all(&binary).await.map_err(Error::from)?;
 
-    // TODO: storing a path in the db like this to read without care allows a hacker of the DB to hijack the server box too
+    // TODO: storing a path in the db like this to read without care easily allows a DB hack to allow hijacking the server box too
     if let Err(err) =
-        api::update::new(pool, user_id, plant_id, file_hash, filename.clone()).await
+        api::update::new(pool, auth.user_id, plant_id, file_hash, filename.clone(), version.to_owned()).await
     {
         // Best effort
         tokio::fs::remove_file(filename)
             .await
             .map_err(Error::from)?;
-        return Err(err.into());
+        return Err(err)?;
     }
     Ok(StatusCode::OK)
 }
 
-pub async fn get(pool: &'static Pool, user_id: i64, headers: warp::http::HeaderMap) -> Result<impl Reply> {
+pub async fn get(pool: &'static Pool, auth: Auth, headers: warp::http::HeaderMap) -> Result<impl Reply> {
     //let chip_ip = headers.get("x-ESP8266-Chip-ID");
-    let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
+    //let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
     //let ap_mac = headers.get("x-ESP8266-AP-MAC");
     //let free_space = headers.get("x-ESP8266-free-space");
     //let sketch_size = headers.get("x-ESP8266-sketch-size");
-    let md5 = headers.get("x-ESP8266-sketch-md5").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
+    let md5 = headers.get("x-ESP8266-sketch-md5").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?.to_uppercase();
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
-    let plant_id = api::plant::put(pool, user_id, mac_address.to_owned()).await?;
-    let update = api::update::get(pool, user_id, plant_id).await?;
-    if update.file_hash == md5 {
-        return Err(Error::NothingFound.into());
-    }
+    if let Some(plant_id) = auth.plant_id {
+        let update = match api::update::get(pool, auth.user_id, plant_id).await? {
+            Some(update) => update,
+            None => return Err(Error::NotModified)?,
+        };
+        if update.file_hash == md5 {
+            return Err(Error::NotModified)?;
+        }
 
-    let content = tokio::fs::read(update.file_name).await.map_err(Error::from)?;
-    let md5 = md5::compute(&content);
-    let md5 = &*md5;
-    let mut file_hash = String::with_capacity(md5.len() * 2);
-    for byte in md5 {
-        write!(file_hash, "{:02X}", byte).map_err(Error::from)?;
+        let content = tokio::fs::read(update.file_name).await.map_err(Error::from)?;
+        let md5 = md5::compute(&content);
+        let md5 = &*md5;
+        let mut file_hash = String::with_capacity(md5.len() * 2);
+        for byte in md5 {
+            write!(file_hash, "{:02X}", byte).map_err(Error::from)?;
+        }
+        if file_hash != update.file_hash {
+            error!("Binary md5 didn't match the expected: {} != {}", file_hash, update.file_hash);
+            return Err(Error::CorruptBinary)?;
+        }
+        Ok(http::Response::builder()
+            .header("Content-Type", "application/octet-stream")
+            .header("Content-Length", content.len().to_string())
+            .header("Content-Disposition", format!("attachment; filename=\"{}.bin\"", file_hash))
+            .header("x-MD5", file_hash)
+            .body(hyper::Body::from(content)))
+    } else {
+        Err(Error::Forbidden)?
     }
-    if file_hash != update.file_hash {
-        error!("Binary md5 didn't match the expected: {} != {}", file_hash, update.file_hash);
-        return Err(Error::CorruptBinary)?;
-    }
-    Ok(http::Response::builder()
-        .header("Content-Type", "application/octet-stream")
-        .header("Content-Length", content.len().to_string())
-        .header("Content-Disposition", format!("attachment; filename={}.bin", file_hash))
-        .header("x-MD5", file_hash)
-        .body(hyper::Body::from(content)))
 }

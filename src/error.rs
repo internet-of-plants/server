@@ -12,8 +12,10 @@ pub enum Error {
     Bcrypt(bcrypt::BcryptError),
     IO(std::io::Error),
     Fmt(std::fmt::Error),
+    Utf8(std::str::Utf8Error),
     Forbidden,
     BadData,
+    NotModified,
     NothingFound,
     CorruptBinary,
     Warp(warp::Error),
@@ -27,7 +29,8 @@ impl Error {
                 | error @ Self::Bcrypt(_)
                 | error @ Self::Warp(_)
                 | error @ Self::IO(_)
-                | error @ Self::Fmt(_) => {
+                | error @ Self::Fmt(_)
+                | error @ Self::Utf8(_) => {
                     error!("{:?} {}", error, error);
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
@@ -42,6 +45,9 @@ impl Error {
                 Self::CorruptBinary => {
                     warn!("Corrupt Binary");
                     StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::NotModified => {
+                    StatusCode::NOT_MODIFIED
                 }
                 Self::NothingFound => {
                     warn!("Nothing Found");

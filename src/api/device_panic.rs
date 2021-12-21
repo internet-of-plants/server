@@ -22,8 +22,8 @@ pub async fn index(
 }
 
 #[exec_time]
-pub async fn new(pool: &'static Pool, user_id: i64, device_panic: NewDevicePanic, mac: String) -> Result<()> {
-    let plant_id = api::plant::put(pool, user_id, mac).await?;
+pub async fn new(pool: &'static Pool, user_id: i64, device_panic: NewDevicePanic, plant_id: i64) -> Result<()> {
+    api::plant::owns(pool, user_id, plant_id).await?;
     sqlx::query("INSERT INTO device_panics (plant_id, owner_id, _file, _line, func, msg) VALUES ($1, $2, $3, $4, $5, $6)")
         .bind(plant_id)
         .bind(user_id)

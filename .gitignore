@@ -4,3 +4,4 @@ target
 .*.swo
 run.log
 workspace.code-workspace
+bins/

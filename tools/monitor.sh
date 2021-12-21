@@ -3,7 +3,10 @@
 SCRIPTPATH="$(cd "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
 FOLDER=/tmp/iop-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '')
 
-rm -rf /tmp/iop-*
+for folder in /tmp/iop-*; do
+  umount -l $folder/bins
+  rm -rf $folder
+done
 
 # Allows to update the binary without stopping it, and jails it
 echo $FOLDER
@@ -26,7 +29,10 @@ sudo chown iop.iop $FOLDER/migrations/*
 sudo chown iop.iop $FOLDER/migrations
 sudo chown root.iop $FOLDER
 
+mkdir -p $SCRIPTPATH/bins $FOLDER/bins
 cd $FOLDER
+mount --bind $SCRIPTPATH/bins $FOLDER/bins
+
 firejail --noprofile --private=$FOLDER << "EOT"
 sudo -su iop
 whoami

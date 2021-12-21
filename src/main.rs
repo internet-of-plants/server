@@ -25,10 +25,10 @@ async fn main() {
     }
 
     if std::env::var("RUST_LOG").is_err() {
-        #[cfg(not(debug_assertions))]
-        let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
+        //#[cfg(not(debug_assertions))]
+        //let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
 
-        #[cfg(debug_assertions)]
+        //#[cfg(debug_assertions)]
         let val = "server=trace,tracing=trace,hyper=trace,warp=trace,event=trace,now=trace,timer=trace";
 
         std::env::set_var("RUST_LOG", val);
@@ -45,7 +45,7 @@ async fn main() {
     let allowed_origin = vec!["http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1:4001", "http://localhost:4001"];
 
     #[cfg(not(debug_assertions))]
-    let allowed_origin = vec!["https://internet-of-plants.github.io", "https://iop-monitor-server.tk:4001"];
+    let allowed_origin = vec!["http://localhost:8080", "https://internet-of-plants.github.io", "https://iop-monitor-server.tk:4001"];
 
     let pool = Pool::connect(url).await.expect("Unable to connect to database");
     let pool: &'static Pool = Box::leak(Box::new(pool));
@@ -58,6 +58,10 @@ async fn main() {
             match token {
                 Some(mut token) if token.starts_with("Basic ") => {
                     token.drain(.."Basic ".len());
+                    // TODO: we should check if the MAC_ADDRESS header is the same as in the db
+                    // TODO: we could check for updates here, but we don't want to lose the
+                    // payload, think about a middleware (although it's unclear what to do with
+                    // failures)
                     api::user::authenticate(pool, token)
                         .await
                         .map_err(warp::Rejection::from)
@@ -125,12 +129,17 @@ async fn main() {
                     .and(auth)
                     .and_then(controllers::device_panic::index)
                 .or(warp::path::end()
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::query::query())
+                    .and_then(controllers::device_panic::plant))
+                .or(warp::path::end()
                     .and(warp::post())
                     .and(pool)
                     .and(auth)
                     .and(warp::body::content_length_limit(2048))
                     .and(warp::body::json())
-                    .and(warp::filters::header::header("MAC_ADDRESS"))
                     .and_then(controllers::device_panic::new))
                 .or(warp::path::end()
                     .and(warp::delete())
@@ -153,24 +162,23 @@ async fn main() {
                     .and(auth)
                     .and(warp::body::content_length_limit(2048))
                     .and(warp::body::bytes())
-                    .and(warp::filters::header::header("MAC_ADDRESS"))
                     .and_then(controllers::device_log::new)),
             ))
             .or(warp::path("update")
-                .and(warp::path::end()
-                    .and(warp::get())
-                    .and(pool)
-                    .and(auth)
-                    .and(warp::header::headers_cloned())
-                    .and_then(controllers::update::get))
-                .or(warp::path::param()
+                .and(warp::path::param()
                     .and(warp::path::end())
                     .and(warp::post())
                     .and(pool)
                     .and(auth)
                     // 1 MB max size
                     .and(warp::filters::multipart::form().max_length(1024 * 1024))
-                    .and_then(controllers::update::new)))
+                    .and_then(controllers::update::new)
+                .or(warp::path::end()
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::header::headers_cloned())
+                    .and_then(controllers::update::get))))
                 /*
                 .or(warp::path("index")
                     .and(warp::path::end())

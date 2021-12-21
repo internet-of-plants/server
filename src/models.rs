@@ -31,6 +31,8 @@ pub struct Plant {
     pub id: i64,
     pub name: String,
     pub mac: String,
+    pub version: Option<String>,
+    pub file_hash: Option<String>,
     pub description: Option<String>,
     pub owner_id: i64,
     pub created_at: i64,
@@ -59,6 +61,7 @@ pub struct Event {
     pub soil_temperature_celsius: f32,
     #[serde(with = "crate::utils::string")]
     pub plant_id: i64,
+    pub hash: String,
     pub created_at: i64,
 }
 
@@ -85,6 +88,7 @@ pub struct Update {
     pub plant_id: Option<i64>,
     pub file_hash: String,
     pub file_name: String,
+    pub version: String,
     pub created_at: i64,
 }
 
@@ -108,11 +112,17 @@ pub struct NewDevicePanic {
 pub struct DevicePanic {
     pub id: i64,
     pub plant_id: i64,
-    pub file: String,
-    pub line: u32,
+    pub _file: String,
+    pub _line: i16,
     pub func: String,
     pub msg: String,
     pub created_at: i64,
+}
+
+#[derive(FromRow, Debug, Clone, PartialEq, Serialize)]
+pub struct Auth {
+    pub user_id: i64,
+    pub plant_id: Option<i64>
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -120,6 +130,16 @@ pub struct Status {
     pub plant: Plant,
     pub event: Option<Event>,
     pub now: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DeviceStat {
+    pub version: String,
+    pub time_running: u64,
+    pub vcc: u16,
+    pub free_heap: u64,
+    pub free_stack: u32,
+    pub biggest_free_heap_block: u64
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

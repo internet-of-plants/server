@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS events (
     soil_temperature_celsius FLOAT(8) NOT NULL,
     soil_resistivity_raw SMALLINT NOT NULL,
     plant_id BIGINT NOT NULL,
+    hash VARCHAR(255) NOT NULL,
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()),
     FOREIGN KEY (plant_id) REFERENCES plants (id)
 );
@@ -73,8 +74,9 @@ CREATE TABLE IF NOT EXISTS updates (
     id BIGSERIAL PRIMARY KEY,
     owner_id BIGINT NOT NULL,
     plant_id BIGINT,
-    file_hash TEXT NOT NULL,
-    file_name TEXT NOT NULL,
+    file_hash VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    version VARCHAR(255) NOT NULL,
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM NOW()),
     FOREIGN KEY (owner_id) REFERENCES users (id),
     FOREIGN KEY (plant_id) REFERENCES plants (id)

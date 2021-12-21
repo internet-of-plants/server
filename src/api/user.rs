@@ -3,10 +3,10 @@ use codegen::{cache, exec_time};
 
 #[exec_time]
 #[cache(valid_for = 3600)]
-pub async fn authenticate(pool: &'static Pool, token: String) -> Result<i64> {
+pub async fn authenticate(pool: &'static Pool, token: String) -> Result<Auth> {
     debug!("Token: {}", token);
-    let id: Option<Id> = sqlx::query_as(
-        "SELECT users.id
+    let auth: Option<Auth> = sqlx::query_as(
+        "SELECT users.id as user_id, authentications.plant_id
         FROM users
         INNER JOIN authentications ON authentications.user_id = users.id
         WHERE authentications.token = $1",
@@ -14,10 +14,7 @@ pub async fn authenticate(pool: &'static Pool, token: String) -> Result<i64> {
     .bind(&token)
     .fetch_optional(pool)
     .await?;
-    match id {
-        Some(Id { id }) => Ok(id),
-        None => Err(Error::Forbidden),
-    }
+    Ok(auth.ok_or(Error::Forbidden)?)
 }
 
 #[exec_time]
