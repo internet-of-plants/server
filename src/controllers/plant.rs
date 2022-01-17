@@ -1,25 +1,32 @@
+use crate::db::device::DeviceId;
 use crate::prelude::*;
 use controllers::Result;
 use std::time::Duration;
 
 pub async fn get(pool: &'static Pool, auth: Auth, Id { id }: Id) -> Result<impl Reply> {
-    Ok(warp::reply::json(
-        &api::plant::get(pool, auth.user_id, id).await?,
-    ))
+    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let plant = db::plant::get(&mut txn, auth.user_id, DeviceId::new(id)).await?;
+    txn.commit().await.map_err(Error::from)?;
+    Ok(warp::reply::json(&plant))
 }
 
 pub async fn history(pool: &'static Pool, auth: Auth, req: RequestHistory) -> Result<impl Reply> {
+    let mut txn = pool.begin().await.map_err(Error::from)?;
     // TODO: easy DOS channel
-    let history = api::plant::history(
-        pool,
+    let history = db::plant::history(
+        &mut txn,
         auth.user_id,
-        req.id,
+        DeviceId::new(req.id),
         Duration::from_secs(req.since_secs_ago),
     )
     .await?;
+    txn.commit().await.map_err(Error::from)?;
     Ok(warp::reply::json(&history))
 }
 
 pub async fn index(pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
-    Ok(warp::reply::json(&api::plant::index(pool, auth.user_id).await?))
+    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let plants = db::plant::index(&mut txn, auth.user_id).await?;
+    txn.commit().await.map_err(Error::from)?;
+    Ok(warp::reply::json(&plants))
 }

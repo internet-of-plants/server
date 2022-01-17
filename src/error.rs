@@ -25,12 +25,27 @@ impl Error {
     pub async fn handle(rejection: Rejection) -> Result<impl warp::Reply, Infallible> {
         let status = if let Some(error) = rejection.find::<Self>() {
             match error {
-                error @ Self::Sqlx(_)
-                | error @ Self::Bcrypt(_)
-                | error @ Self::Warp(_)
-                | error @ Self::IO(_)
-                | error @ Self::Fmt(_)
-                | error @ Self::Utf8(_) => {
+                Self::Sqlx(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::Bcrypt(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::Warp(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::IO(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::Fmt(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::Utf8(error) => {
                     error!("{:?} {}", error, error);
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
@@ -46,9 +61,7 @@ impl Error {
                     warn!("Corrupt Binary");
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
-                Self::NotModified => {
-                    StatusCode::NOT_MODIFIED
-                }
+                Self::NotModified => StatusCode::NOT_MODIFIED,
                 Self::NothingFound => {
                     warn!("Nothing Found");
                     StatusCode::NOT_FOUND

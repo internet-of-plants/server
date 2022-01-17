@@ -18,7 +18,7 @@ http = "0.2"
 md5 = "0.7"
 
 derive_more = "0.99"
-sqlx = { version = "0.5", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres"] }
+sqlx = { version = "0.5", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "chrono"] }
 
 pretty_env_logger = "0.4"
 log = "0.4"
@@ -33,3 +33,5 @@ codegen = { path = "./codegen" }
 names = "0.11"
 
 bcrypt = "0.8"
+
+chrono = { version = "0.4.19", features = ["serde"] }

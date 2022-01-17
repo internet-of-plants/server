@@ -1,10 +1,12 @@
+use crate::db::device::DeviceId;
+use crate::db::user::UserId;
 use crate::prelude::*;
 use codegen::{cache, exec_time};
 use std::time::Duration;
 
 #[exec_time]
-#[cache]
-pub async fn get_plain(pool: &'static Pool, plant_id: i64) -> Result<Plant> {
+//#[cache]
+pub async fn get_plain(txn: &mut Transaction<'_>, plant_id: DeviceId) -> Result<Plant> {
     let plant: Option<Plant> = sqlx::query_as(
         "SELECT p.id, p.name, p.mac, u.version, u.file_hash, p.description, p.owner_id, p.created_at
         FROM plants p
@@ -14,7 +16,7 @@ pub async fn get_plain(pool: &'static Pool, plant_id: i64) -> Result<Plant> {
         LIMIT 1",
     )
     .bind(plant_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *txn)
     .await?;
     match plant {
         Some(plant) => Ok(plant),
@@ -23,25 +25,25 @@ pub async fn get_plain(pool: &'static Pool, plant_id: i64) -> Result<Plant> {
 }
 
 #[exec_time]
-pub async fn get(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<Status> {
-    api::plant::owns(pool, user_id, plant_id).await?;
-    let plant = api::plant::get_plain(pool, plant_id).await?;
-    let event = api::event::last_event(pool, plant_id).await?;
-    let now = api::now(pool).await?;
+pub async fn get(txn: &mut Transaction<'_>, user_id: UserId, plant_id: DeviceId) -> Result<Status> {
+    db::plant::owns(txn, user_id, plant_id).await?;
+    let plant = db::plant::get_plain(txn, plant_id).await?;
+    let event = db::event::last_event(txn, plant_id).await?;
+    let now = db::now(&mut *txn).await?;
     Ok(Status { plant, event, now })
 }
 
 #[exec_time]
-#[cache(valid_for = 3600)]
+//#[cache(valid_for = 3600)]
 pub async fn history(
-    pool: &'static Pool,
-    user_id: i64,
-    plant_id: i64,
+    txn: &mut Transaction<'_>,
+    user_id: UserId,
+    plant_id: DeviceId,
     since: Duration,
 ) -> Result<StatusHistory> {
-    api::plant::owns(pool, user_id, plant_id).await?;
-    let plant = api::plant::get_plain(pool, plant_id).await?;
-    let now = api::now(pool).await?;
+    db::plant::owns(txn, user_id, plant_id).await?;
+    let plant = db::plant::get_plain(txn, plant_id).await?;
+    let now = db::now(&mut *txn).await?;
 
     let since = now - since.as_secs();
     let events: Vec<Event> = sqlx::query_as(
@@ -52,36 +54,36 @@ pub async fn history(
         ORDER BY created_at ASC")
         .bind(plant_id)
         .bind(since as i64)
-        .fetch_all(pool)
+        .fetch_all(&mut *txn)
         .await?;
     Ok(StatusHistory { plant, events, now })
 }
 
 #[exec_time]
-#[cache(valid_for = 30)]
-pub async fn index(pool: &'static Pool, user_id: i64) -> Result<Vec<Status>> {
-    let now = api::now(pool).await?;
-    let plants: Vec<Id> = sqlx::query_as(
+//#[cache(valid_for = 30)]
+pub async fn index(txn: &mut Transaction<'_>, user_id: UserId) -> Result<Vec<Status>> {
+    let now = db::now(&mut *txn).await?;
+    let plants: Vec<(DeviceId,)> = sqlx::query_as(
         "SELECT id
         FROM plants
         WHERE owner_id = $1
         ORDER BY created_at DESC",
     )
     .bind(user_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *txn)
     .await?;
     let mut status = Vec::with_capacity(plants.len());
-    for Id { id } in plants {
-        let event = api::event::last_event(pool, id).await?;
-        let plant = api::plant::get_plain(pool, id).await?;
+    for (id,) in plants {
+        let event = db::event::last_event(txn, id).await?;
+        let plant = db::plant::get_plain(txn, id).await?;
         status.push(Status { plant, event, now })
     }
     Ok(status)
 }
 
 #[exec_time]
-#[cache(valid_for = 30)]
-pub async fn owns(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<()> {
+//#[cache(valid_for = 30)]
+pub async fn owns(txn: &mut Transaction<'_>, user_id: UserId, plant_id: DeviceId) -> Result<()> {
     let exists: Option<(i32,)> = sqlx::query_as(
         "SELECT 1
         FROM plants
@@ -90,7 +92,7 @@ pub async fn owns(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<()
     )
     .bind(user_id)
     .bind(plant_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *txn)
     .await?;
     match exists {
         Some(_) => Ok(()),
@@ -99,7 +101,7 @@ pub async fn owns(pool: &'static Pool, user_id: i64, plant_id: i64) -> Result<()
 }
 
 #[exec_time]
-pub async fn put(pool: &'static Pool, user_id: i64, mac_address: String) -> Result<i64> {
+pub async fn put(txn: &mut Transaction<'_>, user_id: UserId, mac_address: String) -> Result<i64> {
     let plant: Option<Id> = sqlx::query_as(
         "SELECT id
         FROM plants
@@ -108,7 +110,7 @@ pub async fn put(pool: &'static Pool, user_id: i64, mac_address: String) -> Resu
     )
     .bind(&mac_address)
     .bind(user_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *txn)
     .await?;
 
     if let Some(Id { id }) = plant {
@@ -125,7 +127,7 @@ pub async fn put(pool: &'static Pool, user_id: i64, mac_address: String) -> Resu
         .bind(&mac_address)
         .bind(&name)
         .bind(user_id)
-        .execute(pool)
+        .execute(&mut *txn)
         .await?;
     Ok(id)
 }

@@ -46,6 +46,7 @@ pub async fn run_migrations(url: &str) {
     use std::path::Path;
     use tokio::fs;
 
+    // TODO: have a lock here otherwise multiple server instances will race
     let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
     let vec: Vec<Migration> = match sqlx::query_as("SELECT id FROM migrations")
         .fetch_all(&mut connection)
@@ -57,8 +58,14 @@ pub async fn run_migrations(url: &str) {
     let latest = vec.iter().max().map_or(0, |m| m.id);
 
     let mut files = Vec::new();
-    let mut reader = fs::read_dir("migrations").await.unwrap();
-    while let Some(entry) = reader.next_entry().await.unwrap() {
+    let mut reader = fs::read_dir("migrations")
+        .await
+        .expect("Unable to find migrations folder");
+    while let Some(entry) = reader
+        .next_entry()
+        .await
+        .expect("Failed to read migration file")
+    {
         let number = entry
             .file_name()
             .to_str()
@@ -87,9 +94,11 @@ pub async fn run_migrations(url: &str) {
             sqlx::query(&format!("{};", string))
                 .execute(&mut transaction)
                 .await
-                .unwrap();
+                .expect(&format!("Failed to execute query: {}", string));
         }
         if file == 1 {
+            // The first transaction creates the migrations table, so we need a new transaction to
+            // insert into it
             transaction.commit().await.unwrap();
 
             let mut connection = sqlx::PgConnection::connect(url).await.unwrap();

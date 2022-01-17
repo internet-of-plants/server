@@ -1,7 +1,10 @@
+use crate::db::device::DeviceId;
+use crate::db::user::UserId;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Postgres};
 
 pub type Pool = PgPool;
+pub type Transaction<'a> = sqlx::Transaction<'a, Postgres>;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NewUser {
@@ -31,8 +34,8 @@ pub struct Plant {
     pub id: i64,
     pub name: String,
     pub mac: String,
-    pub version: Option<String>,
-    pub file_hash: Option<String>,
+    pub version: String,
+    pub file_hash: String,
     pub description: Option<String>,
     pub owner_id: i64,
     pub created_at: i64,
@@ -108,12 +111,12 @@ pub struct NewDevicePanic {
     pub msg: String,
 }
 
-#[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(FromRow, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DevicePanic {
     pub id: i64,
     pub plant_id: i64,
-    pub _file: String,
-    pub _line: i16,
+    pub file: String,
+    pub line: i16,
     pub func: String,
     pub msg: String,
     pub created_at: i64,
@@ -121,8 +124,8 @@ pub struct DevicePanic {
 
 #[derive(FromRow, Debug, Clone, PartialEq, Serialize)]
 pub struct Auth {
-    pub user_id: i64,
-    pub plant_id: Option<i64>
+    pub user_id: UserId,
+    pub device_id: Option<DeviceId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
