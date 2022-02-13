@@ -1,12 +1,12 @@
-use crate::{Collection, CollectionId, CollectionView, Device, WorkspaceId};
 use crate::prelude::*;
+use crate::{Collection, CollectionId, CollectionView, Device, WorkspaceId};
 use controllers::Result;
 
 pub async fn find(
     _workspace_id: WorkspaceId,
     collection_id: CollectionId,
     pool: &'static Pool,
-    auth: Auth,
+    _auth: Auth,
 ) -> Result<impl Reply> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
     // TODO: check that collection belongs to workspace and user belongs to workspace

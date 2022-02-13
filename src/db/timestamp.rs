@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
 pub type DateTime = chrono::DateTime<chrono::Utc>;

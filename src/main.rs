@@ -8,14 +8,14 @@ use crate::db::user::AuthToken;
 use crate::prelude::*;
 
 pub use crate::db::{
-    workspace::{WorkspaceId, Workspace, WorkspaceView},
-    collection::{CollectionId, Collection, CollectionView},
-    device::{DeviceId, Device, DeviceView, NewDevice},
-    device_log::{DeviceLogId, DeviceLog},
-    device_panic::{DevicePanicId, DevicePanic},
-    update::{UpdateId, Update},
-    user::{UserId, Username, User, NewUser},
-    event::{EventId, Event},
+    collection::{Collection, CollectionId, CollectionView},
+    device::{Device, DeviceId, DeviceView, NewDevice},
+    device_log::{DeviceLog, DeviceLogId},
+    device_panic::{DevicePanic, DevicePanicId},
+    event::{Event, EventId, NewEvent},
+    update::{Update, UpdateId},
+    user::{NewUser, User, UserId, Username},
+    workspace::{Workspace, WorkspaceId, WorkspaceView},
 };
 
 pub mod prelude {
@@ -222,43 +222,29 @@ async fn main() {
                     //    .and(auth)
                     //    .and_then(controllers::device_panic::index)
                     //.or(
-                    .and(
-                        warp::path::end()
-                            .and(warp::get())
-                            .and(pool)
-                            .and(auth)
-                            .and(warp::query::query())
-                            .and_then(controllers::device_panic::plant)
-                            .or(warp::path::end()
+                    .and(warp::path::end()
                                 .and(warp::post())
                                 .and(pool)
                                 .and(auth)
                                 .and(warp::body::content_length_limit(2048))
                                 .and(warp::body::json())
-                                .and_then(controllers::device_panic::new))
+                                .and_then(controllers::device_panic::new)
                             .or(warp::path::end()
                                 .and(warp::path::param())
                                 .and(warp::delete())
                                 .and(pool)
                                 .and(auth)
-                                .and_then(controllers::device_panic::solve)),
-                    ))
+                                .and_then(controllers::device_panic::solve))),
+                    )
                 .or(warp::path("log").and(
-                    warp::path("index")
-                        .and(warp::path::param())
-                        .and(warp::path::end())
-                        .and(warp::get())
-                        .and(pool)
-                        .and(auth)
-                        .and_then(controllers::device_log::index_old)
-                        .or(warp::path::end()
+                        warp::path::end()
                             .and(warp::post())
                             .and(pool)
                             .and(auth)
                             .and(warp::body::content_length_limit(2048))
                             .and(warp::body::bytes())
                             .and_then(controllers::device_log::new)),
-                ))
+                )
                 .or(warp::path("update").and(
                     warp::path::param()
                         .and(warp::path::end())
@@ -309,6 +295,7 @@ async fn main() {
                     "FREE_STACK",
                     "BIGGEST_BLOCK_DRAM",
                     "BIGGEST_BLOCK_IRAM",
+                    "x-ESP8266-sketch-md5",
                 ])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
         )

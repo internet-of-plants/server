@@ -1,8 +1,8 @@
-use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, WorkspaceId};
 use crate::prelude::*;
+use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, WorkspaceId};
 use controllers::Result;
 
-pub async fn solve(id: DevicePanicId, pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
+pub async fn solve(id: DevicePanicId, pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
     // TODO: enforce ownerships
     let mut txn = pool.begin().await.map_err(Error::from)?;
     DevicePanic::solve(&mut txn, id).await?;
@@ -26,21 +26,13 @@ pub async fn new(pool: &'static Pool, auth: Auth, mut error: NewDevicePanic) -> 
     Ok(StatusCode::OK)
 }
 
-pub async fn plant(pool: &'static Pool, auth: Auth, Id { id }: Id) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
-    //let panics = db::device_panic::plant(&mut txn, auth.user_id, id).await?;
-    let panics: Vec<String> = vec![];
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&panics))
-}
-
 pub async fn index(
     _workspace_id: WorkspaceId,
     _collection_id: CollectionId,
     device_id: DeviceId,
     limit: u32,
     pool: &'static Pool,
-    auth: Auth,
+    _auth: Auth,
 ) -> Result<impl Reply> {
     // TODO: enforce ownerships
     let mut txn = pool.begin().await.map_err(Error::from)?;

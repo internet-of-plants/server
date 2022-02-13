@@ -1,5 +1,5 @@
-use crate::{CollectionId, DeviceId, DeviceView, WorkspaceId};
 use crate::prelude::*;
+use crate::{CollectionId, DeviceId, DeviceView, WorkspaceId};
 use controllers::Result;
 
 pub async fn find(
@@ -7,7 +7,7 @@ pub async fn find(
     _collection_id: CollectionId,
     device_id: DeviceId,
     pool: &'static Pool,
-    auth: Auth,
+    _auth: Auth,
 ) -> Result<impl Reply> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
     let device = DeviceView::find_by_id(&mut txn, /*auth.user_id,*/ &device_id).await?;

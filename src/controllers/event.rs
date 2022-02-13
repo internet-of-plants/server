@@ -1,5 +1,5 @@
-use crate::{Event, NewEvent};
 use crate::prelude::*;
+use crate::{Event, NewEvent, Update};
 use codegen::exec_time;
 use controllers::Result;
 
@@ -51,13 +51,13 @@ pub async fn new(
         let mut txn = pool.begin().await.map_err(Error::from)?;
 
         info!(target: "event", "User: {:?}, MAC: {}, DeviceId: {:?}, Stat: {:?}", auth.user_id, mac, device_id, stat);
-        let event = Event::new(&mut txn, &device_id, event, stat.version).await;
+        Event::new(&mut txn, &device_id, event, stat.version.clone()).await?;
 
-        if let Some(update) = db::update::get(&mut txn, auth.user_id, device_id).await? {
-            if update.file_hash != stat.version {
+        if let Some(update) = Update::find_by_device(&mut txn, auth.user_id, device_id).await? {
+            if update.file_hash() != &stat.version {
                 txn.commit().await.map_err(Error::from)?;
                 return Ok(http::Response::builder()
-                    .header("LATEST_VERSION", update.file_hash)
+                    .header("LATEST_VERSION", update.file_hash())
                     .body(""));
             }
         }

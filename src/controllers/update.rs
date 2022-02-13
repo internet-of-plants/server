@@ -1,5 +1,5 @@
-use crate::DeviceId;
 use crate::prelude::*;
+use crate::{DeviceId, Update};
 use bytes::{Buf, BufMut};
 use controllers::Result;
 use futures::{StreamExt, TryStreamExt};
@@ -70,7 +70,7 @@ pub async fn new(
     file.write_all(&binary).await.map_err(Error::from)?;
 
     // TODO: storing a path in the db like this to read without care easily allows a DB hack to allow hijacking the server box too
-    if let Err(err) = db::update::new(
+    if let Err(err) = Update::new(
         &mut txn,
         auth.user_id,
         device_id,
@@ -112,15 +112,15 @@ pub async fn get(
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
     if let Some(device_id) = auth.device_id {
-        let update = match db::update::get(&mut txn, auth.user_id, device_id).await? {
+        let update = match Update::find_by_device(&mut txn, auth.user_id, device_id).await? {
             Some(update) => update,
             None => return Err(Error::NotModified)?,
         };
-        if update.file_hash == md5 {
+        if update.file_hash() == md5 {
             return Err(Error::NotModified)?;
         }
 
-        let content = tokio::fs::read(update.file_name)
+        let content = tokio::fs::read(update.file_name())
             .await
             .map_err(Error::from)?;
         let md5 = md5::compute(&content);
@@ -129,10 +129,11 @@ pub async fn get(
         for byte in md5 {
             write!(file_hash, "{:02X}", byte).map_err(Error::from)?;
         }
-        if file_hash != update.file_hash {
+        if file_hash != update.file_hash() {
             error!(
                 "Binary md5 didn't match the expected: {} != {}",
-                file_hash, update.file_hash
+                file_hash,
+                update.file_hash()
             );
             return Err(Error::CorruptBinary)?;
         }

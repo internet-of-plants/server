@@ -9,11 +9,9 @@ pub mod user;
 pub mod workspace;
 
 use crate::prelude::*;
-use codegen::{cache, exec_time};
 
 pub const OFFLINE_TIMEOUT: i64 = 270;
 
-#[exec_time]
 //#[cache(valid_for = 30)]
 pub async fn now(txn: &mut Transaction<'_>) -> Result<u64> {
     loop {

@@ -1,5 +1,5 @@
-use crate::{NewDevice, User, NewUser};
 use crate::prelude::*;
+use crate::{NewDevice, NewUser, User};
 use controllers::Result;
 
 pub async fn new(pool: &'static Pool, user: NewUser) -> Result<impl Reply> {

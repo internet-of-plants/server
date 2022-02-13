@@ -1,6 +1,6 @@
-use crate::DeviceId;
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
+use crate::DeviceId;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 

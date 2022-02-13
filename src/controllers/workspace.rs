@@ -1,11 +1,11 @@
-use crate::{Workspace, WorkspaceId, WorkspaceView};
 use crate::prelude::*;
+use crate::{Workspace, WorkspaceId, WorkspaceView};
 use controllers::Result;
 
 pub async fn find(
     workspace_id: WorkspaceId,
     pool: &'static Pool,
-    auth: Auth,
+    _auth: Auth,
 ) -> Result<impl Reply> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
     let workspace = WorkspaceView::find_by_id(&mut txn, &workspace_id).await?;

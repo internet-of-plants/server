@@ -1,6 +1,6 @@
-use crate::{Collection, User, UserId, Username};
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
+use crate::{Collection, User, UserId, Username};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -114,17 +114,5 @@ impl Workspace {
         .fetch_one(&mut *txn)
         .await?;
         Ok(workspace)
-    }
-
-    pub fn set_name(name: String) {
-        todo!();
-    }
-
-    pub fn set_description(description: String) {
-        todo!();
-    }
-
-    pub fn unset_description() {
-        todo!();
     }
 }

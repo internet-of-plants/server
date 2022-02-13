@@ -1,6 +1,6 @@
-use crate::{Collection, CollectionId, Event, Workspace, UserId};
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
+use crate::{Collection, CollectionId, Event, UserId, Workspace};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -166,17 +166,5 @@ impl Device {
         .fetch_all(&mut *txn)
         .await?;
         Ok(devices)
-    }
-
-    pub fn set_name(name: String) {
-        todo!();
-    }
-
-    pub fn set_description(description: String) {
-        todo!();
-    }
-
-    pub fn unset_description() {
-        todo!();
     }
 }

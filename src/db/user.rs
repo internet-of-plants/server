@@ -1,6 +1,6 @@
-use crate::{Device, NewDevice, Workspace, WorkspaceId};
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
+use crate::{Device, NewDevice, Workspace, WorkspaceId};
 use codegen::exec_time;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -188,9 +188,5 @@ impl User {
         .execute(&mut *txn)
         .await?;
         Ok(())
-    }
-
-    pub fn set_email(name: String) -> Result<()> {
-        todo!();
     }
 }
