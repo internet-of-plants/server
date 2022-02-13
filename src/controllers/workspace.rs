@@ -1,7 +1,6 @@
-use crate::db::workspace::{Workspace, WorkspaceId, WorkspaceView};
+use crate::{Workspace, WorkspaceId, WorkspaceView};
 use crate::prelude::*;
 use controllers::Result;
-use std::time::Duration;
 
 pub async fn find(
     workspace_id: WorkspaceId,

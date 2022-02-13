@@ -1,4 +1,4 @@
-use crate::db::device::DeviceId;
+use crate::DeviceId;
 use crate::prelude::*;
 use bytes::{Buf, BufMut};
 use controllers::Result;
@@ -7,14 +7,14 @@ use std::fmt::Write;
 use warp::filters::multipart::FormData;
 
 pub async fn new(
-    plant_id: DeviceId,
+    device_id: DeviceId,
     pool: &'static Pool,
     auth: Auth,
     mut form: FormData,
 ) -> Result<impl Reply> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
 
-    db::plant::owns(&mut txn, auth.user_id, plant_id).await?;
+    //db::plant::owns(&mut txn, auth.user_id, device_id).await?;
 
     let mut version = form
         .next()
@@ -58,7 +58,7 @@ pub async fn new(
         .to_uppercase();
     let filename = format!(
         "bins/{}-{:?}-{:?}-{}-{}.bin",
-        version, auth.user_id, plant_id, now, file_hash
+        version, auth.user_id, device_id, now, file_hash
     );
     let mut file = tokio::fs::File::create(&filename)
         .await
@@ -73,7 +73,7 @@ pub async fn new(
     if let Err(err) = db::update::new(
         &mut txn,
         auth.user_id,
-        plant_id,
+        device_id,
         file_hash,
         filename.clone(),
         version.to_owned(),
@@ -111,8 +111,8 @@ pub async fn get(
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
-    if let Some(plant_id) = auth.device_id {
-        let update = match db::update::get(&mut txn, auth.user_id, plant_id).await? {
+    if let Some(device_id) = auth.device_id {
+        let update = match db::update::get(&mut txn, auth.user_id, device_id).await? {
             Some(update) => update,
             None => return Err(Error::NotModified)?,
         };

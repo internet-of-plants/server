@@ -1,8 +1,6 @@
-use crate::db::device::DeviceId;
-use crate::db::user::UserId;
-use crate::prelude::*;
-use codegen::{cache, exec_time};
+use crate::DeviceId;
 use crate::db::timestamp::{now, DateTime};
+use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -21,15 +19,24 @@ impl DeviceLog {
     pub async fn new(txn: &mut Transaction<'_>, device_id: &DeviceId, log: String) -> Result<Self> {
         // TODO: auditing event with history actor
         info!("Log (device_id: {:?}): {}", device_id, log);
-        let (id,): (DeviceLogId,) = sqlx::query_as("INSERT INTO device_logs (device_id, log) VALUES ($1, $2) RETURNING id")
-            .bind(device_id)
-            .bind(&log)
-            .fetch_one(txn)
-            .await?;
-        Ok(Self { id, log, created_at: now() })
+        let (id,): (DeviceLogId,) =
+            sqlx::query_as("INSERT INTO device_logs (device_id, log) VALUES ($1, $2) RETURNING id")
+                .bind(device_id)
+                .bind(&log)
+                .fetch_one(txn)
+                .await?;
+        Ok(Self {
+            id,
+            log,
+            created_at: now(),
+        })
     }
 
-    pub async fn first_n_from_device(txn: &mut Transaction<'_>, device_id: &DeviceId, limit: u32) -> Result<Vec<Self>> {
+    pub async fn first_n_from_device(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+        limit: u32,
+    ) -> Result<Vec<Self>> {
         let device_logs: Vec<DeviceLog> = sqlx::query_as(
             "SELECT id, log, created_at
             FROM device_logs

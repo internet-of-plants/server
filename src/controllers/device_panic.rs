@@ -1,7 +1,4 @@
-use crate::db::workspace::WorkspaceId;
-use crate::db::collection::CollectionId;
-use crate::db::device::DeviceId;
-use crate::db::device_panic::{DevicePanic, DevicePanicId};
+use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, WorkspaceId};
 use crate::prelude::*;
 use controllers::Result;
 
@@ -37,7 +34,14 @@ pub async fn plant(pool: &'static Pool, auth: Auth, Id { id }: Id) -> Result<imp
     Ok(warp::reply::json(&panics))
 }
 
-pub async fn index(_workspace_id: WorkspaceId, _collection_id: CollectionId, device_id: DeviceId, limit: u32, pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
+pub async fn index(
+    _workspace_id: WorkspaceId,
+    _collection_id: CollectionId,
+    device_id: DeviceId,
+    limit: u32,
+    pool: &'static Pool,
+    auth: Auth,
+) -> Result<impl Reply> {
     // TODO: enforce ownerships
     let mut txn = pool.begin().await.map_err(Error::from)?;
     let panics = DevicePanic::first_n_from_device(&mut txn, &device_id, limit).await?;

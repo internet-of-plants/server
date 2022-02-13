@@ -1,8 +1,6 @@
-use crate::db::device::DeviceId;
-use crate::db::user::UserId;
-use crate::prelude::*;
-use codegen::{cache, exec_time};
+use crate::DeviceId;
 use crate::db::timestamp::{now, DateTime};
+use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +38,11 @@ pub struct DevicePanic {
 }
 
 impl DevicePanic {
-    pub async fn new(txn: &mut Transaction<'_>, device_id: &DeviceId, new_device_panic: NewDevicePanic) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+        new_device_panic: NewDevicePanic,
+    ) -> Result<Self> {
         // TODO: auditing event with history actor
         info!("Log (device_id: {:?}): {:?}", device_id, new_device_panic);
         let (id,): (DevicePanicId,) = sqlx::query_as("INSERT INTO device_panics (device_id, \"file\", line, func, msg) VALUES ($1, $2, $3, $4, $5) RETURNING id")
@@ -57,11 +59,15 @@ impl DevicePanic {
             line: new_device_panic.line,
             func: new_device_panic.func,
             msg: new_device_panic.msg,
-            created_at: now()
+            created_at: now(),
         })
     }
 
-    pub async fn first_n_from_device(txn: &mut Transaction<'_>, device_id: &DeviceId, limit: u32) -> Result<Vec<Self>> {
+    pub async fn first_n_from_device(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+        limit: u32,
+    ) -> Result<Vec<Self>> {
         let device_panics: Vec<DevicePanic> = sqlx::query_as(
             "SELECT p.id, p.file, p.line, p.func, p.msg, p.created_at
             FROM device_panics as p

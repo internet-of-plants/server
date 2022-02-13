@@ -1,5 +1,4 @@
-use crate::db::device::NewDevice;
-use crate::db::user::{NewUser, User};
+use crate::{NewDevice, User, NewUser};
 use crate::prelude::*;
 use controllers::Result;
 

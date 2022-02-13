@@ -1,7 +1,5 @@
-use crate::db::collection::{Collection, CollectionView};
-use crate::db::device::DeviceView;
+use crate::{Collection, User, UserId, Username};
 use crate::db::timestamp::{now, DateTime};
-use crate::db::user::{User, UserId, Username};
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};

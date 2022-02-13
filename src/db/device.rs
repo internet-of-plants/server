@@ -1,8 +1,5 @@
-use crate::db::collection::{Collection, CollectionId};
+use crate::{Collection, CollectionId, Event, Workspace, UserId};
 use crate::db::timestamp::{now, DateTime};
-use crate::db::user::UserId;
-use crate::db::event::Event;
-use crate::db::workspace::Workspace;
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -58,6 +55,7 @@ impl DeviceView {
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Device {
     id: DeviceId,
+    collection_id: CollectionId,
     name: Option<String>,
     description: Option<String>,
     mac: String,
@@ -77,7 +75,15 @@ impl Device {
         &self.id
     }
 
-    pub async fn set_file_hash(txn: &mut Transaction<'_>, device_id: &DeviceId, file_hash: &str) -> Result<()> {
+    pub fn collection_id(&self) -> &CollectionId {
+        &self.collection_id
+    }
+
+    pub async fn set_file_hash(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+        file_hash: &str,
+    ) -> Result<()> {
         sqlx::query("UPDATE devices SET file_hash = $1 WHERE id = $2")
             .bind(file_hash)
             .bind(device_id)
@@ -113,6 +119,7 @@ impl Device {
                 .await?;
         Ok(Self {
             id,
+            collection_id: *collection.id(),
             name: None,
             description: None,
             mac: new_device.mac,
@@ -124,7 +131,7 @@ impl Device {
 
     pub async fn try_find_by_mac(txn: &mut Transaction<'_>, mac: &str) -> Result<Option<Self>> {
         let device: Option<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
              FROM devices as dev
              WHERE dev.mac = $1",
         )
@@ -136,7 +143,7 @@ impl Device {
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, device_id: &DeviceId) -> Result<Self> {
         let device: Self = sqlx::query_as(
-            "SELECT dev.id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
              FROM devices as dev
              WHERE dev.id = $1",
         )
@@ -151,7 +158,7 @@ impl Device {
         collection_id: &CollectionId,
     ) -> Result<Vec<Self>> {
         let devices: Vec<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.name, dev.description, dev.mac, dev.file_hash, dev.created_at, dev.updated_at
              FROM devices as dev
              WHERE dev.collection_id = $1",
         )

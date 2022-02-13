@@ -4,8 +4,19 @@ pub mod error;
 pub mod models;
 pub mod utils;
 
-use crate::db::user::{AuthToken, User};
+use crate::db::user::AuthToken;
 use crate::prelude::*;
+
+pub use crate::db::{
+    workspace::{WorkspaceId, Workspace, WorkspaceView},
+    collection::{CollectionId, Collection, CollectionView},
+    device::{DeviceId, Device, DeviceView, NewDevice},
+    device_log::{DeviceLogId, DeviceLog},
+    device_panic::{DevicePanicId, DevicePanic},
+    update::{UpdateId, Update},
+    user::{UserId, Username, User, NewUser},
+    event::{EventId, Event},
+};
 
 pub mod prelude {
     pub use crate::error::{Error, Result};
@@ -27,7 +38,7 @@ async fn main() {
 
     if std::env::var("RUST_LOG").is_err() {
         #[cfg(not(debug_assertions))]
-        let val = "server=debug,tracing=info,hyper=info,warp=debug,event=info,now=info,timer=info";
+        let val = "server=debug,warp=debug,event=info,now=info,timer=info";
 
         #[cfg(debug_assertions)]
         let val =
@@ -173,27 +184,27 @@ async fn main() {
                     .and(pool)
                     .and(auth)
                     .and_then(controllers::device_panic::index))
-                .or(warp::path("plant").and(
-                    warp::path("index")
-                        .and(warp::path::end())
-                        .and(warp::get())
-                        .and(pool)
-                        .and(auth)
-                        .and_then(controllers::plant::index)
-                        .or(warp::path("history")
-                            .and(warp::path::end())
-                            .and(warp::get())
-                            .and(pool)
-                            .and(auth)
-                            .and(warp::query::query())
-                            .and_then(controllers::plant::history))
-                        .or(warp::path::end()
-                            .and(warp::get())
-                            .and(pool)
-                            .and(auth)
-                            .and(warp::query::query())
-                            .and_then(controllers::plant::get)),
-                ))
+                //.or(warp::path("plant").and(
+                //    warp::path("index")
+                //        .and(warp::path::end())
+                //        .and(warp::get())
+                //        .and(pool)
+                //        .and(auth)
+                //        .and_then(controllers::plant::index)
+                //        .or(warp::path("history")
+                //            .and(warp::path::end())
+                //            .and(warp::get())
+                //            .and(pool)
+                //            .and(auth)
+                //            .and(warp::query::query())
+                //            .and_then(controllers::plant::history))
+                //        .or(warp::path::end()
+                //            .and(warp::get())
+                //            .and(pool)
+                //            .and(auth)
+                //            .and(warp::query::query())
+                //            .and_then(controllers::plant::get)),
+                //))
                 .or(warp::path("event")
                     .and(warp::path::end())
                     .and(warp::post())
@@ -255,7 +266,7 @@ async fn main() {
                         .and(pool)
                         .and(auth)
                         // 1 MB max size
-                        .and(warp::filters::multipart::form().max_length(1024 * 1024))
+                        .and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
                         .and_then(controllers::update::new)
                         .or(warp::path::end()
                             .and(warp::get())
@@ -296,8 +307,8 @@ async fn main() {
                     "FREE_DRAM",
                     "FREE_IRAM",
                     "FREE_STACK",
-                    "BIGGEST_DRAM_BLOCK",
-                    "BIGGEST_IRAM_BLOCK",
+                    "BIGGEST_BLOCK_DRAM",
+                    "BIGGEST_BLOCK_IRAM",
                 ])
                 .allow_methods(vec!["GET", "POST", "DELETE", "OPTIONS", "PUT"]),
         )

@@ -18,6 +18,7 @@ pub enum Error {
     NotModified,
     NothingFound,
     CorruptBinary,
+    MissingHeader(&'static str),
     Warp(warp::Error),
 }
 
@@ -52,6 +53,10 @@ impl Error {
                 Self::Forbidden => {
                     warn!("Forbidden");
                     StatusCode::FORBIDDEN
+                }
+                Self::MissingHeader(header) => {
+                    error!("Missing HeaderBad: {}", header);
+                    StatusCode::BAD_REQUEST
                 }
                 Self::BadData => {
                     warn!("Bad Data");

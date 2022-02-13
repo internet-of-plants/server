@@ -1,23 +1,8 @@
-use crate::db::device::DeviceId;
-use crate::db::user::UserId;
-use derive_more::FromStr;
-use crate::prelude::*;
-use codegen::{cache, exec_time};
-use serde::{Deserialize, Serialize};
+use crate::DeviceId;
 use crate::db::timestamp::{now, DateTime};
-
-pub async fn last_event(txn: &mut Transaction<'_>, farm_id: DeviceId) -> Result<Option<crate::models::Event>> {
-    let event: Option<crate::models::Event> = sqlx::query_as(
-        "SELECT id, air_temperature_celsius, air_humidity_percentage, air_heat_index_celsius, soil_resistivity_raw, soil_temperature_celsius, farm_id, hash, created_at
-        FROM events
-        WHERE farm_id = $1
-        ORDER BY created_at DESC")
-        .bind(farm_id)
-        .fetch_optional(txn)
-        .await?;
-    debug!("Last Event: {:?}", event);
-    Ok(event)
-}
+use crate::prelude::*;
+use derive_more::FromStr;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
@@ -49,13 +34,19 @@ impl Event {
         &self.id
     }
 
-    pub async fn new(txn: &mut Transaction<'_>, device_id: &DeviceId, new_event: NewEvent, file_hash: String) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+        new_event: NewEvent,
+        file_hash: String,
+    ) -> Result<Self> {
         //db::plant::owns(txn, user_id, farm_id).await?;
         // TODO: log error if something is NaN
-        let (event_id,): (EventId,) = sqlx::query_as("INSERT INTO events (device_id) VALUES ($1) RETURNING id")
-            .bind(device_id)
-            .fetch_one(&mut *txn)
-            .await?;
+        let (event_id,): (EventId,) =
+            sqlx::query_as("INSERT INTO events (device_id) VALUES ($1) RETURNING id")
+                .bind(device_id)
+                .fetch_one(&mut *txn)
+                .await?;
         sqlx::query("INSERT INTO measurements (air_temperature_celsius, air_humidity_percentage, air_heat_index_celsius, soil_resistivity_raw, soil_temperature_celsius, event_id, firmware_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)")
             .bind(new_event.air_temperature_celsius)
             .bind(new_event.air_humidity_percentage)
@@ -78,7 +69,10 @@ impl Event {
         })
     }
 
-    pub async fn last_from_device(txn: &mut Transaction<'_>, device_id: &DeviceId) -> Result<Option<Self>> {
+    pub async fn last_from_device(
+        txn: &mut Transaction<'_>,
+        device_id: &DeviceId,
+    ) -> Result<Option<Self>> {
         let event: Option<Event> = sqlx::query_as(
             "SELECT m.id, m.air_temperature_celsius, m.air_humidity_percentage, m.air_heat_index_celsius, m.soil_resistivity_raw, m.soil_temperature_celsius, m.firmware_hash, m.created_at
             FROM measurements as m

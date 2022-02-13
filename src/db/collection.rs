@@ -1,6 +1,5 @@
-use crate::db::device::Device;
+use crate::{Device, WorkspaceId};
 use crate::db::timestamp::{now, DateTime};
-use crate::db::workspace::WorkspaceId;
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -106,7 +105,7 @@ impl Collection {
         )
         .bind(collection_id)
         .fetch_one(&mut *txn)
-        .await.expect("OO");
+        .await?;
         Ok(collection)
     }
 
