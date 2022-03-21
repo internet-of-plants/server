@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::{Event, NewEvent, Update};
-use codegen::exec_time;
 use controllers::Result;
 
 fn optional_parse_header<T: std::str::FromStr>(
@@ -28,7 +27,6 @@ fn parse_header<T: std::str::FromStr>(
     optional_parse_header(headers, key)?.ok_or(Error::MissingHeader(key))
 }
 
-#[exec_time]
 pub async fn new(
     pool: &'static Pool,
     auth: Auth,

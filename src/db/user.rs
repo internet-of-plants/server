@@ -1,7 +1,6 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
 use crate::{Device, NewDevice, Organization, OrganizationId};
-use codegen::exec_time;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use warp::Reply;
@@ -91,7 +90,6 @@ impl User {
     // TODO: device auth should be tied to the device not the user, so the user can delete their account, or move
     // the device between collections/organizations
     // TODO: move this to Auth struct
-    #[exec_time]
     pub async fn find_by_auth_token(txn: &mut Transaction<'_>, token: AuthToken) -> Result<Auth> {
         debug!("Token: {:?}", token);
         let auth: Option<Auth> = sqlx::query_as(
