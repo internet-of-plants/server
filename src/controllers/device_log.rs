@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DeviceLog, WorkspaceId};
+use crate::{CollectionId, DeviceId, DeviceLog, OrganizationId};
 use bytes::Bytes;
 use controllers::Result;
 
@@ -16,7 +16,7 @@ pub async fn new(pool: &'static Pool, auth: Auth, log: Bytes) -> Result<impl Rep
 }
 
 pub async fn index(
-    _workspace_id: WorkspaceId,
+    _organization_id: OrganizationId,
     _collection_id: CollectionId,
     device_id: DeviceId,
     limit: u32,

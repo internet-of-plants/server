@@ -15,7 +15,7 @@ pub use crate::db::{
     event::{Event, EventId, NewEvent},
     update::{Update, UpdateId},
     user::{NewUser, User, UserId, Username},
-    workspace::{Workspace, WorkspaceId, WorkspaceView},
+    organization::{Organization, OrganizationId, OrganizationView},
 };
 
 pub mod prelude {
@@ -123,20 +123,20 @@ async fn main() {
                             .and(warp::body::json())
                             .and_then(controllers::user::new)),
                 )
-                .or(warp::path("workspace")
+                .or(warp::path("organization")
                     .and(warp::path::end())
                     .and(warp::get())
                     .and(pool)
                     .and(auth)
-                    .and_then(controllers::workspace::from_user))
-                .or(warp::path("workspace")
+                    .and_then(controllers::organization::from_user))
+                .or(warp::path("organization")
                     .and(warp::path::param())
                     .and(warp::path::end())
                     .and(warp::get())
                     .and(pool)
                     .and(auth)
-                    .and_then(controllers::workspace::find))
-                .or(warp::path("workspace")
+                    .and_then(controllers::organization::find))
+                .or(warp::path("organization")
                     .and(warp::path::param())
                     .and(warp::path("collection"))
                     .and(warp::path::param())
@@ -145,7 +145,7 @@ async fn main() {
                     .and(pool)
                     .and(auth)
                     .and_then(controllers::collection::find))
-                .or(warp::path("workspace")
+                .or(warp::path("organization")
                     .and(warp::path::param())
                     .and(warp::path("collection"))
                     .and(warp::path::param())
@@ -156,7 +156,7 @@ async fn main() {
                     .and(pool)
                     .and(auth)
                     .and_then(controllers::device::find))
-                .or(warp::path("workspace")
+                .or(warp::path("organization")
                     .and(warp::path::param())
                     .and(warp::path("collection"))
                     .and(warp::path::param())
@@ -170,7 +170,7 @@ async fn main() {
                     .and(pool)
                     .and(auth)
                     .and_then(controllers::device_log::index))
-                .or(warp::path("workspace")
+                .or(warp::path("organization")
                     .and(warp::path::param())
                     .and(warp::path("collection"))
                     .and(warp::path::param())

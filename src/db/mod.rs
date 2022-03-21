@@ -6,7 +6,7 @@ pub mod event;
 pub mod timestamp;
 pub mod update;
 pub mod user;
-pub mod workspace;
+pub mod organization;
 
 use crate::prelude::*;
 

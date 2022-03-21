@@ -1,9 +1,9 @@
 use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DeviceView, WorkspaceId};
+use crate::{CollectionId, DeviceId, DeviceView, OrganizationId};
 use controllers::Result;
 
 pub async fn find(
-    _workspace_id: WorkspaceId,
+    _organization_id: OrganizationId,
     _collection_id: CollectionId,
     device_id: DeviceId,
     pool: &'static Pool,

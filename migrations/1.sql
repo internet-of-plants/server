@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS migrations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS workspaces (
+CREATE TABLE IF NOT EXISTS organizations (
     id BIGSERIAL PRIMARY KEY NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -16,20 +16,20 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     username VARCHAR(255) NOT NULL UNIQUE,
-    default_workspace_id BIGINT NOT NULL UNIQUE,
+    default_organization_id BIGINT NOT NULL UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    FOREIGN KEY (default_workspace_id) REFERENCES workspaces (id),
+    FOREIGN KEY (default_organization_id) REFERENCES organizations (id),
     CHECK (email <> '' AND username <> '')
 );
 
-CREATE TABLE IF NOT EXISTS user_belongs_to_workspace (
+CREATE TABLE IF NOT EXISTS user_belongs_to_organization (
     id BIGSERIAL PRIMARY KEY NOT NULL,
     user_id BIGINT NOT NULL,
-    workspace_id BIGINT NOT NULL,
+    organization_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (workspace_id) REFERENCES workspaces (id)
+    FOREIGN KEY (organization_id) REFERENCES organizations (id)
 );
 
 CREATE TABLE IF NOT EXISTS collections (
@@ -40,13 +40,13 @@ CREATE TABLE IF NOT EXISTS collections (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS collection_belongs_to_workspace (
+CREATE TABLE IF NOT EXISTS collection_belongs_to_organization (
     id BIGSERIAL PRIMARY KEY NOT NULL,
     collection_id BIGINT NOT NULL,
-    workspace_id BIGINT NOT NULL,
+    organization_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     FOREIGN KEY (collection_id) REFERENCES collections (id),
-    FOREIGN KEY (workspace_id) REFERENCES workspaces (id)
+    FOREIGN KEY (organization_id) REFERENCES organizations (id)
 );
 
 CREATE TABLE IF NOT EXISTS devices (

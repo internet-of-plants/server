@@ -1,6 +1,6 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
-use crate::{Device, WorkspaceId};
+use crate::{Device, OrganizationId};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +57,7 @@ impl Collection {
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: String,
-        workspace_id: &WorkspaceId,
+        organization_id: &OrganizationId,
     ) -> Result<Self> {
         if name.is_empty() {
             return Err(Error::BadData);
@@ -69,7 +69,7 @@ impl Collection {
         .bind(&name)
         .fetch_one(&mut *txn)
         .await?;
-        Self::associate_to_workspace(&mut *txn, &id, workspace_id).await?;
+        Self::associate_to_organization(&mut *txn, &id, organization_id).await?;
         Ok(Self {
             id,
             name,
@@ -79,16 +79,16 @@ impl Collection {
         })
     }
 
-    pub async fn associate_to_workspace(
+    pub async fn associate_to_organization(
         txn: &mut Transaction<'_>,
         collection_id: &CollectionId,
-        workspace_id: &WorkspaceId,
+        organization_id: &OrganizationId,
     ) -> Result<()> {
         sqlx::query(
-            "INSERT INTO collection_belongs_to_workspace (collection_id, workspace_id) VALUES ($1, $2)",
+            "INSERT INTO collection_belongs_to_organization (collection_id, organization_id) VALUES ($1, $2)",
         )
         .bind(collection_id)
-        .bind(workspace_id)
+        .bind(organization_id)
         .execute(&mut *txn)
         .await?;
         Ok(())
@@ -109,17 +109,17 @@ impl Collection {
         Ok(collection)
     }
 
-    pub async fn from_workspace(
+    pub async fn from_organization(
         txn: &mut Transaction<'_>,
-        workspace_id: &WorkspaceId,
+        organization_id: &OrganizationId,
     ) -> Result<Vec<Self>> {
         let collections: Vec<Self> = sqlx::query_as(
             "SELECT col.id, col.name, col.description, col.created_at, col.updated_at
                 FROM collections as col
-                INNER JOIN collection_belongs_to_workspace as bt ON bt.collection_id = col.id
-                WHERE bt.workspace_id = $1",
+                INNER JOIN collection_belongs_to_organization as bt ON bt.collection_id = col.id
+                WHERE bt.organization_id = $1",
         )
-        .bind(workspace_id)
+        .bind(organization_id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(collections)

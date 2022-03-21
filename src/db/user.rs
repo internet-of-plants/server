@@ -1,6 +1,6 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
-use crate::{Device, NewDevice, Workspace, WorkspaceId};
+use crate::{Device, NewDevice, Organization, OrganizationId};
 use codegen::exec_time;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -65,19 +65,19 @@ impl User {
             return Err(Error::BadData);
         }
 
-        let workspace = Workspace::new(&mut *txn, user.username.clone()).await?;
+        let organization = Organization::new(&mut *txn, user.username.clone()).await?;
 
         let hash = utils::hash_password(&user.password)?;
         let (id,) = sqlx::query_as::<_, (UserId,)>(
-            "INSERT INTO users (email, password_hash, username, default_workspace_id) VALUES ($1, $2, $3, $4) RETURNING id",
+            "INSERT INTO users (email, password_hash, username, default_organization_id) VALUES ($1, $2, $3, $4) RETURNING id",
         )
         .bind(&user.email)
         .bind(&hash)
         .bind(&user.username)
-        .bind(workspace.id())
+        .bind(organization.id())
         .fetch_one(&mut *txn)
         .await?;
-        Self::associate_to_workspace(&mut *txn, &id, workspace.id()).await?;
+        Self::associate_to_organization(&mut *txn, &id, organization.id()).await?;
 
         Ok(Self {
             id,
@@ -89,7 +89,7 @@ impl User {
     }
 
     // TODO: device auth should be tied to the device not the user, so the user can delete their account, or move
-    // the device between collections/workspaces
+    // the device between collections/organizations
     // TODO: move this to Auth struct
     #[exec_time]
     pub async fn find_by_auth_token(txn: &mut Transaction<'_>, token: AuthToken) -> Result<Auth> {
@@ -156,17 +156,17 @@ impl User {
         todo!();
     }
 
-    pub async fn from_workspace(
+    pub async fn from_organization(
         txn: &mut Transaction<'_>,
-        workspace_id: &WorkspaceId,
+        organization_id: &OrganizationId,
     ) -> Result<Vec<Username>> {
         let users: Vec<Username> = sqlx::query_as::<_, (Username,)>(
             "SELECT u.username
              FROM users as u
-             INNER JOIN user_belongs_to_workspace as bt ON bt.user_id = u.id
-             WHERE bt.workspace_id = $1",
+             INNER JOIN user_belongs_to_organization as bt ON bt.user_id = u.id
+             WHERE bt.organization_id = $1",
         )
-        .bind(workspace_id)
+        .bind(organization_id)
         .fetch_all(&mut *txn)
         .await?
         .into_iter()
@@ -175,16 +175,16 @@ impl User {
         Ok(users)
     }
 
-    pub async fn associate_to_workspace(
+    pub async fn associate_to_organization(
         txn: &mut Transaction<'_>,
         user_id: &UserId,
-        workspace_id: &WorkspaceId,
+        organization_id: &OrganizationId,
     ) -> Result<()> {
         sqlx::query(
-            "INSERT INTO user_belongs_to_workspace (user_id, workspace_id) VALUES ($1, $2)",
+            "INSERT INTO user_belongs_to_organization (user_id, organization_id) VALUES ($1, $2)",
         )
         .bind(user_id)
-        .bind(workspace_id)
+        .bind(organization_id)
         .execute(&mut *txn)
         .await?;
         Ok(())

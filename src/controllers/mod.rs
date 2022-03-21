@@ -5,6 +5,6 @@ pub mod device_panic;
 pub mod event;
 pub mod update;
 pub mod user;
-pub mod workspace;
+pub mod organization;
 
 pub type Result<T, E = warp::Rejection> = std::result::Result<T, E>;

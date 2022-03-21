@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, WorkspaceId};
+use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, OrganizationId};
 use controllers::Result;
 
 pub async fn solve(id: DevicePanicId, pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
@@ -27,7 +27,7 @@ pub async fn new(pool: &'static Pool, auth: Auth, mut error: NewDevicePanic) -> 
 }
 
 pub async fn index(
-    _workspace_id: WorkspaceId,
+    _organization_id: OrganizationId,
     _collection_id: CollectionId,
     device_id: DeviceId,
     limit: u32,
