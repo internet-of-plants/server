@@ -5,6 +5,12 @@ use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use warp::Reply;
 
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Login {
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
 pub struct Username(String);

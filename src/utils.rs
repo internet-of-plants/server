@@ -2,6 +2,11 @@ use crate::prelude::*;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{cell::Cell, fmt};
 
+#[derive(FromRow, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Migration {
+    pub id: i16,
+}
+
 pub fn pad_left(src: &str, padding: &str, len: usize) -> String {
     if src.len() >= len {
         src.to_owned()
@@ -77,12 +82,33 @@ pub async fn run_migrations(url: &str) {
             files.push(number);
         }
     }
+    let has_files = files.len() > 0;
     files.sort_unstable();
     connection.close().await.unwrap();
 
-    for file in files {
+    if files.get(0) == Some(&1) {
+        let query = "CREATE TABLE IF NOT EXISTS migrations (
+  id SMALLINT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)";
         let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
         let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
+
+        info!("Creating migrations table");
+        debug!("{}", query);
+        sqlx::query(&query)
+            .execute(&mut transaction)
+            .await
+            .expect(&format!("Failed to execute query: {}", query));
+
+        // The first transaction creates the migrations table, so we need a new transaction to
+        // insert into it
+        transaction.commit().await.unwrap();
+    }
+    let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
+    let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
+
+    for file in files {
         info!("Running migration {}.sql", file);
         let path = Path::new("migrations").join(format!("{}.sql", file));
         let strings = fs::read_to_string(path).await.unwrap();
@@ -96,25 +122,12 @@ pub async fn run_migrations(url: &str) {
                 .await
                 .expect(&format!("Failed to execute query: {}", string));
         }
-        if file == 1 {
-            // The first transaction creates the migrations table, so we need a new transaction to
-            // insert into it
-            transaction.commit().await.unwrap();
 
-            let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
-            sqlx::query("INSERT INTO migrations (id) VALUES ($1)")
-                .bind(file as i16)
-                .execute(&mut connection)
-                .await
-                .unwrap();
-        } else {
-            sqlx::query("INSERT INTO migrations (id) VALUES ($1)")
-                .bind(file as i16)
-                .execute(&mut transaction)
-                .await
-                .unwrap();
-            transaction.commit().await.unwrap();
-        }
+        sqlx::query("INSERT INTO migrations (id) VALUES ($1)")
+            .bind(file as i16)
+            .execute(&mut transaction)
+            .await
+            .unwrap();
         let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
         info!(
             "Has migrations: {:?}",
@@ -123,6 +136,13 @@ pub async fn run_migrations(url: &str) {
                 .await
         );
     }
+
+    if has_files {
+        crate::db::sensor_prototype::builtin::create_builtin(&mut transaction)
+            .await
+            .unwrap();
+    }
+    transaction.commit().await.unwrap();
 }
 
 pub fn http_log(info: warp::log::Info) {

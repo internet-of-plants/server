@@ -1,6 +1,6 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
-use crate::{Collection, CollectionId, Event, UserId, Organization};
+use crate::{Collection, CollectionId, Event, Organization, UserId};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -107,7 +107,8 @@ impl Device {
         }
 
         let organization = Organization::default_for_user(&mut *txn, user_id).await?;
-        let collection = Collection::new(&mut *txn, new_device.mac.clone(), organization.id()).await?;
+        let collection =
+            Collection::new(&mut *txn, new_device.mac.clone(), organization.id()).await?;
 
         // TODO: improve number_of_plants default
         let (id,) =

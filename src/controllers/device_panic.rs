@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, OrganizationId};
+use crate::db::device_panic::NewDevicePanic;
 use controllers::Result;
 
 pub async fn solve(id: DevicePanicId, pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {

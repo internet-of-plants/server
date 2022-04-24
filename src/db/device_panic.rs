@@ -4,6 +4,14 @@ use crate::DeviceId;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct NewDevicePanic {
+    pub file: String,
+    pub line: u32,
+    pub func: String,
+    pub msg: String,
+}
+
 //#[exec_time]
 //#[cache(valid_for = 3600)]
 //pub async fn owns(txn: &mut Transaction<'_>, user_id: i64, error_id: i64) -> Result<()> {

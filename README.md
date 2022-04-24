@@ -6,7 +6,7 @@ It produces data in json, and acts on POST/PUT/DELETE requests, updating the sys
 
 ## Dependencies
 
-Ubuntu (all devops scripts assume ubuntu), Postgres, rust (+ cargo)
+Ubuntu (all devops scripts assume ubuntu), Postgres, rust (+ cargo), platformio cli (https://docs.platformio.org/en/latest/core/installation.html#installation-methods)
 
 ## Setup local environment
 

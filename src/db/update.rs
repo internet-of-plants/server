@@ -1,3 +1,4 @@
+use crate::db::firmware::{Firmware, FirmwareId};
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
 use crate::{CollectionId, Device, DeviceId, UserId};
@@ -18,8 +19,7 @@ impl UpdateId {
 pub struct Update {
     id: UpdateId,
     collection_id: CollectionId,
-    file_hash: String,
-    file_name: String,
+    firmware_id: FirmwareId,
     version: String,
     created_at: DateTime,
 }
@@ -29,39 +29,32 @@ impl Update {
         &self.id
     }
 
-    pub fn file_hash(&self) -> &str {
-        &self.file_hash
-    }
-
-    pub fn file_name(&self) -> &str {
-        &self.file_name
+    pub async fn firmware(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
+        Firmware::find_by_id(txn, self.firmware_id).await
     }
 
     pub async fn new(
         txn: &mut Transaction<'_>,
         _user_id: UserId,
         device_id: DeviceId,
-        file_hash: String,
-        file_name: String,
+        firmware_id: FirmwareId,
         version: String,
     ) -> Result<Self> {
         let device = Device::find_by_id(txn, &device_id).await?;
         // TODO: Redundant since we have device_id?
         //db::plant::owns(txn, user_id, device_id).await?;
         let (id,) = sqlx::query_as::<_, (UpdateId,)>(
-            "INSERT INTO binary_updates (collection_id, file_hash, file_name, version) VALUES ($1, $2, $3, $4) RETURNING id",
+            "INSERT INTO binary_updates (collection_id, firmware_id, version) VALUES ($1, $2, $3) RETURNING id",
         )
             .bind(device.collection_id())
-            .bind(&file_hash)
-            .bind(&file_name)
+            .bind(&firmware_id)
             .bind(&version)
             .fetch_one(txn)
             .await?;
         Ok(Self {
             id,
             collection_id: *device.collection_id(),
-            file_hash,
-            file_name,
+            firmware_id,
             version,
             created_at: now(),
         })
@@ -74,7 +67,7 @@ impl Update {
     ) -> Result<Option<Self>> {
         // TODO: we currently don't allow global updates, but we should (at least by groups)
         let last_update: Option<Update> = sqlx::query_as(
-            "SELECT id, collection_id, file_hash, file_name, version, created_at
+            "SELECT id, collection_id, firmware_id, version, created_at
             FROM binary_updates
             WHERE collection_id = $1
             ORDER BY created_at DESC",

@@ -26,7 +26,10 @@ pub struct OrganizationView {
 }
 
 impl OrganizationView {
-    pub async fn find_by_id(txn: &mut Transaction<'_>, organization_id: &OrganizationId) -> Result<Self> {
+    pub async fn find_by_id(
+        txn: &mut Transaction<'_>,
+        organization_id: &OrganizationId,
+    ) -> Result<Self> {
         // TODO: this is dumb, we are making too many roundtrips to the db, but it's less complex,
         // let's optimize later
         let organization = Organization::find_by_id(&mut *txn, organization_id).await?;
@@ -104,7 +107,10 @@ impl Organization {
         Ok(organizations)
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, organization_id: &OrganizationId) -> Result<Self> {
+    pub async fn find_by_id(
+        txn: &mut Transaction<'_>,
+        organization_id: &OrganizationId,
+    ) -> Result<Self> {
         let organization: Self = sqlx::query_as(
             "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
              FROM organizations as w

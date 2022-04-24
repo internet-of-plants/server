@@ -1,7 +1,6 @@
 pub mod controllers;
 pub mod db;
 pub mod error;
-pub mod models;
 pub mod utils;
 
 use crate::db::user::AuthToken;
@@ -13,20 +12,32 @@ pub use crate::db::{
     device_log::{DeviceLog, DeviceLogId},
     device_panic::{DevicePanic, DevicePanicId},
     event::{Event, EventId, NewEvent},
+    organization::{Organization, OrganizationId, OrganizationView},
     update::{Update, UpdateId},
     user::{NewUser, User, UserId, Username},
-    organization::{Organization, OrganizationId, OrganizationView},
 };
 
 pub mod prelude {
     pub use crate::error::{Error, Result};
-    pub use crate::models::*;
     pub use crate::{controllers, db, utils};
     #[allow(unused_imports)]
     pub use log::{debug, error, info, trace, warn};
     pub use sqlx::prelude::*;
     pub use tokio::io::AsyncWriteExt;
     pub use warp::{http::StatusCode, Filter, Rejection, Reply};
+
+    pub type Pool = sqlx::PgPool;
+    pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
+
+
+    use crate::db::device::DeviceId;
+    use crate::db::user::UserId;
+    use serde::Serialize;
+    #[derive(sqlx::FromRow, Debug, Clone, PartialEq, Serialize)]
+    pub struct Auth {
+        pub user_id: UserId,
+        pub device_id: Option<DeviceId>,
+    }
 }
 
 #[tokio::main]
@@ -123,6 +134,101 @@ async fn main() {
                             .and(warp::body::json())
                             .and_then(controllers::user::new)),
                 )
+                .or(warp::path("sensors")
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::sensor::list))
+                .or(warp::path("sensor")
+                    .and(warp::path("prototype"))
+                    .and(warp::path::param())
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::query::query())
+                    .and_then(controllers::sensor_prototype::find))
+                .or(warp::path("sensor")
+                    .and(warp::path("prototypes"))
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::sensor_prototype::index))
+                .or(warp::path("sensor")
+                    .and(warp::path("of"))
+                    .and(warp::path("prototype"))
+                    .and(warp::path::param())
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::sensor::list_for_prototype))
+                .or(warp::path("sensor")
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::body::json())
+                    .and_then(controllers::sensor::new))
+                .or(warp::path("target")
+                    .and(warp::path("prototypes"))
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::target_prototype::index))
+                .or(warp::path("targets")
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::target::list))
+                .or(warp::path("target")
+                    .and(warp::path("of"))
+                    .and(warp::path("prototype"))
+                    .and(warp::path::param())
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::target::list_for_prototype))
+                .or(warp::path("target")
+                    .and(warp::path("prototype"))
+                    .and(warp::path::param())
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::target_prototype::find))
+                .or(warp::path("target")
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::body::json())
+                    .and_then(controllers::target::new))
+                .or(warp::path("compiler")
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and(warp::body::json())
+                    .and_then(controllers::compiler::new))
+                .or(warp::path("compilations")
+                    .and(warp::path::end())
+                    .and(warp::get())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::compiler::compilations))
+                .or(warp::path("compilation")
+                    .and(warp::path::param())
+                    .and(warp::path::end())
+                    .and(warp::post())
+                    .and(pool)
+                    .and(auth)
+                    .and_then(controllers::compiler::compile_firmware))
                 .or(warp::path("organization")
                     .and(warp::path::end())
                     .and(warp::get())
@@ -222,29 +328,30 @@ async fn main() {
                     //    .and(auth)
                     //    .and_then(controllers::device_panic::index)
                     //.or(
-                    .and(warp::path::end()
-                                .and(warp::post())
-                                .and(pool)
-                                .and(auth)
-                                .and(warp::body::content_length_limit(2048))
-                                .and(warp::body::json())
-                                .and_then(controllers::device_panic::new)
-                            .or(warp::path::end()
-                                .and(warp::path::param())
-                                .and(warp::delete())
-                                .and(pool)
-                                .and(auth)
-                                .and_then(controllers::device_panic::solve))),
-                    )
-                .or(warp::path("log").and(
+                    .and(
                         warp::path::end()
                             .and(warp::post())
                             .and(pool)
                             .and(auth)
                             .and(warp::body::content_length_limit(2048))
-                            .and(warp::body::bytes())
-                            .and_then(controllers::device_log::new)),
-                )
+                            .and(warp::body::json())
+                            .and_then(controllers::device_panic::new)
+                            .or(warp::path::end()
+                                .and(warp::path::param())
+                                .and(warp::delete())
+                                .and(pool)
+                                .and(auth)
+                                .and_then(controllers::device_panic::solve)),
+                    ))
+                .or(warp::path("log").and(
+                    warp::path::end()
+                        .and(warp::post())
+                        .and(pool)
+                        .and(auth)
+                        .and(warp::body::content_length_limit(2048))
+                        .and(warp::body::bytes())
+                        .and_then(controllers::device_log::new),
+                ))
                 .or(warp::path("update").and(
                     warp::path::param()
                         .and(warp::path::end())

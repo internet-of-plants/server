@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use crate::{NewDevice, NewUser, User};
+use crate::db::user::Login;
 use controllers::Result;
 
 pub async fn new(pool: &'static Pool, user: NewUser) -> Result<impl Reply> {
@@ -29,6 +30,7 @@ pub async fn login(
 ) -> Result<impl Reply> {
     info!("Login: {:?}, {:?}, {:?}", user, mac, file_hash);
     let mut txn = pool.begin().await.map_err(Error::from)?;
+    println!("O");
     let token = User::login(
         &mut txn,
         user,

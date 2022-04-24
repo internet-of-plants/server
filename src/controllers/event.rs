@@ -1,6 +1,19 @@
 use crate::prelude::*;
 use crate::{Event, NewEvent, Update};
 use controllers::Result;
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DeviceStat {
+    pub version: String,
+    pub time_running: u64,
+    pub vcc: u16,
+    pub free_dram: u64,
+    pub free_iram: Option<u64>,
+    pub free_stack: u32,
+    pub biggest_dram_block: u64,
+    pub biggest_iram_block: Option<u64>,
+}
 
 fn optional_parse_header<T: std::str::FromStr>(
     headers: &warp::http::HeaderMap,
@@ -52,10 +65,11 @@ pub async fn new(
         Event::new(&mut txn, &device_id, event, stat.version.clone()).await?;
 
         if let Some(update) = Update::find_by_device(&mut txn, auth.user_id, device_id).await? {
-            if update.file_hash() != &stat.version {
+            let firmware = update.firmware(&mut txn).await?;
+            if firmware.hash() != &stat.version {
                 txn.commit().await.map_err(Error::from)?;
                 return Ok(http::Response::builder()
-                    .header("LATEST_VERSION", update.file_hash())
+                    .header("LATEST_VERSION", firmware.hash())
                     .body(""));
             }
         }

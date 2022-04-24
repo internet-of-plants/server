@@ -10,6 +10,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     Sqlx(sqlx::error::Error),
     Bcrypt(bcrypt::BcryptError),
+    Join(tokio::task::JoinError),
     IO(std::io::Error),
     Fmt(std::fmt::Error),
     Utf8(std::str::Utf8Error),
@@ -27,6 +28,10 @@ impl Error {
         let status = if let Some(error) = rejection.find::<Self>() {
             match error {
                 Self::Sqlx(error) => {
+                    error!("{:?} {}", error, error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Self::Join(error) => {
                     error!("{:?} {}", error, error);
                     StatusCode::INTERNAL_SERVER_ERROR
                 }

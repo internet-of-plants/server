@@ -15,6 +15,12 @@ pub async fn find(
     Ok(warp::reply::json(&device))
 }
 
+
+//#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+//pub struct RequestHistory {
+//    pub id: i64,
+//    pub since_secs_ago: u64,
+//}
 //pub async fn history(pool: &'static Pool, auth: Auth, req: RequestHistory) -> Result<impl Reply> {
 //    let mut txn = pool.begin().await.map_err(Error::from)?;
 //    // TODO: easy DOS channel
