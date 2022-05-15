@@ -1,7 +1,14 @@
+use crate::extractor::Authorization;
+use crate::extractor::{
+    BiggestDramBlock, FreeDram, FreeStack, MacAddress, TimeRunning, Vcc, Version,
+};
 use crate::prelude::*;
 use crate::{Event, NewEvent, Update};
+use axum::extract::{Extension, Json, TypedHeader};
+use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
 use controllers::Result;
 use serde::Serialize;
+use std::iter::FromIterator;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DeviceStat {
@@ -15,8 +22,9 @@ pub struct DeviceStat {
     pub biggest_iram_block: Option<u64>,
 }
 
+/*
 fn optional_parse_header<T: std::str::FromStr>(
-    headers: &warp::http::HeaderMap,
+    headers: &axum::http::header::HeaderMap,
     key: &'static str,
 ) -> Result<Option<T>, Error> {
     Ok(headers
@@ -39,27 +47,33 @@ fn parse_header<T: std::str::FromStr>(
 ) -> Result<T, Error> {
     optional_parse_header(headers, key)?.ok_or(Error::MissingHeader(key))
 }
+*/
 
 pub async fn new(
-    pool: &'static Pool,
-    auth: Auth,
-    event: NewEvent,
-    headers: warp::http::HeaderMap,
-) -> Result<impl Reply> {
-    let mac: String = parse_header(&headers, "MAC_ADDRESS")?;
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+    Json(event): Json<NewEvent>,
+    TypedHeader(MacAddress(mac)): TypedHeader<MacAddress>,
+    TypedHeader(Version(version)): TypedHeader<Version>,
+    TypedHeader(TimeRunning(time_running)): TypedHeader<TimeRunning>,
+    TypedHeader(Vcc(vcc)): TypedHeader<Vcc>,
+    TypedHeader(FreeDram(free_dram)): TypedHeader<FreeDram>,
+    TypedHeader(BiggestDramBlock(biggest_dram_block)): TypedHeader<BiggestDramBlock>,
+    TypedHeader(FreeStack(free_stack)): TypedHeader<FreeStack>,
+) -> Result<impl IntoResponse> {
     let stat = DeviceStat {
-        version: parse_header(&headers, "VERSION")?,
-        time_running: parse_header(&headers, "TIME_RUNNING")?,
-        vcc: parse_header(&headers, "VCC")?,
-        free_dram: parse_header(&headers, "FREE_DRAM")?,
-        free_iram: optional_parse_header(&headers, "FREE_IRAM")?,
-        free_stack: parse_header(&headers, "FREE_STACK")?,
-        biggest_dram_block: parse_header(&headers, "BIGGEST_BLOCK_DRAM")?,
-        biggest_iram_block: optional_parse_header(&headers, "BIGGEST_BLOCK_IRAM")?,
+        version,
+        time_running: time_running.parse()?,
+        vcc: vcc.parse()?,
+        free_dram: free_dram.parse()?,
+        free_iram: None, //optional_parse_header(&headers, "FREE_IRAM")?,
+        free_stack: free_stack.parse()?,
+        biggest_dram_block: biggest_dram_block.parse()?,
+        biggest_iram_block: None, //optional_parse_header(&headers, "BIGGEST_BLOCK_IRAM")?,
     };
 
     if let Some(device_id) = auth.device_id {
-        let mut txn = pool.begin().await.map_err(Error::from)?;
+        let mut txn = pool.begin().await?;
 
         info!(target: "event", "User: {:?}, MAC: {}, DeviceId: {:?}, Stat: {:?}", auth.user_id, mac, device_id, stat);
         Event::new(&mut txn, &device_id, event, stat.version.clone()).await?;
@@ -67,14 +81,15 @@ pub async fn new(
         if let Some(update) = Update::find_by_device(&mut txn, auth.user_id, device_id).await? {
             let firmware = update.firmware(&mut txn).await?;
             if firmware.hash() != &stat.version {
-                txn.commit().await.map_err(Error::from)?;
-                return Ok(http::Response::builder()
-                    .header("LATEST_VERSION", firmware.hash())
-                    .body(""));
+                txn.commit().await?;
+                return Ok(HeaderMap::from_iter([(
+                    HeaderName::from_static("LATEST_VERSION"),
+                    HeaderValue::from_str(firmware.hash())?,
+                )]));
             }
         }
-        txn.commit().await.map_err(Error::from)?;
-        Ok(http::Response::builder().body(""))
+        txn.commit().await?;
+        Ok(HeaderMap::new())
     } else {
         warn!(target: "event", "Not Found => User: {:?}, Device: {}", auth.user_id, mac);
         Err(Error::Forbidden)?

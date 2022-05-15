@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use rand::{distributions::Alphanumeric, Rng};
-use std::{cell::Cell, fmt};
+use std::fmt;
 
 #[derive(FromRow, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Migration {
@@ -145,6 +145,7 @@ pub async fn run_migrations(url: &str) {
     transaction.commit().await.unwrap();
 }
 
+/*
 pub fn http_log(info: warp::log::Info) {
     thread_local! {
         static PATH_LEN: Cell<usize> = Cell::new(0);
@@ -172,6 +173,7 @@ pub fn http_log(info: warp::log::Info) {
         utils::OptFmt(info.user_agent().map(|u| utils::truncate(u.to_owned(), 30))),
     );
 }
+*/
 
 /// Wrapper to allow optional formatting of a type
 pub struct OptFmt<T>(pub Option<T>);

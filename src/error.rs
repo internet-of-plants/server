@@ -1,8 +1,10 @@
+use axum::http::StatusCode;
 use derive_more::{Display, From};
-use http::StatusCode;
 use log::{error, warn};
-use std::convert::Infallible;
-use warp::Rejection;
+use serde_json::json;
+//use std::convert::Infallible;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -19,71 +21,85 @@ pub enum Error {
     NotModified,
     NothingFound,
     CorruptBinary,
+    ParseInt(std::num::ParseIntError),
     MissingHeader(&'static str),
-    Warp(warp::Error),
-}
-
-impl Error {
-    pub async fn handle(rejection: Rejection) -> Result<impl warp::Reply, Infallible> {
-        let status = if let Some(error) = rejection.find::<Self>() {
-            match error {
-                Self::Sqlx(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Join(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Bcrypt(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Warp(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::IO(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Fmt(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Utf8(error) => {
-                    error!("{:?} {}", error, error);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::Forbidden => {
-                    warn!("Forbidden");
-                    StatusCode::FORBIDDEN
-                }
-                Self::MissingHeader(header) => {
-                    error!("Missing HeaderBad: {}", header);
-                    StatusCode::BAD_REQUEST
-                }
-                Self::BadData => {
-                    warn!("Bad Data");
-                    StatusCode::BAD_REQUEST
-                }
-                Self::CorruptBinary => {
-                    warn!("Corrupt Binary");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Self::NotModified => StatusCode::NOT_MODIFIED,
-                Self::NothingFound => {
-                    warn!("Nothing Found");
-                    StatusCode::NOT_FOUND
-                }
-            }
-        } else {
-            error!("Unknown internal server error: {:?}", rejection);
-            StatusCode::INTERNAL_SERVER_ERROR
-        };
-        Ok(warp::reply::with_status(status, status))
-    }
+    Hyper(hyper::Error),
+    InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
+    Http(axum::http::Error)
 }
 
 impl std::error::Error for Error {}
-impl warp::reject::Reject for Error {}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            Self::Http(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Hyper(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Sqlx(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Join(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Bcrypt(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::IO(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Fmt(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Utf8(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::InvalidHeaderValue(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::ParseInt(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Forbidden => {
+                warn!("Forbidden");
+                (StatusCode::UNAUTHORIZED, "Unauthorized")
+            }
+            Self::MissingHeader(header) => {
+                error!("Missing HeaderBad: {}", header);
+                (StatusCode::BAD_REQUEST, "Bad Request")
+            }
+            Self::BadData => {
+                warn!("Bad Data");
+                (StatusCode::BAD_REQUEST, "Bad Request")
+            }
+            Self::CorruptBinary => {
+                warn!("Corrupt Binary");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::NotModified => (StatusCode::NOT_MODIFIED, "Not modified"),
+            Self::NothingFound => {
+                warn!("Nothing Found");
+                (StatusCode::NOT_FOUND, "Not found")
+            }
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+        }));
+
+        (status, body).into_response()
+    }
+}

@@ -3,7 +3,6 @@ use crate::prelude::*;
 use crate::{Device, NewDevice, Organization, OrganizationId};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
-use warp::Reply;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Login {
@@ -43,7 +42,7 @@ pub struct User {
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Debug, PartialEq, Eq)]
 #[sqlx(transparent)]
-pub struct AuthToken(String);
+pub struct AuthToken(pub String);
 
 impl AuthToken {
     pub fn random() -> Self {
@@ -51,11 +50,11 @@ impl AuthToken {
     }
 }
 
-impl Reply for AuthToken {
-    fn into_response(self) -> warp::reply::Response {
-        self.0.into_response()
-    }
-}
+//impl Reply for AuthToken {
+//    fn into_response(self) -> warp::reply::Response {
+//        self.0.into_response()
+//    }
+//}
 
 impl AuthToken {
     pub fn new(token: String) -> Self {
@@ -97,7 +96,6 @@ impl User {
     // the device between collections/organizations
     // TODO: move this to Auth struct
     pub async fn find_by_auth_token(txn: &mut Transaction<'_>, token: AuthToken) -> Result<Auth> {
-        debug!("Token: {:?}", token);
         let auth: Option<Auth> = sqlx::query_as(
             "SELECT users.id as user_id, authentications.device_id
              FROM users
@@ -141,7 +139,6 @@ impl User {
                 };
 
                 let token = AuthToken::random();
-                debug!("Token: {:?}", token);
                 sqlx::query(
                     "INSERT INTO authentications (user_id, device_id, token) VALUES ($1, $2, $3)",
                 )

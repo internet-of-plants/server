@@ -2,7 +2,10 @@ use crate::controllers::Result;
 use crate::db::code_generation::{Compiled, CompiledId, Compiler, CompilerId};
 use crate::db::sensor::SensorId;
 use crate::db::target::TargetId;
+use crate::extractor::Authorization;
 use crate::prelude::*;
+use axum::extract::{Extension, Json, Path};
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -14,7 +17,7 @@ pub struct NewCompiler {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct CompilerView {
+pub struct CompilerView {
     id: CompilerId,
     sensor_names: Vec<String>,
     target_arch: String,
@@ -36,7 +39,7 @@ impl CompilerView {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct CompiledView {
+pub struct CompiledView {
     id: CompiledId,
     compiler: CompilerView,
     platformio_ini: String,
@@ -58,26 +61,23 @@ impl CompiledView {
 }
 
 pub async fn new(
-    pool: &'static Pool,
-    _auth: Auth,
-    new_compiler: NewCompiler,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+    Json(new_compiler): Json<NewCompiler>,
+) -> Result<Json<CompiledView>> {
+    let mut txn = pool.begin().await?;
 
     // TODO: filter by user
     let compiler = Compiler::new(&mut txn, new_compiler.target_id, new_compiler.sensor_ids).await?;
     let compiled = compiler.compile(&mut txn).await?;
     let view = CompiledView::new(&mut txn, compiled).await?;
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&view))
+    txn.commit().await?;
+    Ok(Json(view))
 }
 
-pub async fn compilations(
-    pool: &'static Pool,
-    _auth: Auth,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn compilations(Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<Vec<CompiledView>>> {
+    let mut txn = pool.begin().await?;
 
     // TODO: filter by user
     let compileds = Compiled::list(&mut txn).await?;
@@ -86,21 +86,21 @@ pub async fn compilations(
         views.push(CompiledView::new(&mut txn, compiled).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
 pub async fn compile_firmware(
-    compiled_id: CompiledId,
-    pool: &'static Pool,
-    _auth: Auth,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(compiled_id): Path<CompiledId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<StatusCode> {
+    let mut txn = pool.begin().await?;
 
     // TODO: filter by user
     let compiled = Compiled::find_by_id(&mut txn, compiled_id).await?;
     let _firmware = compiled.compile(&mut txn).await?;
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok("")
+    txn.commit().await?;
+    Ok(StatusCode::OK)
 }

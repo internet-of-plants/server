@@ -1,17 +1,28 @@
+use crate::db::device_panic::NewDevicePanic;
+use crate::extractor::Authorization;
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, OrganizationId};
-use crate::db::device_panic::NewDevicePanic;
+use axum::extract::{Extension, Json, Path};
 use controllers::Result;
+use axum::http::StatusCode;
 
-pub async fn solve(id: DevicePanicId, pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
+pub async fn solve(
+    Path(id): Path<DevicePanicId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<StatusCode> {
     // TODO: enforce ownerships
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let mut txn = pool.begin().await?;
     DevicePanic::solve(&mut txn, id).await?;
-    txn.commit().await.map_err(Error::from)?;
+    txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
-pub async fn new(pool: &'static Pool, auth: Auth, mut error: NewDevicePanic) -> Result<impl Reply> {
+pub async fn new(
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+    Json(mut error): Json<NewDevicePanic>,
+) -> Result<StatusCode> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
 
     if error.msg.trim() != error.msg {
@@ -28,18 +39,17 @@ pub async fn new(pool: &'static Pool, auth: Auth, mut error: NewDevicePanic) -> 
 }
 
 pub async fn index(
-    _organization_id: OrganizationId,
-    _collection_id: CollectionId,
-    device_id: DeviceId,
-    limit: u32,
-    pool: &'static Pool,
-    _auth: Auth,
-) -> Result<impl Reply> {
+    Path(_organization_id): Path<OrganizationId>,
+    Path(_collection_id): Path<CollectionId>,
+    Path(device_id): Path<DeviceId>,
+    Path(limit): Path<u32>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<Json<Vec<DevicePanic>>> {
     // TODO: enforce ownerships
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let mut txn = pool.begin().await?;
     let panics = DevicePanic::first_n_from_device(&mut txn, &device_id, limit).await?;
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&panics))
+    Ok(Json(panics))
 }
 
 //pub async fn index(pool: &'static Pool, auth: Auth) -> Result<impl Reply> {

@@ -4,6 +4,8 @@ use crate::db::target_prototype::TargetPrototypeId;
 use crate::prelude::*;
 use controllers::Result;
 use serde::{Deserialize, Serialize};
+use crate::extractor::Authorization;
+use axum::extract::{Extension, Path, Json};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,7 +15,7 @@ pub struct NewTarget {
 }
 
 #[derive(Serialize, Debug)]
-struct TargetView {
+pub struct TargetView {
     id: TargetId,
     arch: String,
     build_flags: String,
@@ -42,35 +44,35 @@ impl TargetView {
     }
 }
 
-pub async fn list(pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn list(Extension(pool): Extension<&'static Pool>, Authorization(auth): Authorization) -> Result<Json<Vec<TargetView>>> {
+    let mut txn = pool.begin().await?;
     let targets = Target::list(&mut txn, auth.user_id).await?;
     let mut views = Vec::with_capacity(targets.len());
     for target in targets {
         views.push(TargetView::new(&mut txn, target).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
 pub async fn list_for_prototype(
-    target_prototype_id: TargetPrototypeId,
-    pool: &'static Pool,
-    auth: Auth,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(target_prototype_id): Path<TargetPrototypeId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+) -> Result<Json<Vec<TargetView>>> {
+    let mut txn = pool.begin().await?;
     let targets = Target::list_for_prototype(&mut txn, auth.user_id, target_prototype_id).await?;
     let mut views = Vec::with_capacity(targets.len());
     for target in targets {
         views.push(TargetView::new(&mut txn, target).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
-pub async fn new(pool: &'static Pool, auth: Auth, new_target: NewTarget) -> Result<impl Reply> {
+pub async fn new(Extension(pool): Extension<&'static Pool>, Authorization(auth): Authorization, Json(new_target): Json<NewTarget>) -> Result<Json<TargetView>> {
     let mut txn = pool.begin().await.map_err(Error::from)?;
 
     let target = Target::new(
@@ -83,5 +85,5 @@ pub async fn new(pool: &'static Pool, auth: Auth, new_target: NewTarget) -> Resu
     let view = TargetView::new(&mut txn, target).await?;
 
     txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&view))
+    Ok(Json(view))
 }

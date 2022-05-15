@@ -3,6 +3,8 @@ use crate::db::target_prototype::{TargetPrototype, TargetPrototypeId};
 use crate::prelude::*;
 use controllers::Result;
 use serde::Serialize;
+use crate::extractor::Authorization;
+use axum::extract::{Extension, Path, Json};
 
 #[derive(Serialize)]
 pub struct BoardView {
@@ -46,8 +48,8 @@ impl TargetPrototypeView {
     }
 }
 
-pub async fn index(pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn index(Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<Vec<TargetPrototypeView>>> {
+    let mut txn = pool.begin().await?;
 
     let prototypes = TargetPrototype::list(&mut txn).await?;
     let mut views = Vec::with_capacity(prototypes.len());
@@ -55,16 +57,16 @@ pub async fn index(pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
         views.push(TargetPrototypeView::new(&mut txn, prototype).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
-pub async fn find(id: TargetPrototypeId, pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn find(Path(id): Path<TargetPrototypeId>, Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<TargetPrototypeView>> {
+    let mut txn = pool.begin().await?;
 
     let prototype = TargetPrototype::find_by_id(&mut txn, id).await?;
     let view = TargetPrototypeView::new(&mut txn, prototype).await?;
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&view))
+    txn.commit().await?;
+    Ok(Json(view))
 }

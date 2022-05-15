@@ -12,4 +12,4 @@ pub mod compiler;
 pub mod update;
 pub mod user;
 
-pub type Result<T, E = warp::Rejection> = std::result::Result<T, E>;
+pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;

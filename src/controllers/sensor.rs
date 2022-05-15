@@ -3,6 +3,8 @@ use crate::db::sensor::config::Config;
 use crate::db::sensor::{Measurement, NewSensor, Sensor, SensorId};
 use crate::db::sensor_prototype::SensorPrototypeId;
 use crate::prelude::*;
+use crate::extractor::Authorization;
+use axum::extract::{Extension, Path, Json};
 use serde::Serialize;
 
 #[derive(Serialize, Debug)]
@@ -24,7 +26,7 @@ impl ConfigView {
 }
 
 #[derive(Serialize, Debug)]
-struct SensorView {
+pub struct SensorView {
     id: SensorId,
     name: String,
     dependencies: Vec<String>,
@@ -56,40 +58,46 @@ impl SensorView {
     }
 }
 
-pub async fn list(pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn list(
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+) -> Result<Json<Vec<SensorView>>> {
+    let mut txn = pool.begin().await?;
     let sensors = Sensor::list(&mut txn, auth.user_id).await?;
     let mut views = Vec::with_capacity(sensors.len());
     for sensor in sensors {
         views.push(SensorView::new(&mut txn, sensor).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
-
 pub async fn list_for_prototype(
-    sensor_prototype_id: SensorPrototypeId,
-    pool: &'static Pool,
-    auth: Auth,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(sensor_prototype_id): Path<SensorPrototypeId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+) -> Result<Json<Vec<SensorView>>> {
+    let mut txn = pool.begin().await?;
     let sensors = Sensor::list_for_prototype(&mut txn, auth.user_id, sensor_prototype_id).await?;
     let mut views = Vec::with_capacity(sensors.len());
     for sensor in sensors {
         views.push(SensorView::new(&mut txn, sensor).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
-pub async fn new(pool: &'static Pool, auth: Auth, new_sensor: NewSensor) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn new(
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+    Json(new_sensor): Json<NewSensor>,
+) -> Result<Json<SensorView>> {
+    let mut txn = pool.begin().await?;
 
     let sensor = Sensor::new(&mut txn, auth.user_id, new_sensor).await?;
     let view = SensorView::new(&mut txn, sensor).await?;
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&view))
+    txn.commit().await?;
+    Ok(Json(view))
 }

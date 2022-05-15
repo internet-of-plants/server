@@ -1,18 +1,20 @@
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DeviceView, OrganizationId};
 use controllers::Result;
+use crate::extractor::Authorization;
+use axum::extract::{Extension, Path, Json};
 
 pub async fn find(
-    _organization_id: OrganizationId,
-    _collection_id: CollectionId,
-    device_id: DeviceId,
-    pool: &'static Pool,
-    _auth: Auth,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(_organization_id): Path<OrganizationId>,
+    Path(_collection_id): Path<CollectionId>,
+    Path(device_id): Path<DeviceId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<Json<DeviceView>> {
+    let mut txn = pool.begin().await?;
     let device = DeviceView::find_by_id(&mut txn, /*auth.user_id,*/ &device_id).await?;
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&device))
+    txn.commit().await?;
+    Ok(Json(device))
 }
 
 

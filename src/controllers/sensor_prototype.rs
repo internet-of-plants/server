@@ -6,6 +6,8 @@ use crate::db::target::TargetId;
 use crate::prelude::*;
 use controllers::Result;
 use serde::{Deserialize, Serialize};
+use crate::extractor::Authorization;
+use axum::extract::{Extension, Path, Query, Json};
 
 #[derive(Serialize)]
 struct ConfigTypeView {
@@ -49,7 +51,7 @@ impl ConfigRequestView {
 }
 
 #[derive(Serialize)]
-struct SensorPrototypeView {
+pub struct SensorPrototypeView {
     id: SensorPrototypeId,
     name: String,
     dependencies: Vec<String>,
@@ -85,8 +87,8 @@ impl SensorPrototypeView {
     }
 }
 
-pub async fn index(pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+pub async fn index(Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<Vec<SensorPrototypeView>>> {
+    let mut txn = pool.begin().await?;
 
     let prototypes = SensorPrototype::list(&mut txn).await?;
     let mut views = Vec::with_capacity(prototypes.len());
@@ -94,8 +96,8 @@ pub async fn index(pool: &'static Pool, _auth: Auth) -> Result<impl Reply> {
         views.push(SensorPrototypeView::new(&mut txn, prototype, &[]).await?);
     }
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&views))
+    txn.commit().await?;
+    Ok(Json(views))
 }
 
 #[derive(Deserialize)]
@@ -104,16 +106,16 @@ pub struct TargetList {
 }
 
 pub async fn find(
-    sensor_prototype_id: SensorPrototypeId,
-    pool: &'static Pool,
-    _auth: Auth,
-    target_ids: TargetList,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(sensor_prototype_id): Path<SensorPrototypeId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+    Query(target_ids): Query<TargetList>,
+) -> Result<Json<SensorPrototypeView>> {
+    let mut txn = pool.begin().await?;
 
     let prototype = SensorPrototype::find_by_id(&mut txn, sensor_prototype_id).await?;
     let view = SensorPrototypeView::new(&mut txn, prototype, &[target_ids.target]).await?;
 
-    txn.commit().await.map_err(Error::from)?;
-    Ok(warp::reply::json(&view))
+    txn.commit().await?;
+    Ok(Json(view))
 }

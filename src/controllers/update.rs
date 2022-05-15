@@ -1,83 +1,88 @@
 use crate::db::firmware::Firmware;
 use crate::prelude::*;
 use crate::{DeviceId, Update};
-use bytes::{Buf, BufMut};
+//use bytes::{Buf, BufMut};
 use controllers::Result;
-use futures::{StreamExt, TryStreamExt};
+//use futures::{StreamExt, TryStreamExt};
 use std::fmt::Write;
-use warp::filters::multipart::FormData;
+//use warp::filters::multipart::FormData;
+use crate::extractor::{Authorization, Esp8266Md5};
+use axum::extract::{Extension, Path, TypedHeader, Form};
+use axum::{body::Full, body::Bytes, http::StatusCode};
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateForm {
+    version: String,
+    file: Vec<u8>
+}
 
 pub async fn new(
-    device_id: DeviceId,
-    pool: &'static Pool,
-    auth: Auth,
-    mut form: FormData,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Path(device_id): Path<DeviceId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+    Form(form): Form<UpdateForm>,
+) -> Result<StatusCode> {
+    let mut txn = pool.begin().await?;
 
     //db::plant::owns(&mut txn, auth.user_id, device_id).await?;
 
-    let mut version = form
-        .next()
-        .await
-        .ok_or(Error::BadData)?
-        .map_err(Error::Warp)?;
-    let mut version = version
-        .data()
-        .await
-        .ok_or(Error::BadData)?
-        .map_err(Error::Warp)?;
-    let buf_version = version.copy_to_bytes(version.remaining());
-    let version = std::str::from_utf8(buf_version.as_ref())
-        .map_err(Error::Utf8)?
-        .to_uppercase();
+    //let mut version = form
+    //    .next()
+    //    .await
+    //    .ok_or(Error::BadData)?
+    //    .map_err(Error::Warp)?;
+    //let mut version = version
+    //    .data()
+    //    .await
+    //    .ok_or(Error::BadData)?
+    //    .map_err(Error::Warp)?;
+    //let buf_version = version.copy_to_bytes(version.remaining());
+    //let version = std::str::from_utf8(buf_version.as_ref())
+    //    .map_err(Error::Utf8)?
+    //    .to_uppercase();
 
-    let file = form
-        .next()
-        .await
-        .ok_or(Error::BadData)?
-        .map_err(Error::Warp)?;
-    let binary = file
-        .stream()
-        .try_fold(Vec::new(), |mut vec, data| {
-            vec.put(data);
-            async move { Ok(vec) }
-        })
-        .await
-        .map_err(Error::from)?;
+    //let file = form
+    //    .next()
+    //    .await
+    //    .ok_or(Error::BadData)?
+    //    .map_err(Error::Warp)?;
+    //let binary = file
+    //    .stream()
+    //    .try_fold(Vec::new(), |mut vec, data| {
+    //        vec.put(data);
+    //        async move { Ok(vec) }
+    //    })
+    //    .await
+    //    .map_err(Error::from)?;
 
-    let firmware = Firmware::new(&mut txn, None, binary).await?;
+    let firmware = Firmware::new(&mut txn, None, form.file).await?;
     let _update = Update::new(
         &mut txn,
         auth.user_id,
         device_id,
         firmware.id(),
-        version.to_owned(),
+        form.version,
     )
     .await?;
 
-    txn.commit().await.map_err(Error::from)?;
+    txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
 pub async fn get(
-    pool: &'static Pool,
-    auth: Auth,
-    headers: warp::http::HeaderMap,
-) -> Result<impl Reply> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(auth): Authorization,
+    TypedHeader(Esp8266Md5(md5)): TypedHeader<Esp8266Md5>,
+) -> Result<impl IntoResponse> {
+    let mut txn = pool.begin().await?;
 
     //let chip_ip = headers.get("x-ESP8266-Chip-ID");
     //let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
     //let ap_mac = headers.get("x-ESP8266-AP-MAC");
     //let free_space = headers.get("x-ESP8266-free-space");
     //let sketch_size = headers.get("x-ESP8266-sketch-size");
-    let md5 = headers
-        .get("x-ESP8266-sketch-md5")
-        .ok_or(Error::NothingFound)?
-        .to_str()
-        .map_err(|_| Error::NothingFound)?
-        .to_uppercase();
+    let md5 = md5.to_uppercase();
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
@@ -105,8 +110,8 @@ pub async fn get(
             );
             return Err(Error::CorruptBinary)?;
         }
-        txn.commit().await.map_err(Error::from)?;
-        Ok(http::Response::builder()
+        txn.commit().await?;
+        let response = axum::http::Response::builder()
             .header("Content-Type", "application/octet-stream")
             .header("Content-Length", firmware.binary().len().to_string())
             .header(
@@ -114,7 +119,8 @@ pub async fn get(
                 format!("attachment; filename=\"{}.bin\"", file_hash),
             )
             .header("x-MD5", file_hash)
-            .body(hyper::Body::from(firmware.into_binary())))
+            .body(Full::new(Bytes::from(firmware.into_binary())))?;
+        Ok(response)
     } else {
         Err(Error::Forbidden)?
     }
