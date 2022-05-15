@@ -1,8 +1,8 @@
+use crate::extractor::Authorization;
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DeviceView, OrganizationId};
+use axum::extract::{Extension, Json, Path};
 use controllers::Result;
-use crate::extractor::Authorization;
-use axum::extract::{Extension, Path, Json};
 
 pub async fn find(
     Path(_organization_id): Path<OrganizationId>,
@@ -16,7 +16,6 @@ pub async fn find(
     txn.commit().await?;
     Ok(Json(device))
 }
-
 
 //#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 //pub struct RequestHistory {

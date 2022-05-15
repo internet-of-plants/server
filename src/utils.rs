@@ -53,6 +53,7 @@ pub async fn run_migrations(url: &str) {
 
     // TODO: have a lock here otherwise multiple server instances will race
     let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
+
     let vec: Vec<Migration> = match sqlx::query_as("SELECT id FROM migrations")
         .fetch_all(&mut connection)
         .await

@@ -1,12 +1,11 @@
+use crate::extractor::Authorization;
 use crate::prelude::*;
 use crate::{Collection, CollectionId, CollectionView, Device, OrganizationId};
+use axum::extract::{Extension, Json, Path};
 use controllers::Result;
-use crate::extractor::Authorization;
-use axum::extract::{Extension, Path, Json};
 
 pub async fn find(
-    Path(_organization_id): Path<OrganizationId>,
-    Path(collection_id): Path<CollectionId>,
+    Path((_organization_id, collection_id)): Path<(OrganizationId, CollectionId)>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<Json<CollectionView>> {

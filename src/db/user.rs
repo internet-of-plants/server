@@ -4,7 +4,7 @@ use crate::{Device, NewDevice, Organization, OrganizationId};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Login {
     pub email: String,
     pub password: String,
@@ -24,7 +24,7 @@ impl UserId {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NewUser {
     pub email: String,
     pub password: String,

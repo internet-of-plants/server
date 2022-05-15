@@ -25,7 +25,7 @@ pub enum Error {
     MissingHeader(&'static str),
     Hyper(hyper::Error),
     InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
-    Http(axum::http::Error)
+    Http(axum::http::Error),
 }
 
 impl std::error::Error for Error {}

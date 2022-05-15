@@ -3,8 +3,8 @@ use crate::extractor::Authorization;
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, OrganizationId};
 use axum::extract::{Extension, Json, Path};
-use controllers::Result;
 use axum::http::StatusCode;
+use controllers::Result;
 
 pub async fn solve(
     Path(id): Path<DevicePanicId>,

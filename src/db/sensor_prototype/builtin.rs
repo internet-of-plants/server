@@ -145,7 +145,8 @@ async fn nodemcuv2_esp8266_board(
     Ok(Board::new(
         txn,
         "nodemcuv2".to_owned(),
-        vec!["Pin::D1".to_owned(),
+        vec![
+            "Pin::D1".to_owned(),
             "Pin::D2".to_owned(),
             "Pin::D5".to_owned(),
             "Pin::D6".to_owned(),

@@ -84,11 +84,12 @@ impl Board {
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: BoardId) -> Result<Self> {
-        let board =
-            sqlx::query_as("SELECT id, board, target_prototype_id, pin_hpp FROM boards WHERE id = $1")
-                .bind(&id)
-                .fetch_one(&mut *txn)
-                .await?;
+        let board = sqlx::query_as(
+            "SELECT id, board, target_prototype_id, pin_hpp FROM boards WHERE id = $1",
+        )
+        .bind(&id)
+        .fetch_one(&mut *txn)
+        .await?;
         Ok(board)
     }
 }

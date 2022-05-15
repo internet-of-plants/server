@@ -100,16 +100,12 @@ impl Sensor {
         self.id
     }
 
-    pub async fn list(
-        txn: &mut Transaction<'_>,
-        owner_id: UserId,
-    ) -> Result<Vec<Self>> {
-        let sensors: Vec<Self> = sqlx::query_as(
-            "SELECT id, owner_id, prototype_id FROM sensors WHERE owner_id = $1",
-        )
-        .bind(&owner_id)
-        .fetch_all(&mut *txn)
-        .await?;
+    pub async fn list(txn: &mut Transaction<'_>, owner_id: UserId) -> Result<Vec<Self>> {
+        let sensors: Vec<Self> =
+            sqlx::query_as("SELECT id, owner_id, prototype_id FROM sensors WHERE owner_id = $1")
+                .bind(&owner_id)
+                .fetch_all(&mut *txn)
+                .await?;
         Ok(sensors)
     }
 

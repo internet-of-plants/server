@@ -3,11 +3,11 @@ use crate::db::sensor::config_type::{ConfigType, WidgetKind};
 use crate::db::sensor::Measurement;
 use crate::db::sensor_prototype::{SensorPrototype, SensorPrototypeId};
 use crate::db::target::TargetId;
+use crate::extractor::Authorization;
 use crate::prelude::*;
+use axum::extract::{Extension, Json, Path, Query};
 use controllers::Result;
 use serde::{Deserialize, Serialize};
-use crate::extractor::Authorization;
-use axum::extract::{Extension, Path, Query, Json};
 
 #[derive(Serialize)]
 struct ConfigTypeView {
@@ -87,7 +87,10 @@ impl SensorPrototypeView {
     }
 }
 
-pub async fn index(Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<Vec<SensorPrototypeView>>> {
+pub async fn index(
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<Json<Vec<SensorPrototypeView>>> {
     let mut txn = pool.begin().await?;
 
     let prototypes = SensorPrototype::list(&mut txn).await?;

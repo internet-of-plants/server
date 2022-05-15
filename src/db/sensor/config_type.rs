@@ -80,7 +80,11 @@ impl ConfigType {
         Ok(ty)
     }
 
-    pub async fn widget(&self, txn: &mut Transaction<'_>, target_ids: &[TargetId]) -> Result<WidgetKind> {
+    pub async fn widget(
+        &self,
+        txn: &mut Transaction<'_>,
+        target_ids: &[TargetId],
+    ) -> Result<WidgetKind> {
         Ok(match &self.widget {
             WidgetKindRaw::U8 => WidgetKind::U8,
             WidgetKindRaw::U16 => WidgetKind::U16,

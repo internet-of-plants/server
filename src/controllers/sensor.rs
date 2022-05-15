@@ -2,9 +2,9 @@ use crate::controllers::Result;
 use crate::db::sensor::config::Config;
 use crate::db::sensor::{Measurement, NewSensor, Sensor, SensorId};
 use crate::db::sensor_prototype::SensorPrototypeId;
-use crate::prelude::*;
 use crate::extractor::Authorization;
-use axum::extract::{Extension, Path, Json};
+use crate::prelude::*;
+use axum::extract::{Extension, Json, Path};
 use serde::Serialize;
 
 #[derive(Serialize, Debug)]

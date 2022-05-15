@@ -7,14 +7,14 @@ use controllers::Result;
 use std::fmt::Write;
 //use warp::filters::multipart::FormData;
 use crate::extractor::{Authorization, Esp8266Md5};
-use axum::extract::{Extension, Path, TypedHeader, Form};
-use axum::{body::Full, body::Bytes, http::StatusCode};
+use axum::extract::{Extension, Form, Path, TypedHeader};
+use axum::{body::Bytes, body::Full, http::StatusCode};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateForm {
     version: String,
-    file: Vec<u8>
+    file: Vec<u8>,
 }
 
 pub async fn new(

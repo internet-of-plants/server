@@ -112,7 +112,10 @@ impl Compiled {
             }
 
             // TODO: is dir.path().display() the correct approach?
-            let mut command = tokio::process::Command::new(format!("pio run -e {build_name} -d {}", dir.path().display()));
+            let mut command = tokio::process::Command::new(format!(
+                "pio run -e {build_name} -d {}",
+                dir.path().display()
+            ));
             // TODO: stream output
             // TODO: check exit code?
             let output = command.spawn()?.wait_with_output().await?;

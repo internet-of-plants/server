@@ -5,7 +5,14 @@ authors = ["Paulo <paulosanz@poli.ufrj.br>"]
 edition = "2018"
 description = "Internet of Plants - Monitor Server"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "server"
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "server-bin"
+path = "src/main.rs"
 
 [dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -16,6 +23,7 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process"] }
 hyper = { version = "0.14", features = ["stream", "server", "http1", "tcp", "client"] }
 tower-http = { version = "0.2", features = ["cors"] }
+tower = "0.4"
 
 md5 = "0.7"
 
@@ -36,4 +44,8 @@ bcrypt = "0.8"
 
 chrono = { version = "0.4.19", features = ["serde"] }
 
+once_cell = "1.1"
+
 tempfile = "3"
+
+mime = "0.3"

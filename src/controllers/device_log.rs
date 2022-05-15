@@ -2,9 +2,9 @@ use crate::extractor::Authorization;
 use crate::prelude::*;
 use crate::{CollectionId, DeviceId, DeviceLog, OrganizationId};
 use axum::extract::{Extension, Json, Path, RawBody};
+use axum::http::StatusCode;
 use controllers::Result;
 use futures::StreamExt;
-use axum::http::StatusCode;
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
@@ -16,7 +16,9 @@ pub async fn new(
     for log in log.next().await {
         log_buffer.extend(&log?);
     }
-    let log = String::from_utf8_lossy(log_buffer.as_ref()).trim().to_owned();
+    let log = String::from_utf8_lossy(log_buffer.as_ref())
+        .trim()
+        .to_owned();
     if let Some(device_id) = auth.device_id {
         DeviceLog::new(&mut txn, &device_id, log).await?;
     } else {

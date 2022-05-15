@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct OrganizationId(i64);
+pub struct OrganizationId(pub i64);
 
 impl OrganizationId {
     pub fn new(id: i64) -> Self {
@@ -16,13 +16,13 @@ impl OrganizationId {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct OrganizationView {
-    id: OrganizationId,
-    name: String,
-    description: Option<String>,
-    collections: Vec<Collection>,
-    members: Vec<Username>,
-    created_at: DateTime,
-    updated_at: DateTime,
+    pub id: OrganizationId,
+    pub name: String,
+    pub description: Option<String>,
+    pub collections: Vec<Collection>,
+    pub members: Vec<Username>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 impl OrganizationView {

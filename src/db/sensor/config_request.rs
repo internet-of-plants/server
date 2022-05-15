@@ -56,7 +56,7 @@ impl ConfigRequest {
     ) -> Result<Self> {
         let ty = ConfigType::new(txn, type_name, widget).await?;
 
-         let (id,) = sqlx::query_as::<_, (ConfigRequestId,)>(
+        let (id,) = sqlx::query_as::<_, (ConfigRequestId,)>(
             "INSERT INTO config_requests (type_id, name, sensor_prototype_id) VALUES ($1, $2, $3) RETURNING id",
         )
             .bind(ty.id())
@@ -64,7 +64,11 @@ impl ConfigRequest {
             .bind(&sensor_prototype_id)
             .fetch_one(&mut *txn)
             .await?;
-        Ok(Self { id, type_id: ty.id(), name })
+        Ok(Self {
+            id,
+            type_id: ty.id(),
+            name,
+        })
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: ConfigRequestId) -> Result<Self> {

@@ -76,7 +76,10 @@ pub async fn new(
     Ok(Json(view))
 }
 
-pub async fn compilations(Extension(pool): Extension<&'static Pool>, Authorization(_auth): Authorization) -> Result<Json<Vec<CompiledView>>> {
+pub async fn compilations(
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<Json<Vec<CompiledView>>> {
     let mut txn = pool.begin().await?;
 
     // TODO: filter by user
