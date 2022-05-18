@@ -297,3 +297,59 @@ impl headers_core::Header for Esp8266Md5 {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct FreeIram(pub String);
+
+const FREE_IRAM_NAME: &str = "free_iram";
+impl headers_core::Header for FreeIram {
+    fn name() -> &'static headers_core::HeaderName {
+        thread_local! {
+            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(FREE_IRAM_NAME).into());
+        }
+        NAME.with(|n| *n)
+    }
+
+    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
+        values: &mut I,
+    ) -> Result<Self, headers_core::Error> {
+        values
+            .next()
+            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
+            .ok_or_else(headers_core::Error::invalid)
+    }
+
+    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
+        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
+            values.extend(std::iter::once(name));
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BiggestIramBlock(pub String);
+
+const BIGGEST_IRAM_BLOCK_NAME: &str = "biggest_iram_block";
+impl headers_core::Header for BiggestIramBlock {
+    fn name() -> &'static headers_core::HeaderName {
+        thread_local! {
+            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(BIGGEST_IRAM_BLOCK_NAME).into());
+        }
+        NAME.with(|n| *n)
+    }
+
+    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
+        values: &mut I,
+    ) -> Result<Self, headers_core::Error> {
+        values
+            .next()
+            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
+            .ok_or_else(headers_core::Error::invalid)
+    }
+
+    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
+        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
+            values.extend(std::iter::once(name));
+        }
+    }
+}

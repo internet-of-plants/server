@@ -25,7 +25,8 @@ async fn main() {
 
     //pretty_env_logger::init();
 
-    let router = router().await;
+    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
+    let router = router(url).await;
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
     tracing::info!("Listening on {}", addr);

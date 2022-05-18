@@ -5,9 +5,9 @@ use crate::db::sensor_prototype::SensorPrototypeId;
 use crate::extractor::Authorization;
 use crate::prelude::*;
 use axum::extract::{Extension, Json, Path};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct ConfigView {
     name: String,
     type_name: String,
@@ -25,16 +25,16 @@ impl ConfigView {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct SensorView {
-    id: SensorId,
-    name: String,
-    dependencies: Vec<String>,
-    includes: Vec<String>,
-    definitions: Vec<String>,
-    setups: Vec<String>,
-    measurements: Vec<Measurement>,
-    configurations: Vec<ConfigView>,
+    pub id: SensorId,
+    pub name: String,
+    pub dependencies: Vec<String>,
+    pub includes: Vec<String>,
+    pub definitions: Vec<String>,
+    pub setups: Vec<String>,
+    pub measurements: Vec<Measurement>,
+    pub configurations: Vec<ConfigView>,
 }
 
 impl SensorView {

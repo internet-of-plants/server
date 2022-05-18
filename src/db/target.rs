@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct TargetId(i64);
+pub struct TargetId(pub i64);
 
 impl TargetId {
     pub fn new(id: i64) -> Self {
@@ -125,6 +125,11 @@ build_flags =
     -O3
     -D IOP_LOG_LEVEL=iop::LogLevel::INFO
 
+    -D ARDUINOJSON_ENABLE_ARDUINO_STRING=0
+	-D ARDUINOJSON_ENABLE_ARDUINO_STREAM=0
+	-D ARDUINOJSON_ENABLE_ARDUINO_PRINT=0
+	-D ARDUINOJSON_ENABLE_PROGMEM=0
+
     {build_flags}
 platform = {platform}
 {framework}
@@ -133,7 +138,7 @@ board = {board}
 {extra_platformio_params}
 lib_deps = 
     {lib_deps}
-https://github.com/internet-of-plants/iop
+    https://github.com/internet-of-plants/iop
 platform_packages = 
     {platform_packages}"
         ))

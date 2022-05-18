@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct TargetPrototypeId(i64);
+pub struct TargetPrototypeId(pub i64);
 
 impl TargetPrototypeId {
     pub fn new(id: i64) -> Self {

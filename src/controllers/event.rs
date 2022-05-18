@@ -1,6 +1,7 @@
 use crate::extractor::Authorization;
 use crate::extractor::{
-    BiggestDramBlock, FreeDram, FreeStack, MacAddress, TimeRunning, Vcc, Version,
+    BiggestDramBlock, BiggestIramBlock, FreeDram, FreeIram, FreeStack, MacAddress, TimeRunning,
+    Vcc, Version,
 };
 use crate::prelude::*;
 use crate::{Event, NewEvent, Update};
@@ -22,33 +23,6 @@ pub struct DeviceStat {
     pub biggest_iram_block: Option<u64>,
 }
 
-/*
-fn optional_parse_header<T: std::str::FromStr>(
-    headers: &axum::http::header::HeaderMap,
-    key: &'static str,
-) -> Result<Option<T>, Error> {
-    Ok(headers
-        .get(key)
-        .map(|k| {
-            k.to_str()
-                .map_err(|_| Error::MissingHeader(key))
-                .and_then(|k| {
-                    k.to_string()
-                        .parse::<T>()
-                        .map_err(|_| Error::MissingHeader(key))
-                })
-        })
-        .transpose()?)
-}
-
-fn parse_header<T: std::str::FromStr>(
-    headers: &warp::http::HeaderMap,
-    key: &'static str,
-) -> Result<T, Error> {
-    optional_parse_header(headers, key)?.ok_or(Error::MissingHeader(key))
-}
-*/
-
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
     Authorization(auth): Authorization,
@@ -60,16 +34,19 @@ pub async fn new(
     TypedHeader(FreeDram(free_dram)): TypedHeader<FreeDram>,
     TypedHeader(BiggestDramBlock(biggest_dram_block)): TypedHeader<BiggestDramBlock>,
     TypedHeader(FreeStack(free_stack)): TypedHeader<FreeStack>,
+    free_iram: Option<TypedHeader<FreeIram>>,
+    biggest_iram_block: Option<TypedHeader<BiggestIramBlock>>,
 ) -> Result<impl IntoResponse> {
     let stat = DeviceStat {
         version,
         time_running: time_running.parse()?,
         vcc: vcc.parse()?,
         free_dram: free_dram.parse()?,
-        free_iram: None, //optional_parse_header(&headers, "FREE_IRAM")?,
+        free_iram: free_iram.and_then(|TypedHeader(FreeIram(iram))| iram.parse().ok()),
         free_stack: free_stack.parse()?,
         biggest_dram_block: biggest_dram_block.parse()?,
-        biggest_iram_block: None, //optional_parse_header(&headers, "BIGGEST_BLOCK_IRAM")?,
+        biggest_iram_block: biggest_iram_block
+            .and_then(|TypedHeader(BiggestIramBlock(size))| size.parse().ok()),
     };
 
     if let Some(device_id) = auth.device_id {

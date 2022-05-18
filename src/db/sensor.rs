@@ -10,16 +10,16 @@ use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewSensor {
-    prototype_id: SensorPrototypeId,
-    configs: Vec<NewConfig>,
+    pub prototype_id: SensorPrototypeId,
+    pub configs: Vec<NewConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NewConfig {
+pub struct NewConfig {
     pub request_id: ConfigRequestId,
     pub value: String, // encoded the way it will be used by C++
 }

@@ -4,15 +4,15 @@ use crate::extractor::Authorization;
 use crate::prelude::*;
 use axum::extract::{Extension, Json, Path};
 use controllers::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct BoardView {
-    id: BoardId,
-    name: String,
+    pub id: BoardId,
+    pub name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TargetPrototypeView {
     pub id: TargetPrototypeId,
     pub arch: String,

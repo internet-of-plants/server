@@ -1,5 +1,22 @@
 use crate::db::user::{AuthToken, Login, NewUser};
-use crate::{CollectionId, CollectionView, Organization, OrganizationId, OrganizationView};
+use crate::extractor::{MacAddress, Version};
+use crate::{
+    controllers::compiler::{CompilationView, NewCompiler},
+    controllers::sensor::SensorView,
+    controllers::sensor_prototype::SensorPrototypeView,
+    controllers::target::NewTarget,
+    controllers::target::TargetView,
+    controllers::target_prototype::TargetPrototypeView,
+    controllers::update::NewUpdate,
+    db::board::BoardId,
+    db::code_generation::CompilationId,
+    db::device_panic::NewDevicePanic,
+    db::sensor::NewSensor,
+    db::sensor_prototype::SensorPrototypeId,
+    db::target_prototype::TargetPrototypeId,
+    CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView, NewEvent,
+    Organization, OrganizationId, OrganizationView,
+};
 use axum::{
     body::Body,
     http::{self, Method, Request, StatusCode},
@@ -75,7 +92,6 @@ pub async fn list_organizations(app: Router, token: &AuthToken) -> Vec<Organizat
             Request::builder()
                 .uri("/v1/organizations")
                 .header("Authorization", format!("Basic {}", token.0))
-                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -97,7 +113,6 @@ pub async fn find_organization(
             Request::builder()
                 .uri(format!("/v1/organization/{}", id.0))
                 .header("Authorization", format!("Basic {}", token.0))
-                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -123,7 +138,6 @@ pub async fn find_collection(
                     organization_id.0, collection_id.0
                 ))
                 .header("Authorization", format!("Basic {}", token.0))
-                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -133,4 +147,490 @@ pub async fn find_collection(
     assert_eq!(response.status(), StatusCode::OK);
     let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
     serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn send_device_log(app: Router, token: &AuthToken, log: &str) {
+    let body = Body::from(log.to_owned());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/log")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::POST)
+                .body(body)
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+pub async fn find_device(
+    app: Router,
+    token: &AuthToken,
+    organization_id: OrganizationId,
+    collection_id: CollectionId,
+    device_id: DeviceId,
+) -> DeviceView {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/organization/{}/collection/{}/device/{}",
+                    organization_id.0, collection_id.0, device_id.0,
+                ))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_device_logs(
+    app: Router,
+    token: &AuthToken,
+    organization_id: OrganizationId,
+    collection_id: CollectionId,
+    device_id: DeviceId,
+) -> Vec<DeviceLog> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/organization/{}/collection/{}/device/{}/log/last/{}",
+                    organization_id.0, collection_id.0, device_id.0, 10
+                ))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn send_device_panic(app: Router, token: &AuthToken, panic: &NewDevicePanic) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/panic")
+                .header("Authorization", format!("Basic {}", token.0))
+                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                .method(Method::POST)
+                .body(Body::from(serde_json::to_vec(&panic).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+pub async fn list_device_panics(
+    app: Router,
+    token: &AuthToken,
+    organization_id: OrganizationId,
+    collection_id: CollectionId,
+    device_id: DeviceId,
+) -> Vec<DevicePanic> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/organization/{}/collection/{}/device/{}/panic/last/{}",
+                    organization_id.0, collection_id.0, device_id.0, 10
+                ))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn send_event(
+    app: Router,
+    token: &AuthToken,
+    version: &Version,
+    mac_address: &MacAddress,
+    new_event: &NewEvent,
+) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/event")
+                .header("Authorization", format!("Basic {}", token.0))
+                .header("MAC_ADDRESS", &mac_address.0)
+                .header("VERSION", &version.0)
+                .header("TIME_RUNNING", "1")
+                .header("VCC", "1")
+                .header("FREE_STACK", "10000")
+                .header("FREE_DRAM", "10000")
+                .header("BIGGEST_DRAM_BLOCK", "10000")
+                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                .method(Method::POST)
+                .body(Body::from(serde_json::to_vec(&new_event).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+pub async fn send_update(
+    app: Router,
+    token: &AuthToken,
+    organization_id: OrganizationId,
+    collection_id: CollectionId,
+    device_id: DeviceId,
+    update: NewUpdate,
+) {
+    let NewUpdate { file, version } = update;
+    let mut body = format!(
+        "-----------------------------152619935231652215881740279177\r
+Content-Disposition: form-data; name=\"version\"\r
+\r
+{}\r
+-----------------------------152619935231652215881740279177\r
+Content-Disposition: form-data; name=\"binary\"; filename=\"firmware.bin\"\r
+Content-Type: application/octet-stream\r
+\r
+",
+        version
+    )
+    .into_bytes();
+    body.extend(file);
+    body.extend("\r\n-----------------------------152619935231652215881740279177--".as_bytes());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/organization/{}/collection/{}/device/{}/update",
+                    organization_id.0, collection_id.0, device_id.0
+                ))
+                .header("Authorization", format!("Basic {}", token.0))
+                .header(
+                    http::header::CONTENT_LENGTH,
+                    body.len().to_string()
+                )
+                .header(
+                    http::header::CONTENT_TYPE,
+                    "multipart/form-data; boundary=---------------------------152619935231652215881740279177"
+                )
+                .method(Method::POST)
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+pub async fn find_update(app: Router, token: &AuthToken, file_hash: &Version) -> Vec<u8> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/update")
+                .header("Authorization", format!("Basic {}", token.0))
+                .header("x-ESP8266-sketch-md5", &file_hash.0)
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    body.as_ref().to_owned()
+}
+
+pub async fn list_target_prototypes(app: Router, token: &AuthToken) -> Vec<TargetPrototypeView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/target/prototypes")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn find_target_prototype(
+    app: Router,
+    token: &AuthToken,
+    id: TargetPrototypeId,
+) -> TargetPrototypeView {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/target/prototype/{}", id.0))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn create_target(
+    app: Router,
+    token: &AuthToken,
+    id: TargetPrototypeId,
+    board_id: BoardId,
+) -> TargetView {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/target")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::POST)
+                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                .body(Body::from(
+                    serde_json::to_vec(&NewTarget {
+                        target_prototype_id: id,
+                        board_id,
+                    })
+                    .unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_targets(app: Router, token: &AuthToken) -> Vec<TargetView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/targets")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_targets_for_prototype(
+    app: Router,
+    token: &AuthToken,
+    target_prototype_id: TargetPrototypeId,
+) -> Vec<TargetView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/targets/of/prototype/{}",
+                    target_prototype_id.0
+                ))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_boards(app: Router, token: &AuthToken) -> Vec<SensorPrototypeView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/sensor/prototypes")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_sensor_prototypes(app: Router, token: &AuthToken) -> Vec<SensorPrototypeView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/sensor/prototypes")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn find_sensor_prototype(
+    app: Router,
+    token: &AuthToken,
+    id: SensorPrototypeId,
+    target: Option<TargetView>,
+) -> SensorPrototypeView {
+    let uri = if let Some(target) = target {
+        format!("/v1/sensor/prototype/{}?target_id={}", id.0, target.id.0)
+    } else {
+        format!("/v1/sensor/prototype/{}", id.0)
+    };
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(uri)
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn create_sensor(app: Router, token: &AuthToken, sensor: NewSensor) -> SensorView {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/sensor")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::POST)
+                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                .body(Body::from(serde_json::to_vec(&sensor).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_sensors(app: Router, token: &AuthToken) -> Vec<SensorView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/sensors")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_sensors_for_prototype(
+    app: Router,
+    token: &AuthToken,
+    sensor_prototype: SensorPrototypeId,
+) -> Vec<SensorView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/sensors/of/prototype/{}", sensor_prototype.0))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn create_compiler(
+    app: Router,
+    token: &AuthToken,
+    compiler: NewCompiler,
+) -> CompilationView {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/compiler")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::POST)
+                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                .body(Body::from(serde_json::to_vec(&compiler).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn list_compilations(app: Router, token: &AuthToken) -> Vec<CompilationView> {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/compilations")
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::GET)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+pub async fn compile_firmware(app: Router, token: &AuthToken, compilation_id: CompilationId) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/compile/{}", compilation_id.0))
+                .header("Authorization", format!("Basic {}", token.0))
+                .method(Method::POST)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
 }

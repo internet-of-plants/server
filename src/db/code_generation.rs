@@ -8,25 +8,25 @@ use tokio::fs;
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct CompiledId(i64);
+pub struct CompilationId(pub i64);
 
-impl CompiledId {
+impl CompilationId {
     pub fn new(id: i64) -> Self {
         Self(id)
     }
 }
 
 #[derive(sqlx::FromRow, Debug)]
-pub struct Compiled {
-    id: CompiledId,
+pub struct Compilation {
+    id: CompilationId,
     compiler_id: CompilerId,
     pub platformio_ini: String,
     pub main_cpp: String,
     pub pin_hpp: String,
 }
 
-impl Compiled {
-    pub fn id(&self) -> CompiledId {
+impl Compilation {
+    pub fn id(&self) -> CompilationId {
         self.id
     }
 
@@ -37,7 +37,7 @@ impl Compiled {
         main_cpp: String,
         pin_hpp: String,
     ) -> Result<Self> {
-        let (id,): (CompiledId,) =
+        let (id,): (CompilationId,) =
             sqlx::query_as("INSERT INTO compilations (compiler_id, platformio_ini, main_cpp, pin_hpp) VALUES ($1, $2, $3, $4) RETURNING id")
                 .bind(compiler_id)
                 .bind(&platformio_ini)
@@ -54,7 +54,7 @@ impl Compiled {
         })
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, id: CompiledId) -> Result<Self> {
+    pub async fn find_by_id(txn: &mut Transaction<'_>, id: CompilationId) -> Result<Self> {
         let comp = sqlx::query_as("SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp FROM compilations WHERE id = $1")
             .bind(id)
             .fetch_one(&mut *txn)
@@ -104,40 +104,27 @@ impl Compiled {
             )
             .await?;
 
-            info!("pio run -e {build_name} -d {}", dir.path().display());
-
-            let mut cursor = fs::read_dir(dir.path()).await?;
-            while let Some(file) = cursor.next_entry().await? {
-                info!("File: {:?}", file);
-            }
+            info!("pio run -e {build_name} -d \"{}\"", dir.path().display());
 
             // TODO: is dir.path().display() the correct approach?
-            let mut command = tokio::process::Command::new(format!(
-                "pio run -e {build_name} -d {}",
-                dir.path().display()
-            ));
+            let dir_arg = dir.path().display().to_string();
+            let mut command = tokio::process::Command::new("pio");
+            command.args(["run", "-e", &build_name, "-d", dir_arg.as_str()]);
             // TODO: stream output
             // TODO: check exit code?
             let output = command.spawn()?.wait_with_output().await?;
 
-            let mut cursor = fs::read_dir(dir.path()).await?;
-            while let Some(file) = cursor.next_entry().await? {
-                info!("File: {:?}", file);
+            if !output.stderr.is_empty() {
+                error!("{}", String::from_utf8_lossy(&output.stderr));
+            }
+            if !output.stdout.is_empty() {
+                info!("{}", String::from_utf8_lossy(&output.stdout));
             }
 
-            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-            println!("{}", String::from_utf8_lossy(&output.stdout));
-
-            info!("{:?}", fs::read_dir(dir.path().join(".pio")).await.unwrap());
-            info!(
-                "{:?}",
-                fs::read_dir(dir.path().join(".pio").join(&build_name))
-                    .await
-                    .unwrap()
-            );
             fs::read(
                 dir.path()
                     .join(".pio")
+                    .join("build")
                     .join(&build_name)
                     .join("firmware.bin"),
             )
@@ -217,7 +204,7 @@ impl Compiler {
         Ok(sensors)
     }
 
-    pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Compiled> {
+    pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {
         let sensors = self.sensors(&mut *txn).await?;
 
         let mut lib_deps = Vec::new();
@@ -298,6 +285,6 @@ auto setup(EventLoop &loop) noexcept -> void {{
 }}
 ",
         );
-        Ok(Compiled::new(&mut *txn, self.id, platformio_ini, main_cpp, pin_hpp).await?)
+        Ok(Compilation::new(&mut *txn, self.id, platformio_ini, main_cpp, pin_hpp).await?)
     }
 }

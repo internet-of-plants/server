@@ -9,10 +9,10 @@ use axum::extract::{Extension, Json, Path, Query};
 use controllers::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
-struct ConfigTypeView {
-    name: String,
-    widget: WidgetKind,
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct ConfigTypeView {
+    pub name: String,
+    pub widget: WidgetKind,
 }
 
 impl ConfigTypeView {
@@ -28,11 +28,11 @@ impl ConfigTypeView {
     }
 }
 
-#[derive(Serialize)]
-struct ConfigRequestView {
-    id: ConfigRequestId,
-    name: String,
-    ty: ConfigTypeView,
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct ConfigRequestView {
+    pub id: ConfigRequestId,
+    pub name: String,
+    pub ty: ConfigTypeView,
 }
 
 impl ConfigRequestView {
@@ -50,16 +50,16 @@ impl ConfigRequestView {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorPrototypeView {
-    id: SensorPrototypeId,
-    name: String,
-    dependencies: Vec<String>,
-    includes: Vec<String>,
-    definitions: Vec<String>,
-    setups: Vec<String>,
-    measurements: Vec<Measurement>,
-    configuration_requests: Vec<ConfigRequestView>,
+    pub id: SensorPrototypeId,
+    pub name: String,
+    pub dependencies: Vec<String>,
+    pub includes: Vec<String>,
+    pub definitions: Vec<String>,
+    pub setups: Vec<String>,
+    pub measurements: Vec<Measurement>,
+    pub configuration_requests: Vec<ConfigRequestView>,
 }
 
 impl SensorPrototypeView {
@@ -104,20 +104,20 @@ pub async fn index(
 }
 
 #[derive(Deserialize)]
-pub struct TargetList {
-    target: TargetId,
+pub struct RequestTarget {
+    target_id: Option<TargetId>,
 }
 
 pub async fn find(
     Path(sensor_prototype_id): Path<SensorPrototypeId>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
-    Query(target_ids): Query<TargetList>,
+    Query(target): Query<RequestTarget>,
 ) -> Result<Json<SensorPrototypeView>> {
     let mut txn = pool.begin().await?;
 
     let prototype = SensorPrototype::find_by_id(&mut txn, sensor_prototype_id).await?;
-    let view = SensorPrototypeView::new(&mut txn, prototype, &[target_ids.target]).await?;
+    let view = SensorPrototypeView::new(&mut txn, prototype, &target.target_id.map_or(vec![], |id| vec![id])).await?;
 
     txn.commit().await?;
     Ok(Json(view))

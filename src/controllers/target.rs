@@ -7,24 +7,24 @@ use axum::extract::{Extension, Json, Path};
 use controllers::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewTarget {
-    target_prototype_id: TargetPrototypeId,
-    board_id: BoardId,
+    pub target_prototype_id: TargetPrototypeId,
+    pub board_id: BoardId,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct TargetView {
-    id: TargetId,
-    arch: String,
-    build_flags: String,
-    platform: String,
-    framework: Option<String>,
-    platform_packages: String,
-    extra_platformio_params: String,
-    ldf_mode: Option<String>,
-    board: String,
+    pub id: TargetId,
+    pub arch: String,
+    pub build_flags: String,
+    pub platform: String,
+    pub framework: Option<String>,
+    pub platform_packages: String,
+    pub extra_platformio_params: String,
+    pub ldf_mode: Option<String>,
+    pub board: String,
 }
 
 impl TargetView {
@@ -80,7 +80,7 @@ pub async fn new(
     Authorization(auth): Authorization,
     Json(new_target): Json<NewTarget>,
 ) -> Result<Json<TargetView>> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let mut txn = pool.begin().await?;
 
     let target = Target::new(
         &mut txn,
@@ -91,6 +91,6 @@ pub async fn new(
     .await?;
     let view = TargetView::new(&mut txn, target).await?;
 
-    txn.commit().await.map_err(Error::from)?;
+    txn.commit().await?;
     Ok(Json(view))
 }

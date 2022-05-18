@@ -28,17 +28,15 @@ pub async fn new(
     Ok(StatusCode::OK)
 }
 
+type IndexPath = (OrganizationId, CollectionId, DeviceId, u16);
 pub async fn index(
-    Path(_organization_id): Path<OrganizationId>,
-    Path(_collection_id): Path<CollectionId>,
-    Path(device_id): Path<DeviceId>,
-    Path(limit): Path<u32>,
+    Path((_organization_id, _collection_id, device_id, limit)): Path<IndexPath>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<Json<Vec<DeviceLog>>> {
     // TODO: enforce ownerships
     let mut txn = pool.begin().await?;
-    let logs = DeviceLog::first_n_from_device(&mut txn, &device_id, limit).await?;
+    let logs = DeviceLog::first_n_from_device(&mut txn, &device_id, limit as i32).await?;
     txn.commit().await?;
     Ok(Json(logs))
 }

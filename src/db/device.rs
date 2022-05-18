@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct DeviceId(i64);
+pub struct DeviceId(pub i64);
 
 impl DeviceId {
     pub fn new(id: i64) -> Self {
@@ -24,15 +24,15 @@ pub struct LastUpdate {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DeviceView {
-    id: DeviceId,
-    name: Option<String>,
-    description: Option<String>,
-    mac: String,
-    file_hash: String,
-    last_update: Option<LastUpdate>,
-    last_event: Option<Event>,
-    created_at: DateTime,
-    updated_at: DateTime,
+    pub id: DeviceId,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub mac: String,
+    pub file_hash: String,
+    pub last_update: Option<LastUpdate>,
+    pub last_event: Option<Event>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 impl DeviceView {

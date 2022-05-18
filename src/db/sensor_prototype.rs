@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct SensorPrototypeId(i64);
+pub struct SensorPrototypeId(pub i64);
 
 impl SensorPrototypeId {
     pub fn new(id: i64) -> Self {

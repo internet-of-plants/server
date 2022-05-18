@@ -4,10 +4,10 @@ use crate::DeviceId;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NewDevicePanic {
     pub file: String,
-    pub line: u32,
+    pub line: i32,
     pub func: String,
     pub msg: String,
 }
@@ -39,7 +39,7 @@ pub struct DevicePanicId(i64);
 pub struct DevicePanic {
     id: DevicePanicId,
     file: String,
-    line: u32,
+    line: i32,
     func: String,
     msg: String,
     created_at: DateTime,
@@ -74,7 +74,7 @@ impl DevicePanic {
     pub async fn first_n_from_device(
         txn: &mut Transaction<'_>,
         device_id: &DeviceId,
-        limit: u32,
+        limit: i32,
     ) -> Result<Vec<Self>> {
         let device_panics: Vec<DevicePanic> = sqlx::query_as(
             "SELECT p.id, p.file, p.line, p.func, p.msg, p.created_at
@@ -97,5 +97,9 @@ impl DevicePanic {
             .execute(txn)
             .await?;
         Ok(())
+    }
+
+    pub fn msg(&self) -> &str {
+        &self.msg
     }
 }

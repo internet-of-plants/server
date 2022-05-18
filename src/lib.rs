@@ -2,8 +2,8 @@ pub mod controllers;
 pub mod db;
 pub mod error;
 pub mod extractor;
-pub mod utils;
 pub mod test_helpers;
+pub mod utils;
 
 pub use crate::db::{
     collection::{Collection, CollectionId, CollectionView},
@@ -56,22 +56,22 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub async fn test_router() -> Router {
     static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
     let _guard = LOCK.lock().unwrap();
-    // TODO: have a lock here otherwise multiple server instances will race
     if !INITIALIZED.swap(true, Ordering::Relaxed) {
         let url = "postgres://postgres:postgres@127.0.0.1:5432";
         let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
-        let _ = sqlx::query("DROP DATABASE iop")
+        let _ = sqlx::query("DROP DATABASE iop_test")
             .execute(&mut connection)
             .await;
-        sqlx::query("CREATE DATABASE iop")
+        sqlx::query("CREATE DATABASE iop_test")
             .execute(&mut connection)
             .await
             .unwrap();
     }
-    router().await
+    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop_test";
+    router(url).await
 }
 
-pub async fn router() -> Router {
+pub async fn router(url: &str) -> Router {
     tracing_subscriber::registry()
         .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(
             |_| {
@@ -127,7 +127,6 @@ pub async fn router() -> Router {
         ])
         .allow_origin(Origin::list(allowed_origin));
 
-    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
     utils::run_migrations(url).await;
 
     let pool = Pool::connect(url)
@@ -140,10 +139,10 @@ pub async fn router() -> Router {
         .route("/v1/user", post(controllers::user::new))
         .route("/v1/sensor", post(controllers::sensor::new))
         .route(
-            "/v1/sensor/of/prototype/:id",
+            "/v1/sensors/of/prototype/:id",
             get(controllers::sensor::list_for_prototype),
         )
-        .route("/v1/sensors", get(controllers::sensor::list_for_prototype))
+        .route("/v1/sensors", get(controllers::sensor::list))
         .route(
             "/v1/sensor/prototype/:id",
             get(controllers::sensor_prototype::find),
@@ -152,12 +151,11 @@ pub async fn router() -> Router {
             "/v1/sensor/prototypes",
             get(controllers::sensor_prototype::index),
         )
-        .route("/v1/log", get(controllers::device_log::new)) //.and(warp::body::content_length_limit(2048))
         .route("/v1/event", post(controllers::event::new))
         .route("/v1/targets", get(controllers::target::list))
         .route("/v1/target", post(controllers::target::new))
         .route(
-            "/v1/target/of/prototype/:id",
+            "/v1/targets/of/prototype/:id",
             get(controllers::target::list_for_prototype),
         )
         .route(
@@ -171,7 +169,7 @@ pub async fn router() -> Router {
         .route("/v1/compiler", post(controllers::compiler::new))
         .route("/v1/compilations", get(controllers::compiler::compilations))
         .route(
-            "/v1/compilations",
+            "/v1/compile/:id",
             post(controllers::compiler::compile_firmware),
         )
         .route(
@@ -187,22 +185,23 @@ pub async fn router() -> Router {
             "/v1/organization/:id/collection/:id/device/:id",
             get(controllers::device::find),
         )
+        .route("/v1/log", post(controllers::device_log::new)) //.and(warp::body::content_length_limit(2048))
         .route(
-            "/v1/organization/:id/collection/:id/device/:id/log/last",
+            "/v1/organization/:id/collection/:id/device/:id/log/last/:limit",
             get(controllers::device_log::index),
         )
+        .route("/v1/panic", post(controllers::device_panic::new))
         .route(
-            "/v1/organization/:id/collection/:id/device/:id/panic/last",
+            "/v1/organization/:id/collection/:id/device/:id/panic/last/:limit",
             get(controllers::device_panic::index),
         )
-        .route("/v1/panic", post(controllers::device_panic::new))
         .route("/v1/panic/:id", delete(controllers::device_panic::solve))
         .route(
-            "/v1/update",
+            "/v1/organization/:id/collection/:id/device/:id/update",
             post(controllers::update::new), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
         )
         .route(
-            "/v1/update/:id",
+            "/v1/update",
             get(controllers::update::get), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
         )
         .layer(Extension(pool))

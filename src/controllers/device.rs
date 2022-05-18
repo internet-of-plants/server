@@ -4,10 +4,9 @@ use crate::{CollectionId, DeviceId, DeviceView, OrganizationId};
 use axum::extract::{Extension, Json, Path};
 use controllers::Result;
 
+type FindPath = (OrganizationId, CollectionId, DeviceId);
 pub async fn find(
-    Path(_organization_id): Path<OrganizationId>,
-    Path(_collection_id): Path<CollectionId>,
-    Path(device_id): Path<DeviceId>,
+    Path((_organization_id, _collection_id, device_id)): Path<FindPath>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<Json<DeviceView>> {
@@ -23,7 +22,7 @@ pub async fn find(
 //    pub since_secs_ago: u64,
 //}
 //pub async fn history(pool: &'static Pool, auth: Auth, req: RequestHistory) -> Result<impl Reply> {
-//    let mut txn = pool.begin().await.map_err(Error::from)?;
+//    let mut txn = pool.begin().await?;
 //    // TODO: easy DOS channel
 //    let history = db::plant::history(
 //        &mut txn,
@@ -32,6 +31,6 @@ pub async fn find(
 //        Duration::from_secs(req.since_secs_ago),
 //    )
 //    .await?;
-//    txn.commit().await.map_err(Error::from)?;
+//    txn.commit().await?;
 //    Ok(warp::reply::json(&history))
 //}

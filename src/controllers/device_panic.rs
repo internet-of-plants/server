@@ -23,7 +23,7 @@ pub async fn new(
     Authorization(auth): Authorization,
     Json(mut error): Json<NewDevicePanic>,
 ) -> Result<StatusCode> {
-    let mut txn = pool.begin().await.map_err(Error::from)?;
+    let mut txn = pool.begin().await?;
 
     if error.msg.trim() != error.msg {
         error.msg = error.msg.trim().to_owned();
@@ -34,21 +34,19 @@ pub async fn new(
         return Err(Error::Forbidden)?;
     }
 
-    txn.commit().await.map_err(Error::from)?;
+    txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
+type IndexPath = (OrganizationId, CollectionId, DeviceId, u16);
 pub async fn index(
-    Path(_organization_id): Path<OrganizationId>,
-    Path(_collection_id): Path<CollectionId>,
-    Path(device_id): Path<DeviceId>,
-    Path(limit): Path<u32>,
+    Path((_organization_id, _collection_id, device_id, limit)): Path<IndexPath>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<Json<Vec<DevicePanic>>> {
     // TODO: enforce ownerships
     let mut txn = pool.begin().await?;
-    let panics = DevicePanic::first_n_from_device(&mut txn, &device_id, limit).await?;
+    let panics = DevicePanic::first_n_from_device(&mut txn, &device_id, limit as i32).await?;
     Ok(Json(panics))
 }
 

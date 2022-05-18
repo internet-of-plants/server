@@ -26,6 +26,7 @@ pub enum Error {
     Hyper(hyper::Error),
     InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
     Http(axum::http::Error),
+    Multipart(axum::extract::multipart::MultipartError)
 }
 
 impl std::error::Error for Error {}
@@ -33,6 +34,10 @@ impl std::error::Error for Error {}
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
+            Self::Multipart(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
             Self::Http(error) => {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")

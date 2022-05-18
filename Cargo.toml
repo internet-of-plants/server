@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = "0.1"
-axum = { version = "0.5", features = ["headers"] }
+axum = { version = "0.5", features = ["headers", "multipart"] }
 headers-core = "0.2"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process"] }

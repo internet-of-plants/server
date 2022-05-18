@@ -1,5 +1,5 @@
 use crate::controllers::Result;
-use crate::db::code_generation::{Compiled, CompiledId, Compiler, CompilerId};
+use crate::db::code_generation::{Compilation, CompilationId, Compiler, CompilerId};
 use crate::db::sensor::SensorId;
 use crate::db::target::TargetId;
 use crate::extractor::Authorization;
@@ -8,19 +8,19 @@ use axum::extract::{Extension, Json, Path};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NewCompiler {
-    target_id: TargetId,
-    sensor_ids: Vec<SensorId>,
+    pub target_id: TargetId,
+    pub sensor_ids: Vec<SensorId>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilerView {
-    id: CompilerId,
-    sensor_names: Vec<String>,
-    target_arch: String,
+    pub id: CompilerId,
+    pub sensor_names: Vec<String>,
+    pub target_arch: String,
 }
 
 impl CompilerView {
@@ -37,24 +37,24 @@ impl CompilerView {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct CompiledView {
-    id: CompiledId,
-    compiler: CompilerView,
-    platformio_ini: String,
-    main_cpp: String,
-    pin_hpp: String,
+pub struct CompilationView {
+    pub id: CompilationId,
+    pub compiler: CompilerView,
+    pub platformio_ini: String,
+    pub main_cpp: String,
+    pub pin_hpp: String,
 }
 
-impl CompiledView {
-    async fn new(txn: &mut Transaction<'_>, compiled: Compiled) -> Result<Self> {
-        let compiler = compiled.compiler(txn).await?;
+impl CompilationView {
+    async fn new(txn: &mut Transaction<'_>, compilation: Compilation) -> Result<Self> {
+        let compiler = compilation.compiler(txn).await?;
         Ok(Self {
-            id: compiled.id(),
-            platformio_ini: compiled.platformio_ini,
-            main_cpp: compiled.main_cpp,
-            pin_hpp: compiled.pin_hpp,
+            id: compilation.id(),
+            platformio_ini: compilation.platformio_ini,
+            main_cpp: compilation.main_cpp,
+            pin_hpp: compilation.pin_hpp,
             compiler: CompilerView::new(txn, compiler).await?,
         })
     }
@@ -64,13 +64,13 @@ pub async fn new(
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
     Json(new_compiler): Json<NewCompiler>,
-) -> Result<Json<CompiledView>> {
+) -> Result<Json<CompilationView>> {
     let mut txn = pool.begin().await?;
 
     // TODO: filter by user
     let compiler = Compiler::new(&mut txn, new_compiler.target_id, new_compiler.sensor_ids).await?;
-    let compiled = compiler.compile(&mut txn).await?;
-    let view = CompiledView::new(&mut txn, compiled).await?;
+    let compilation = compiler.compile(&mut txn).await?;
+    let view = CompilationView::new(&mut txn, compilation).await?;
 
     txn.commit().await?;
     Ok(Json(view))
@@ -79,14 +79,14 @@ pub async fn new(
 pub async fn compilations(
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
-) -> Result<Json<Vec<CompiledView>>> {
+) -> Result<Json<Vec<CompilationView>>> {
     let mut txn = pool.begin().await?;
 
     // TODO: filter by user
-    let compileds = Compiled::list(&mut txn).await?;
+    let compilations = Compilation::list(&mut txn).await?;
     let mut views = Vec::new();
-    for compiled in compileds {
-        views.push(CompiledView::new(&mut txn, compiled).await?);
+    for compilation in compilations {
+        views.push(CompilationView::new(&mut txn, compilation).await?);
     }
 
     txn.commit().await?;
@@ -94,15 +94,15 @@ pub async fn compilations(
 }
 
 pub async fn compile_firmware(
-    Path(compiled_id): Path<CompiledId>,
+    Path(compilation_id): Path<CompilationId>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
 
     // TODO: filter by user
-    let compiled = Compiled::find_by_id(&mut txn, compiled_id).await?;
-    let _firmware = compiled.compile(&mut txn).await?;
+    let compilation = Compilation::find_by_id(&mut txn, compilation_id).await?;
+    let _firmware = compilation.compile(&mut txn).await?;
 
     txn.commit().await?;
     Ok(StatusCode::OK)

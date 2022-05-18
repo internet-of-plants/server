@@ -10,23 +10,23 @@ pub struct EventId(i64);
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Event {
-    id: EventId,
-    air_temperature_celsius: f64,
-    air_humidity_percentage: f64,
-    air_heat_index_celsius: f64,
-    soil_resistivity_raw: i16,
-    soil_temperature_celsius: f64,
-    firmware_hash: String,
-    created_at: DateTime,
+    pub id: EventId,
+    pub air_temperature_celsius: f64,
+    pub air_humidity_percentage: f64,
+    pub air_heat_index_celsius: f64,
+    pub soil_resistivity_raw: i16,
+    pub soil_temperature_celsius: f64,
+    pub firmware_hash: String,
+    pub created_at: DateTime,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NewEvent {
-    air_temperature_celsius: f64,
-    air_humidity_percentage: f64,
-    air_heat_index_celsius: f64,
-    soil_resistivity_raw: i16,
-    soil_temperature_celsius: f64,
+    pub air_temperature_celsius: f64,
+    pub air_humidity_percentage: f64,
+    pub air_heat_index_celsius: f64,
+    pub soil_resistivity_raw: i16,
+    pub soil_temperature_celsius: f64,
 }
 
 impl Event {

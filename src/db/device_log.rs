@@ -35,7 +35,7 @@ impl DeviceLog {
     pub async fn first_n_from_device(
         txn: &mut Transaction<'_>,
         device_id: &DeviceId,
-        limit: u32,
+        limit: i32,
     ) -> Result<Vec<Self>> {
         let device_logs: Vec<DeviceLog> = sqlx::query_as(
             "SELECT id, log, created_at
@@ -49,5 +49,9 @@ impl DeviceLog {
         .fetch_all(txn)
         .await?;
         Ok(device_logs.into_iter().rev().collect())
+    }
+
+    pub fn log(&self) -> &str {
+        &self.log
     }
 }

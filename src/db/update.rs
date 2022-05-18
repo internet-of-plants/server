@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct UpdateId(i64);
+pub struct UpdateId(pub i64);
 
 impl UpdateId {
     pub fn new(id: i64) -> Self {

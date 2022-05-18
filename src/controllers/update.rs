@@ -1,68 +1,58 @@
 use crate::db::firmware::Firmware;
-use crate::prelude::*;
-use crate::{DeviceId, Update};
-//use bytes::{Buf, BufMut};
-use controllers::Result;
-//use futures::{StreamExt, TryStreamExt};
-use std::fmt::Write;
-//use warp::filters::multipart::FormData;
 use crate::extractor::{Authorization, Esp8266Md5};
-use axum::extract::{Extension, Form, Path, TypedHeader};
+use crate::prelude::*;
+use crate::{CollectionId, DeviceId, OrganizationId, Update};
+use axum::extract::{Extension, Multipart, Path, TypedHeader};
 use axum::{body::Bytes, body::Full, http::StatusCode};
-use serde::Deserialize;
+use controllers::Result;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Write};
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateForm {
-    version: String,
-    file: Vec<u8>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewUpdate {
+    pub version: String,
+    pub file: Vec<u8>,
 }
 
+type NewPath = (OrganizationId, CollectionId, DeviceId);
 pub async fn new(
-    Path(device_id): Path<DeviceId>,
+    Path((_organization_id, _collection_id, device_id)): Path<NewPath>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(auth): Authorization,
-    Form(form): Form<UpdateForm>,
+    mut multipart: Multipart
 ) -> Result<StatusCode> {
+    if auth.device_id.is_some() && Some(device_id) != auth.device_id {
+        return Err(Error::Forbidden);
+    }
+
     let mut txn = pool.begin().await?;
 
     //db::plant::owns(&mut txn, auth.user_id, device_id).await?;
 
-    //let mut version = form
-    //    .next()
-    //    .await
-    //    .ok_or(Error::BadData)?
-    //    .map_err(Error::Warp)?;
-    //let mut version = version
-    //    .data()
-    //    .await
-    //    .ok_or(Error::BadData)?
-    //    .map_err(Error::Warp)?;
-    //let buf_version = version.copy_to_bytes(version.remaining());
-    //let version = std::str::from_utf8(buf_version.as_ref())
-    //    .map_err(Error::Utf8)?
-    //    .to_uppercase();
+    let mut map: HashMap<String, Bytes> = HashMap::default();
+        println!("{:?}", multipart);
+    while let Some(field) = multipart.next_field().await? {
+        println!("aaaa {:?}", field);
+        println!("name");
+        let name = field.name().ok_or(Error::BadData)?.to_string();
+        println!("data");
+        let data = field.bytes().await?;
+        map.insert(name, data);
+    }
 
-    //let file = form
-    //    .next()
-    //    .await
-    //    .ok_or(Error::BadData)?
-    //    .map_err(Error::Warp)?;
-    //let binary = file
-    //    .stream()
-    //    .try_fold(Vec::new(), |mut vec, data| {
-    //        vec.put(data);
-    //        async move { Ok(vec) }
-    //    })
-    //    .await
-    //    .map_err(Error::from)?;
-
-    let firmware = Firmware::new(&mut txn, None, form.file).await?;
+    dbg!(map.keys().collect::<Vec<_>>());
+    let firmware = Firmware::new(
+        &mut txn,
+        None,
+        map.get("binary").ok_or(Error::BadData)?.to_vec(),
+    )
+    .await?;
     let _update = Update::new(
         &mut txn,
         auth.user_id,
         device_id,
         firmware.id(),
-        form.version,
+        String::from_utf8_lossy(map.get("version").ok_or(Error::BadData)?).to_string(),
     )
     .await?;
 
@@ -100,7 +90,7 @@ pub async fn get(
         let md5 = &*md5;
         let mut file_hash = String::with_capacity(md5.len() * 2);
         for byte in md5 {
-            write!(file_hash, "{:02X}", byte).map_err(Error::from)?;
+            write!(file_hash, "{:02X}", byte)?;
         }
         if file_hash != firmware.hash() {
             error!(
