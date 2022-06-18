@@ -1,7 +1,8 @@
-use crate::db::board::Board;
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
+
+use super::target::Target;
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
@@ -14,15 +15,17 @@ impl TargetPrototypeId {
 }
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct TargetPrototype {
     pub id: TargetPrototypeId,
     pub arch: String,
     //kind: CompilationType,
     pub build_flags: String,
+    pub build_unflags: Option<String>,
     pub platform: String,
     pub framework: Option<String>,
-    pub platform_packages: String,
-    pub extra_platformio_params: String,
+    pub platform_packages: Option<String>,
+    pub extra_platformio_params: Option<String>,
     pub ldf_mode: Option<String>,
 }
 
@@ -34,8 +37,8 @@ impl TargetPrototype {
         build_flags: String,
         platform: String,
         framework: Option<String>,
-        platform_packages: String,
-        extra_platformio_params: String,
+        platform_packages: Option<String>,
+        extra_platformio_params: Option<String>,
         ldf_mode: Option<String>,
     ) -> Result<Self> {
         let (id,): (TargetPrototypeId,) = sqlx::query_as(
@@ -55,6 +58,7 @@ impl TargetPrototype {
             arch,
             //kind,
             build_flags,
+            build_unflags: None,
             platform,
             framework,
             platform_packages,
@@ -65,22 +69,36 @@ impl TargetPrototype {
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
-            "SELECT id, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes"
+            "SELECT id, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes"
         )
             .fetch_all(&mut *txn)
             .await?)
     }
 
-    pub async fn boards(&self, txn: &mut Transaction<'_>) -> Result<Vec<Board>> {
-        Board::list_by_target_prototype(txn, self.id).await
+    pub async fn targets(&self, txn: &mut Transaction<'_>) -> Result<Vec<Target>> {
+        Target::list_by_prototype(txn, self.id).await
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetPrototypeId) -> Result<Self> {
         Ok(sqlx::query_as(
-            "SELECT id, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE id = $1"
+            "SELECT id, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE id = $1"
         )
             .bind(&id)
             .fetch_one(&mut *txn)
             .await?)
+    }
+
+    pub async fn set_build_unflags(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        build_unflags: Option<String>,
+    ) -> Result<()> {
+        sqlx::query("UPDATE target_prototypes SET build_unflags = $1 WHERE id = $2")
+            .bind(&build_unflags)
+            .bind(&self.id)
+            .execute(&mut *txn)
+            .await?;
+        self.build_unflags = build_unflags;
+        Ok(())
     }
 }

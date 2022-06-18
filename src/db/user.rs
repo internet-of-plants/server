@@ -133,7 +133,7 @@ impl User {
 
         match (hash, is_auth) {
             (Some((user_id, _)), true) => {
-                let device = match new_device {
+                let device_id = match new_device {
                     Some(new_device) => Some(Device::put(txn, &user_id, new_device).await?),
                     None => None,
                 };
@@ -143,7 +143,7 @@ impl User {
                     "INSERT INTO authentications (user_id, device_id, token) VALUES ($1, $2, $3)",
                 )
                 .bind(user_id)
-                .bind(device.map(|d| *d.id()))
+                .bind(device_id)
                 .bind(&token)
                 .execute(&mut *txn)
                 .await?;

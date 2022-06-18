@@ -1,7 +1,5 @@
-use crate::db::board::*;
 use crate::db::sensor::Dependency;
 use crate::db::target_prototype::*;
-use crate::db::user::UserId;
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -18,77 +16,117 @@ impl TargetId {
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Target {
-    pub id: TargetId,
-    owner_id: UserId,
+    id: TargetId,
+    board: Option<String>,
     target_prototype_id: TargetPrototypeId,
-    board_id: BoardId,
+    pin_hpp: String,
+    build_flags: Option<String>,
 }
 
 impl Target {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        board: Option<String>,
+        pins: Vec<String>,
+        pin_hpp: String,
+        target_prototype_id: TargetPrototypeId,
+    ) -> Result<Self> {
+        let (id,): (TargetId,) = sqlx::query_as(
+            "INSERT INTO targets (board, target_prototype_id, pin_hpp) VALUES ($1, $2, $3) RETURNING id",
+        )
+        .bind(&board)
+        .bind(&target_prototype_id)
+        .bind(&pin_hpp)
+        .fetch_one(&mut *txn)
+        .await?;
+        for pin in pins {
+            sqlx::query("INSERT INTO pins (target_id, name) VALUES ($1, $2)")
+                .bind(id)
+                .bind(pin)
+                .execute(&mut *txn)
+                .await?;
+        }
+        Ok(Self {
+            id,
+            board,
+            pin_hpp,
+            target_prototype_id,
+            build_flags: None,
+        })
+    }
+
     pub fn id(&self) -> TargetId {
         self.id
     }
 
-    pub async fn board(&self, txn: &mut Transaction<'_>) -> Result<Board> {
-        Ok(Board::find_by_id(txn, self.board_id).await?)
+    pub fn pin_hpp(&self) -> &str {
+        &self.pin_hpp
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, target_id: TargetId) -> Result<Target> {
-        Ok(sqlx::query_as(
-            "SELECT id, owner_id, target_prototype_id, board_id FROM targets WHERE id = $1",
-        )
-        .bind(&target_id)
-        .fetch_one(&mut *txn)
-        .await?)
+    pub fn board(&self) -> Option<&str> {
+        self.board.as_deref()
+    }
+
+    pub async fn pins(&self, txn: &mut Transaction<'_>) -> Result<Vec<String>> {
+        let pins = sqlx::query_as("SELECT name FROM pins WHERE target_id = $1")
+            .bind(self.id)
+            .fetch_all(&mut *txn)
+            .await?
+            .into_iter()
+            .map(|(name,)| name)
+            .collect();
+        Ok(pins)
+    }
+
+    pub async fn set_build_flags(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        build_flags: Option<String>,
+    ) -> Result<()> {
+        sqlx::query("UPDATE targets SET build_flags = $1 WHERE id = $2")
+            .bind(&build_flags)
+            .bind(&self.id)
+            .execute(&mut *txn)
+            .await?;
+        self.build_flags = build_flags;
+        Ok(())
     }
 
     pub async fn prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
         TargetPrototype::find_by_id(txn, self.target_prototype_id).await
     }
 
-    pub async fn list_for_prototype(
-        txn: &mut Transaction<'_>,
-        owner_id: UserId,
-        target_prototype_id: TargetPrototypeId,
-    ) -> Result<Vec<Self>> {
+    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
-            "SELECT id, owner_id, target_prototype_id, board_id FROM targets WHERE target_prototype_id = $1 AND owner_id = $2",
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
+            FROM targets",
         )
-            .bind(&target_prototype_id)
-            .bind(&owner_id)
-            .fetch_all(&mut *txn)
-        .await?)
-    }
-
-    pub async fn list(txn: &mut Transaction<'_>, owner_id: UserId) -> Result<Vec<Self>> {
-        Ok(sqlx::query_as(
-            "SELECT id, owner_id, target_prototype_id, board_id FROM targets WHERE owner_id = $1",
-        )
-        .bind(&owner_id)
         .fetch_all(&mut *txn)
         .await?)
     }
 
-    pub async fn new(
+    pub async fn list_by_prototype(
         txn: &mut Transaction<'_>,
-        board_id: BoardId,
-        owner_id: UserId,
         target_prototype_id: TargetPrototypeId,
-    ) -> Result<Self> {
-        let (id,): (TargetId,) = sqlx::query_as(
-            "INSERT INTO targets (board_id, target_prototype_id, owner_id) VALUES ($1, $2, $3) RETURNING id",
+    ) -> Result<Vec<Self>> {
+        Ok(sqlx::query_as(
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
+            FROM targets
+            WHERE target_prototype_id = $1",
         )
-        .bind(&board_id)
         .bind(&target_prototype_id)
-        .bind(&owner_id)
+        .fetch_all(&mut *txn)
+        .await?)
+    }
+
+    pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetId) -> Result<Self> {
+        let target = sqlx::query_as(
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
+        )
+        .bind(&id)
         .fetch_one(&mut *txn)
         .await?;
-        Ok(Self {
-            id,
-            owner_id,
-            board_id,
-            target_prototype_id,
-        })
+        Ok(target)
     }
 
     pub async fn compile_platformio_ini(
@@ -106,41 +144,59 @@ impl Target {
         let framework = prototype
             .framework
             .as_ref()
-            .map_or(String::new(), |f| format!("framework = {f}"));
+            .map_or(String::new(), |f| format!("framework = {f}\n"));
         let platform = &prototype.platform;
-        let board = self.board(&mut *txn).await?.board;
+        let board = &self.board;
         let ldf_mode = prototype
             .ldf_mode
             .as_ref()
-            .map_or(String::new(), |f| format!("lib_ldf_mode = {f}"));
-        let build_flags = &prototype.build_flags;
+            .map_or(String::new(), |f| format!("lib_ldf_mode = {f}\n"));
+        let mut build_flags = prototype.build_flags.clone();
+        if let Some(flags) = &self.build_flags {
+            build_flags.push_str(flags);
+        }
         let extra_platformio_params = &prototype.extra_platformio_params;
         let platform_packages = &prototype.platform_packages;
+        let mut lib_deps = lib_deps.to_owned();
+        lib_deps.sort_unstable();
         let lib_deps = lib_deps.join("\n    ");
+        let mut env_name = vec![arch.as_str()];
+        let board = if let Some(board) = board {
+            env_name.push(board.as_str());
+            format!("board = {board}\n")
+        } else {
+            String::new()
+        };
+        let env_name = env_name.join("-");
 
         Ok(format!(
-            "[env:{arch}-{board}]
-build_type = {build_type}
+            "[env:{env_name}]
 build_flags =
-    -O3
-    -D IOP_LOG_LEVEL=iop::LogLevel::INFO
-
     -D ARDUINOJSON_ENABLE_ARDUINO_STRING=0
-	-D ARDUINOJSON_ENABLE_ARDUINO_STREAM=0
-	-D ARDUINOJSON_ENABLE_ARDUINO_PRINT=0
-	-D ARDUINOJSON_ENABLE_PROGMEM=0
+    -D ARDUINOJSON_ENABLE_ARDUINO_STREAM=0
+    -D ARDUINOJSON_ENABLE_ARDUINO_PRINT=0
+    -D ARDUINOJSON_ENABLE_PROGMEM=0
 
+    -std=c++17
+    -O3
+    -Wall
     {build_flags}
+    -D IOP_LOG_LEVEL=iop::LogLevel::INFO
 platform = {platform}
-{framework}
-board = {board}
-{ldf_mode}
-{extra_platformio_params}
-lib_deps = 
+build_type = {build_type}
+{framework}\
+{board}\
+{ldf_mode}\
+{}\
+lib_deps =
     {lib_deps}
-    https://github.com/internet-of-plants/iop
-platform_packages = 
-    {platform_packages}"
+    https://github.com/internet-of-plants/iop\
+{}",
+            extra_platformio_params.as_ref().map_or_else(String::new, |p| format!("{p}\n")),
+            platform_packages
+                .as_ref()
+                .map(|p| format!("\nplatform_packages = {p}"))
+                .unwrap_or_else(String::new)
         ))
     }
 }

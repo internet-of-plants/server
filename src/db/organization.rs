@@ -15,6 +15,7 @@ impl OrganizationId {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct OrganizationView {
     pub id: OrganizationId,
     pub name: String,

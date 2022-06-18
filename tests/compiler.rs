@@ -1,16 +1,12 @@
 use rand::{random, seq::SliceRandom};
+use server::DeviceId;
 use server::test_helpers::{
-    create_sensor, create_target, list_sensor_prototypes, 
-    list_target_prototypes, signup,
-    list_compilations,
-    compile_firmware,
-    create_compiler
+    compile_firmware, create_compiler, create_sensor, list_compilations, list_sensor_prototypes,
+    list_targets, signup,
 };
 use server::{
-    db::sensor::config_type::WidgetKind, db::sensor::NewConfig, db::sensor::NewSensor,
-    db::sensor_prototype::SensorPrototype, 
-    controllers::compiler::NewCompiler,
-    db::user::NewUser, test_router,
+    controllers::compiler::NewCompiler, db::sensor::config_type::WidgetKind, db::sensor::NewConfig,
+    db::sensor::NewSensor, db::sensor_prototype::SensorPrototype, db::user::NewUser, test_router,
 };
 use sqlx::Connection;
 
@@ -28,15 +24,11 @@ async fn compiler() {
     )
     .await;
 
-    let target_prototypes = list_target_prototypes(app.clone(), &token).await;
-    let target = create_target(
-        app.clone(),
-        &token,
-        target_prototypes[0].id,
-        target_prototypes[0].boards[0].id,
-    )
-    .await;
-
+    let target = list_targets(app.clone(), &token)
+        .await
+        .into_iter()
+        .next()
+        .unwrap();
     let sensor_prototypes = list_sensor_prototypes(app.clone(), &token).await;
 
     let mut configs = vec![];
@@ -66,15 +58,11 @@ async fn compiler() {
         });
     }
 
-    let sensor = create_sensor(
-        app.clone(),
-        &token,
-        NewSensor {
-            prototype_id: sensor_prototypes[0].id,
-            configs,
-        },
-    )
-    .await;
+    let new_sensor1 = NewSensor {
+        prototype_id: sensor_prototypes[0].id,
+        configs,
+    };
+    let _sensor1 = create_sensor(app.clone(), &token, new_sensor1.clone()).await;
 
     let prototype = SensorPrototype::find_by_id(&mut txn, sensor_prototypes[1].id)
         .await
@@ -101,20 +89,22 @@ async fn compiler() {
     }
     txn.commit().await.unwrap();
 
-    let sensor2 = create_sensor(
+    let new_sensor2 = NewSensor {
+        prototype_id: sensor_prototypes[1].id,
+        configs,
+    };
+    let _sensor2 = create_sensor(app.clone(), &token, new_sensor2.clone()).await;
+
+    let compilation = create_compiler(
         app.clone(),
         &token,
-        NewSensor {
-            prototype_id: sensor_prototypes[1].id,
-            configs,
+        NewCompiler {
+            device_id: DeviceId::new(-1),
+            target_id: target.id,
+            sensors: vec![new_sensor1, new_sensor2],
         },
     )
     .await;
-
-    let compilation = create_compiler(app.clone(), &token, NewCompiler {
-       target_id: target.id, 
-       sensor_ids: vec![sensor.id, sensor2.id],
-    }).await;
     println!("{}", compilation.platformio_ini);
     println!("{}", compilation.main_cpp);
     println!("{}", compilation.pin_hpp);

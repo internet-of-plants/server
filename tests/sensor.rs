@@ -1,12 +1,12 @@
 use rand::{random, seq::SliceRandom};
 use server::test_helpers::{
-    create_sensor, create_target, list_sensor_prototypes, list_sensors, list_sensors_for_prototype,
-    list_target_prototypes, signup,
+    create_sensor, list_sensor_prototypes, list_sensors, list_sensors_for_prototype,
+    signup, list_targets,
 };
 use server::{
-    db::sensor_prototype::SensorPrototypeId,
     db::sensor::config_type::WidgetKind, db::sensor::NewConfig, db::sensor::NewSensor,
-    db::sensor_prototype::SensorPrototype, db::user::NewUser, test_router,
+    db::sensor_prototype::SensorPrototype, db::sensor_prototype::SensorPrototypeId,
+    db::user::NewUser, test_router,
 };
 use sqlx::Connection;
 
@@ -24,15 +24,7 @@ async fn sensor() {
     )
     .await;
 
-    let target_prototypes = list_target_prototypes(app.clone(), &token).await;
-    let target = create_target(
-        app.clone(),
-        &token,
-        target_prototypes[0].id,
-        target_prototypes[0].boards[0].id,
-    )
-    .await;
-
+    let targets = list_targets(app.clone(), &token).await;
     let sensor_prototypes = list_sensor_prototypes(app.clone(), &token).await;
 
     let mut configs = vec![];
@@ -46,7 +38,7 @@ async fn sensor() {
         let ty = config_request.ty(&mut txn).await.unwrap();
         configs.push(NewConfig {
             request_id: config_request.id,
-            value: match ty.widget(&mut txn, &[target.id]).await.unwrap() {
+            value: match ty.widget(&mut txn, &[targets[0].id]).await.unwrap() {
                 WidgetKind::U8 => format!("{}", random::<u8>()),
                 WidgetKind::U16 => format!("{}", random::<u16>()),
                 WidgetKind::U32 => format!("{}", random::<u32>()),

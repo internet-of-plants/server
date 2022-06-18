@@ -67,10 +67,11 @@ impl Update {
     ) -> Result<Option<Self>> {
         // TODO: we currently don't allow global updates, but we should (at least by groups)
         let last_update: Option<Update> = sqlx::query_as(
-            "SELECT id, collection_id, firmware_id, version, created_at
+            "SELECT binary_updates.id, binary_updates.collection_id, binary_updates.firmware_id, binary_updates.version, binary_updates.created_at
             FROM binary_updates
-            WHERE collection_id = $1
-            ORDER BY created_at DESC",
+            INNER JOIN devices ON devices.collection_id = binary_updates.collection_id
+            WHERE devices.id = $1
+            ORDER BY binary_updates.created_at DESC",
         )
         .bind(device_id)
         .fetch_optional(txn)

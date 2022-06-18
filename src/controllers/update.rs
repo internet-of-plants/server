@@ -1,6 +1,6 @@
 use crate::db::firmware::Firmware;
 use crate::extractor::{Authorization, Esp8266Md5};
-use crate::prelude::*;
+use crate::{prelude::*, Device};
 use crate::{CollectionId, DeviceId, OrganizationId, Update};
 use axum::extract::{Extension, Multipart, Path, TypedHeader};
 use axum::{body::Bytes, body::Full, http::StatusCode};
@@ -19,7 +19,7 @@ pub async fn new(
     Path((_organization_id, _collection_id, device_id)): Path<NewPath>,
     Extension(pool): Extension<&'static Pool>,
     Authorization(auth): Authorization,
-    mut multipart: Multipart
+    mut multipart: Multipart,
 ) -> Result<StatusCode> {
     if auth.device_id.is_some() && Some(device_id) != auth.device_id {
         return Err(Error::Forbidden);
@@ -30,7 +30,7 @@ pub async fn new(
     //db::plant::owns(&mut txn, auth.user_id, device_id).await?;
 
     let mut map: HashMap<String, Bytes> = HashMap::default();
-        println!("{:?}", multipart);
+    println!("{:?}", multipart);
     while let Some(field) = multipart.next_field().await? {
         println!("aaaa {:?}", field);
         println!("name");
@@ -77,40 +77,44 @@ pub async fn get(
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
     if let Some(device_id) = auth.device_id {
-        let update = match Update::find_by_device(&mut txn, auth.user_id, device_id).await? {
+        let firmware = match Device::update(&mut txn, device_id).await? {
             Some(update) => update,
             None => return Err(Error::NotModified)?,
         };
-        let firmware = update.firmware(&mut txn).await?;
         if firmware.hash() == md5 {
             return Err(Error::NotModified)?;
         }
 
-        let md5 = md5::compute(firmware.binary());
-        let md5 = &*md5;
-        let mut file_hash = String::with_capacity(md5.len() * 2);
-        for byte in md5 {
-            write!(file_hash, "{:02X}", byte)?;
+        let hash = firmware.hash().to_owned();
+        if let Some(binary) = firmware.into_binary() {
+            let md5 = md5::compute(&binary);
+            let md5 = &*md5;
+            let mut file_hash = String::with_capacity(md5.len() * 2);
+            for byte in md5 {
+                write!(file_hash, "{:02X}", byte)?;
+            }
+            if file_hash != hash {
+                error!(
+                    "Binary md5 didn't match the expected: {} != {}",
+                    file_hash, hash,
+                );
+                return Err(Error::CorruptBinary)?;
+            }
+            txn.commit().await?;
+            let response = axum::http::Response::builder()
+                .header("Content-Type", "application/octet-stream")
+                .header("Content-Length", binary.len().to_string())
+                .header(
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{}.bin\"", file_hash),
+                )
+                .header("x-MD5", file_hash)
+                .body(Full::new(Bytes::from(binary)))?;
+            Ok(response)
+        } else {
+            // Updates should always have a binary attached to it
+            Err(Error::InvalidUpdateFound)
         }
-        if file_hash != firmware.hash() {
-            error!(
-                "Binary md5 didn't match the expected: {} != {}",
-                file_hash,
-                firmware.hash(),
-            );
-            return Err(Error::CorruptBinary)?;
-        }
-        txn.commit().await?;
-        let response = axum::http::Response::builder()
-            .header("Content-Type", "application/octet-stream")
-            .header("Content-Length", firmware.binary().len().to_string())
-            .header(
-                "Content-Disposition",
-                format!("attachment; filename=\"{}.bin\"", file_hash),
-            )
-            .header("x-MD5", file_hash)
-            .body(Full::new(Bytes::from(firmware.into_binary())))?;
-        Ok(response)
     } else {
         Err(Error::Forbidden)?
     }

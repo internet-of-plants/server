@@ -4,9 +4,9 @@ use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
+#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Hash, PartialOrd, Ord)]
 #[sqlx(transparent)]
-pub struct ConfigRequestId(i64);
+pub struct ConfigRequestId(pub i64);
 
 impl ConfigRequestId {
     pub fn new(id: i64) -> Self {

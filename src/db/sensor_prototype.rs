@@ -45,7 +45,7 @@ impl SensorPrototype {
     /// A sensor should import N libraries (#include expressions)
     pub async fn includes(&self, txn: &mut Transaction<'_>) -> Result<Vec<Include>> {
         let list = sqlx::query_as(
-            "SELECT include FROM sensor_prototype_includes WHERE sensor_prototype_id = $1",
+            "SELECT include FROM sensor_prototype_includes WHERE sensor_prototype_id = $1 ORDER BY include ASC",
         )
         .bind(&self.id)
         .fetch_all(&mut *txn)
@@ -78,7 +78,7 @@ impl SensorPrototype {
     /// A sensor should execute N measurements and store them in the JSON
     pub async fn measurements(&self, txn: &mut Transaction<'_>) -> Result<Vec<Measurement>> {
         let list = sqlx::query_as(
-            "SELECT name, value FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1",
+            "SELECT name, value, ty FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1 ORDER BY id ASC",
         )
         .bind(&self.id)
         .fetch_all(&mut *txn)
@@ -154,10 +154,11 @@ impl SensorPrototype {
         }
         for measurement in &measurements {
             sqlx::query(
-                "INSERT INTO sensor_prototype_measurements (name, value, sensor_prototype_id) VALUES ($1, $2, $3)",
+                "INSERT INTO sensor_prototype_measurements (name, value, ty, sensor_prototype_id) VALUES ($1, $2, $3, $4)",
             )
             .bind(&measurement.name)
             .bind(&measurement.value)
+            .bind(&measurement.ty)
             .bind(&sensor_prototype_id)
             .execute(&mut *txn)
             .await?;

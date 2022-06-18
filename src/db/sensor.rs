@@ -2,32 +2,41 @@ pub mod config;
 pub mod config_request;
 pub mod config_type;
 
+use std::collections::HashSet;
+
 use crate::db::sensor::config::Config;
 use crate::db::sensor::config_request::ConfigRequestId;
 use crate::db::sensor_prototype::*;
-use crate::db::user::UserId;
 use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewSensor {
     pub prototype_id: SensorPrototypeId,
     pub configs: Vec<NewConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewConfig {
     pub request_id: ConfigRequestId,
     pub value: String, // encoded the way it will be used by C++
 }
 
+#[derive(sqlx::Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum MeasurementType {
+    FloatCelsius,
+    Percentage,
+    RawAnalogRead, // (0-1024)
+}
+
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Measurement {
     pub name: String,
     pub value: String,
+    pub ty: MeasurementType
 }
 
 pub type Dependency = String;
@@ -37,7 +46,7 @@ pub type Setup = String;
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
-pub struct SensorId(i64);
+pub struct SensorId(pub i64);
 
 impl SensorId {
     pub fn new(id: i64) -> Self {
@@ -48,17 +57,15 @@ impl SensorId {
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct Sensor {
     pub id: SensorId,
-    pub owner_id: UserId,
     pub prototype_id: SensorPrototypeId,
 }
 
 impl Sensor {
     pub async fn find_by_id(txn: &mut Transaction<'_>, sensor_id: SensorId) -> Result<Self> {
-        let sensor: Self =
-            sqlx::query_as("SELECT id, owner_id, prototype_id FROM sensors WHERE id = $1")
-                .bind(&sensor_id)
-                .fetch_one(&mut *txn)
-                .await?;
+        let sensor: Self = sqlx::query_as("SELECT id, prototype_id FROM sensors WHERE id = $1")
+            .bind(&sensor_id)
+            .fetch_one(&mut *txn)
+            .await?;
         Ok(sensor)
     }
 
@@ -72,26 +79,65 @@ impl Sensor {
 
     pub async fn new(
         txn: &mut Transaction<'_>,
-        owner_id: UserId,
-        new_sensor: NewSensor,
+        mut new_sensor: NewSensor,
     ) -> Result<Self> {
-        let (id,): (SensorId,) = sqlx::query_as(
-            "INSERT INTO sensors (owner_id, prototype_id) VALUES ($1, $2) RETURNING id",
+        let mut uniq = HashSet::new();
+        new_sensor
+            .configs
+            .iter()
+            .map(|c| c.request_id)
+            .all(|x| uniq.insert(x));
+        if uniq.len() != new_sensor.configs.len() {
+            // Duplicated configs
+            todo!();
+        }
+
+        new_sensor
+            .configs
+            .sort_by(|a, b| a.request_id.cmp(&b.request_id));
+        let serialized = new_sensor
+            .configs
+            .iter()
+            .map(|c| format!("{}-{}", c.request_id.0, c.value))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        // TODO: think about using json instead of serialized string (injection/hijacking risks?)
+        // Racy?
+        let id: Option<(SensorId,)> = sqlx::query_as(
+            "
+            SELECT sensor_id
+            FROM (SELECT sensor_id, string_agg(concat, ',') as str, COUNT(*) as count
+                  FROM (SELECT concat(request_id, '-', value) as concat, sensor_id
+                        FROM configs) as conf
+                  GROUP BY sensor_id) as sub
+            INNER JOIN sensors ON sensors.id = sensor_id
+            WHERE prototype_id = $1
+                  AND count = $2
+                  AND str = $3",
         )
-        .bind(&owner_id)
         .bind(&new_sensor.prototype_id)
-        .fetch_one(&mut *txn)
+        .bind(new_sensor.configs.len() as i64)
+        .bind(&serialized)
+        .fetch_optional(&mut *txn)
         .await?;
 
-        let mut configs = Vec::with_capacity(new_sensor.configs.len());
-        for config in new_sensor.configs {
-            let req_id = config.request_id;
-            let config = Config::new(&mut *txn, owner_id, id, req_id, config.value).await?;
-            configs.push(config);
-        }
+        let id = if let Some((id,)) = id {
+            id
+        } else {
+            let (id,): (SensorId,) =
+                sqlx::query_as("INSERT INTO sensors (prototype_id) VALUES ($1) RETURNING id")
+                    .bind(&new_sensor.prototype_id)
+                    .fetch_one(&mut *txn)
+                    .await?;
+
+            for config in new_sensor.configs {
+                Config::new(&mut *txn, id, config.request_id, config.value).await?;
+            }
+            id
+        };
         Ok(Self {
             id,
-            owner_id,
             prototype_id: new_sensor.prototype_id,
         })
     }
@@ -100,27 +146,22 @@ impl Sensor {
         self.id
     }
 
-    pub async fn list(txn: &mut Transaction<'_>, owner_id: UserId) -> Result<Vec<Self>> {
-        let sensors: Vec<Self> =
-            sqlx::query_as("SELECT id, owner_id, prototype_id FROM sensors WHERE owner_id = $1")
-                .bind(&owner_id)
-                .fetch_all(&mut *txn)
-                .await?;
+    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+        let sensors: Vec<Self> = sqlx::query_as("SELECT id, prototype_id FROM sensors")
+            .fetch_all(&mut *txn)
+            .await?;
         Ok(sensors)
     }
 
     pub async fn list_for_prototype(
         txn: &mut Transaction<'_>,
-        owner_id: UserId,
         prototype_id: SensorPrototypeId,
     ) -> Result<Vec<Self>> {
-        let sensors: Vec<Self> = sqlx::query_as(
-            "SELECT id, owner_id, prototype_id FROM sensors WHERE prototype_id = $1 AND owner_id = $2",
-        )
-        .bind(&prototype_id)
-        .bind(&owner_id)
-        .fetch_all(&mut *txn)
-        .await?;
+        let sensors: Vec<Self> =
+            sqlx::query_as("SELECT id, prototype_id FROM sensors WHERE prototype_id = $1")
+                .bind(&prototype_id)
+                .fetch_all(&mut *txn)
+                .await?;
         Ok(sensors)
     }
 }

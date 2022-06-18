@@ -1,3 +1,6 @@
+use crate::controllers::firmware::FirmwareView;
+use crate::controllers::sensor::SensorView;
+use crate::controllers::target::TargetView;
 use crate::db::firmware::Firmware;
 use crate::db::sensor::*;
 use crate::db::target::*;
@@ -5,6 +8,60 @@ use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CompilerView {
+    pub id: CompilerId,
+    pub sensors: Vec<SensorView>,
+    pub target: TargetView,
+    pub latest_firmware: FirmwareView,
+}
+
+impl CompilerView {
+    pub async fn new(txn: &mut Transaction<'_>, compiler: Compiler) -> Result<Self> {
+        let mut sensors = Vec::new();
+        let target = compiler.target(txn).await?;
+        for sensor in compiler.sensors(txn).await? {
+            sensors.push(SensorView::new(txn, sensor, target.clone()).await?);
+        }
+        let target = compiler.target(txn).await?;
+        let target = TargetView::new(txn, target).await?;
+
+        let latest_compilation = compiler.latest_compilation(txn).await?;
+        let latest_firmware = latest_compilation.firmware(txn).await?;
+        let latest_firmware = FirmwareView::new(txn, latest_firmware).await?;
+        Ok(Self {
+            id: compiler.id(),
+            sensors,
+            target,
+            latest_firmware,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CompilationView {
+    pub id: CompilationId,
+    pub compiler: CompilerView,
+    pub platformio_ini: String,
+    pub main_cpp: String,
+    pub pin_hpp: String,
+}
+
+impl CompilationView {
+    pub async fn new(txn: &mut Transaction<'_>, compilation: Compilation) -> Result<Self> {
+        let compiler = compilation.compiler(txn).await?;
+        Ok(Self {
+            id: compilation.id(),
+            platformio_ini: compilation.platformio_ini,
+            main_cpp: compilation.main_cpp,
+            pin_hpp: compilation.pin_hpp,
+            compiler: CompilerView::new(txn, compiler).await?,
+        })
+    }
+}
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
@@ -37,21 +94,72 @@ impl Compilation {
         main_cpp: String,
         pin_hpp: String,
     ) -> Result<Self> {
-        let (id,): (CompilationId,) =
-            sqlx::query_as("INSERT INTO compilations (compiler_id, platformio_ini, main_cpp, pin_hpp) VALUES ($1, $2, $3, $4) RETURNING id")
-                .bind(compiler_id)
-                .bind(&platformio_ini)
-                .bind(&main_cpp)
-                .bind(&pin_hpp)
-                .fetch_one(&mut *txn)
-                .await?;
-        Ok(Self {
+        let id: Option<(CompilationId,)> = sqlx::query_as(
+            "
+            SELECT id
+            FROM compilations
+            WHERE compiler_id = $1
+                  AND platformio_ini = $2
+                  AND main_cpp = $3
+                  AND pin_hpp = $4",
+        )
+        .bind(&compiler_id)
+        .bind(&platformio_ini)
+        .bind(&main_cpp)
+        .bind(&pin_hpp)
+        .fetch_optional(&mut *txn)
+        .await?;
+
+        let mut should_compile = false;
+        let id = if let Some((id,)) = id {
+            id
+        } else {
+            should_compile = true;
+            let (id,): (CompilationId,) =
+                sqlx::query_as("INSERT INTO compilations (compiler_id, platformio_ini, main_cpp, pin_hpp) VALUES ($1, $2, $3, $4) RETURNING id")
+                    .bind(compiler_id)
+                    .bind(&platformio_ini)
+                    .bind(&main_cpp)
+                    .bind(&pin_hpp)
+                    .fetch_one(&mut *txn)
+                    .await?;
+            id
+        };
+
+        let compilation = Self {
             id,
             platformio_ini,
             main_cpp,
             pin_hpp,
             compiler_id,
-        })
+        };
+
+        if should_compile {
+            compilation.compile(txn).await?;
+        }
+
+        Ok(compilation)
+    }
+
+    pub async fn firmware(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
+        Firmware::find_by_compilation(txn, self.id()).await
+    }
+
+    pub async fn latest_for_compiler(
+        txn: &mut Transaction<'_>,
+        compiler_id: CompilerId,
+    ) -> Result<Self> {
+        let comp = sqlx::query_as(
+            "
+            SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp
+            FROM compilations
+            WHERE compiler_id = $1
+            ORDER BY created_at DESC",
+        )
+        .bind(compiler_id)
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(comp)
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: CompilationId) -> Result<Self> {
@@ -81,8 +189,12 @@ impl Compilation {
         let target = compiler.target(&mut *txn).await?;
         let prototype = target.prototype(&mut *txn).await?;
         let arch = &prototype.arch;
-        let board = &target.board(&mut *txn).await?.board;
-        let build_name = format!("{arch}-{board}");
+        let board = target.board();
+        let mut env_name = vec![arch.as_str()];
+        if let Some(board) = board {
+            env_name.push(board);
+        }
+        let env_name = env_name.join("-");
 
         let firmware = {
             let dir = tokio::task::spawn_blocking(|| tempfile::tempdir()).await??;
@@ -104,12 +216,12 @@ impl Compilation {
             )
             .await?;
 
-            info!("pio run -e {build_name} -d \"{}\"", dir.path().display());
+            info!("pio run -e {env_name} -d \"{}\"", dir.path().display());
 
             // TODO: is dir.path().display() the correct approach?
             let dir_arg = dir.path().display().to_string();
             let mut command = tokio::process::Command::new("pio");
-            command.args(["run", "-e", &build_name, "-d", dir_arg.as_str()]);
+            command.args(["run", "-e", &env_name, "-d", dir_arg.as_str()]);
             // TODO: stream output
             // TODO: check exit code?
             let output = command.spawn()?.wait_with_output().await?;
@@ -121,12 +233,18 @@ impl Compilation {
                 info!("{}", String::from_utf8_lossy(&output.stdout));
             }
 
+            // This is a big hack
+            let mut filename = "firmware.bin";
+            if env_name == "posix" {
+                filename = "program";
+            }
+
             fs::read(
                 dir.path()
                     .join(".pio")
                     .join("build")
-                    .join(&build_name)
-                    .join("firmware.bin"),
+                    .join(&env_name)
+                    .join(filename),
             )
             .await?
         };
@@ -160,22 +278,52 @@ impl Compiler {
         txn: &mut Transaction<'_>,
         target_id: TargetId,
         sensor_ids: Vec<SensorId>,
-    ) -> Result<Self> {
-        let (id,): (CompilerId,) =
-            sqlx::query_as("INSERT INTO compilers (target_id) VALUES ($1) RETURNING id")
-                .bind(target_id)
-                .fetch_one(&mut *txn)
+    ) -> Result<(Self, Compilation)> {
+        let id: Option<(CompilerId,)> = sqlx::query_as(
+            "
+            SELECT compiler_id
+            FROM (SELECT COUNT(sensor_id) as count, compiler_id
+                  FROM (SELECT bt.sensor_id, bt.compiler_id
+                        FROM sensor_belongs_to_compiler as bt
+                        WHERE bt.sensor_id = ANY($1)) as s_bt_c
+                  GROUP BY compiler_id) as sensors_count
+            INNER JOIN compilers on compilers.id = compiler_id
+            WHERE count = $2 AND target_id = $3",
+        )
+        .bind(&sensor_ids.iter().map(|s| s.0).collect::<Vec<_>>())
+        .bind(&(sensor_ids.len() as i64))
+        .bind(&target_id)
+        .fetch_optional(&mut *txn)
+        .await?;
+
+        let mut should_compile = false;
+        let id = if let Some((id,)) = id {
+            id
+        } else {
+            should_compile = true;
+            let (id,): (CompilerId,) =
+                sqlx::query_as("INSERT INTO compilers (target_id) VALUES ($1) RETURNING id")
+                    .bind(target_id)
+                    .fetch_one(&mut *txn)
+                    .await?;
+            for sensor_id in sensor_ids {
+                sqlx::query(
+                    "INSERT INTO sensor_belongs_to_compiler (sensor_id, compiler_id) VALUES ($1, $2)",
+                )
+                .bind(&sensor_id)
+                .bind(&id)
+                .execute(&mut *txn)
                 .await?;
-        for sensor_id in sensor_ids {
-            sqlx::query(
-                "INSERT INTO sensor_belongs_to_compiler (sensor_id, compiler_id) VALUES ($1, $2)",
-            )
-            .bind(&sensor_id)
-            .bind(&id)
-            .execute(&mut *txn)
-            .await?;
-        }
-        Ok(Self { id, target_id })
+            }
+            id
+        };
+        let compiler = Self { id, target_id };
+        let compilation = if should_compile {
+            compiler.compile(txn).await?
+        } else {
+            compiler.latest_compilation(txn).await?
+        };
+        Ok((compiler, compilation))
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: CompilerId) -> Result<Self> {
@@ -223,36 +371,51 @@ impl Compiler {
                     .into_iter()
                     .map(|name| format!("#include <{name}>")),
             );
-            definitions.extend(prototype.definitions(&mut *txn).await?);
-            measurements.extend(
+            definitions.push(prototype.definitions(&mut *txn).await?.join("\n"));
+            measurements.push(
                 prototype
                     .measurements(&mut *txn)
                     .await?
                     .into_iter()
-                    .map(|m| format!("doc[\"{}\"] = {}", m.name, m.value)),
+                    .map(|m| format!("doc[\"{}\"] = {}", m.name, m.value))
+                    .collect::<Vec<_>>()
+                    .join("\n    "),
             );
             setups.extend(prototype.setups(&mut *txn).await?);
 
             for c in sensor.configs(&mut *txn).await? {
                 let req = c.request(&mut *txn).await?;
-                configs.push(format!(
-                    "constexpr static {} {} = {};",
-                    req.ty(&mut *txn).await?.name,
-                    req.name,
-                    c.value
+                configs.push((
+                    req.name.clone(),
+                    format!(
+                        "constexpr static {} {} = {};",
+                        req.ty(&mut *txn).await?.name,
+                        req.name,
+                        c.value
+                    ),
                 ));
             }
         }
+        lib_deps.sort_unstable();
+        includes.sort_unstable();
+        measurements.sort_unstable();
+        configs.sort_by(|a, b| a.0.cmp(&b.0));
+        setups.sort_unstable();
+        definitions.sort_unstable();
 
         let target = self.target(&mut *txn).await?;
-        let pin_hpp = target.board(&mut *txn).await?.pin_hpp().to_owned();
+        let pin_hpp = target.pin_hpp().to_owned();
         let platformio_ini = target.compile_platformio_ini(&mut *txn, &lib_deps).await?;
 
         let includes = includes.join("\n");
         let definitions = definitions.join("\n");
         let measurements = measurements.join("\n    ");
         let setups = setups.join("\n  ");
-        let configs = configs.join("\n");
+        let configs = configs
+            .into_iter()
+            .map(|c| c.1)
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let main_cpp = format!(
             "#include <iop/loop.hpp>
@@ -263,13 +426,12 @@ namespace config {{
 constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
 {configs}
 }}
-
 {definitions}
 
 auto reportMeasurements(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
   loop.logger().debug(IOP_STR(\"Handle Measurements\"));
 
-  const auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{
+  const auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{\
     {measurements}
   }});
   if (!json) iop_panic(IOP_STR(\"Unable to send measurements, buffer overflow\"));
@@ -282,9 +444,12 @@ auto setup(EventLoop &loop) noexcept -> void {{
   {setups}
   loop.setAuthenticatedInterval(config::measurementsInterval, reportMeasurements);
 }}
-}}
-",
+}}",
         );
         Ok(Compilation::new(&mut *txn, self.id, platformio_ini, main_cpp, pin_hpp).await?)
+    }
+
+    pub async fn latest_compilation(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {
+        Compilation::latest_for_compiler(txn, self.id).await
     }
 }

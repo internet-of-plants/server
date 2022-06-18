@@ -8,7 +8,6 @@ pub mod timestamp;
 pub mod update;
 pub mod user;
 
-pub mod board;
 pub mod code_generation;
 pub mod firmware;
 pub mod sensor;

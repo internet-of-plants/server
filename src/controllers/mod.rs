@@ -4,6 +4,7 @@ pub mod device;
 pub mod device_log;
 pub mod device_panic;
 pub mod event;
+pub mod firmware;
 pub mod organization;
 pub mod sensor;
 pub mod sensor_prototype;

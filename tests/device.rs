@@ -1,4 +1,6 @@
-use server::test_helpers::{find_collection, find_organization, list_organizations, login, signup, find_device};
+use server::test_helpers::{
+    find_collection, find_device, find_organization, list_organizations, login, signup,
+};
 use server::{db::user::Login, db::user::NewUser, test_router};
 
 #[tokio::test]
@@ -35,7 +37,14 @@ async fn device() {
     let col = find_collection(app.clone(), &token, org.id, *collection.id()).await;
     assert_eq!(col.id, *collection.id());
     assert_eq!(col.devices.len(), 1);
-    
-    let dev = find_device(app.clone(), &token, org.id, *collection.id(), *col.devices[0].id()).await;
+
+    let dev = find_device(
+        app.clone(),
+        &token,
+        org.id,
+        *collection.id(),
+        *col.devices[0].id(),
+    )
+    .await;
     assert_eq!(dev.id, *col.devices[0].id());
 }

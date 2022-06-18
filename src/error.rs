@@ -23,10 +23,11 @@ pub enum Error {
     CorruptBinary,
     ParseInt(std::num::ParseIntError),
     MissingHeader(&'static str),
+    InvalidUpdateFound,
     Hyper(hyper::Error),
     InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
     Http(axum::http::Error),
-    Multipart(axum::extract::multipart::MultipartError)
+    Multipart(axum::extract::multipart::MultipartError),
 }
 
 impl std::error::Error for Error {}
@@ -78,6 +79,14 @@ impl IntoResponse for Error {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
+            Self::InvalidUpdateFound => {
+                error!("Corrupt Binary");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::CorruptBinary => {
+                error!("Corrupt Binary");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
             Self::Forbidden => {
                 warn!("Forbidden");
                 (StatusCode::UNAUTHORIZED, "Unauthorized")
@@ -89,10 +98,6 @@ impl IntoResponse for Error {
             Self::BadData => {
                 warn!("Bad Data");
                 (StatusCode::BAD_REQUEST, "Bad Request")
-            }
-            Self::CorruptBinary => {
-                warn!("Corrupt Binary");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::NotModified => (StatusCode::NOT_MODIFIED, "Not modified"),
             Self::NothingFound => {

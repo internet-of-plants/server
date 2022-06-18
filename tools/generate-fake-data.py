@@ -8,8 +8,8 @@ if __name__ == "__main__":
     free_dram = "1000"
     free_iram = "1000"
     free_stack = "1000"
-    biggest_dram_block = "1000"
-    biggest_iram_block = "1000"
+    biggest_block_dram = "1000"
+    biggest_block_dram = "1000"
 
     air_temperature_celsius = 0
     air_humidity_percentage = 0
@@ -31,6 +31,6 @@ if __name__ == "__main__":
         "FREE_DRAM": free_dram,
         "FREE_IRAM": free_iram,
         "FREE_STACK": free_stack,
-        "BIGGEST_DRAM_BLOCK": biggest_dram_block,
-        "BIGGEST_IRAM_BLOCK": biggest_iram_block,
+        "BIGGEST_BLOCK_DRAM": biggest_dram_block,
+        "BIGGEST_BLOCK_IRAM": biggest_iram_block,
     })

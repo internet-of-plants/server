@@ -63,7 +63,7 @@ pub struct SensorPrototypeView {
 }
 
 impl SensorPrototypeView {
-    async fn new(
+    pub async fn new(
         txn: &mut Transaction<'_>,
         prototype: SensorPrototype,
         target_ids: &[TargetId],
@@ -87,7 +87,7 @@ impl SensorPrototypeView {
     }
 }
 
-pub async fn index(
+pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     Authorization(_auth): Authorization,
 ) -> Result<Json<Vec<SensorPrototypeView>>> {
@@ -97,6 +97,23 @@ pub async fn index(
     let mut views = Vec::with_capacity(prototypes.len());
     for prototype in prototypes {
         views.push(SensorPrototypeView::new(&mut txn, prototype, &[]).await?);
+    }
+
+    txn.commit().await?;
+    Ok(Json(views))
+}
+
+pub async fn list_for_target(
+    Path(target_id): Path<TargetId>,
+    Extension(pool): Extension<&'static Pool>,
+    Authorization(_auth): Authorization,
+) -> Result<Json<Vec<SensorPrototypeView>>> {
+    let mut txn = pool.begin().await?;
+
+    let prototypes = SensorPrototype::list(&mut txn).await?;
+    let mut views = Vec::with_capacity(prototypes.len());
+    for prototype in prototypes {
+        views.push(SensorPrototypeView::new(&mut txn, prototype, &[target_id]).await?);
     }
 
     txn.commit().await?;
@@ -117,7 +134,12 @@ pub async fn find(
     let mut txn = pool.begin().await?;
 
     let prototype = SensorPrototype::find_by_id(&mut txn, sensor_prototype_id).await?;
-    let view = SensorPrototypeView::new(&mut txn, prototype, &target.target_id.map_or(vec![], |id| vec![id])).await?;
+    let view = SensorPrototypeView::new(
+        &mut txn,
+        prototype,
+        &target.target_id.map_or(vec![], |id| vec![id]),
+    )
+    .await?;
 
     txn.commit().await?;
     Ok(Json(view))

@@ -137,23 +137,29 @@ pub async fn router(url: &str) -> Router {
     let app = Router::new()
         .route("/v1/user/login", post(controllers::user::login))
         .route("/v1/user", post(controllers::user::new))
-        .route("/v1/sensor", post(controllers::sensor::new))
-        .route(
-            "/v1/sensors/of/prototype/:id",
-            get(controllers::sensor::list_for_prototype),
-        )
-        .route("/v1/sensors", get(controllers::sensor::list))
+        //.route("/v1/sensor", post(controllers::sensor::new))
+        //.route(
+        //    "/v1/sensors/of/prototype/:id",
+        //    get(controllers::sensor::list_for_prototype),
+        //)
+        //.route("/v1/sensors", get(controllers::sensor::list))
         .route(
             "/v1/sensor/prototype/:id",
             get(controllers::sensor_prototype::find),
         )
         .route(
             "/v1/sensor/prototypes",
-            get(controllers::sensor_prototype::index),
+            get(controllers::sensor_prototype::list),
+        )
+        .route(
+            "/v1/target/:id/sensor/prototypes",
+            get(controllers::sensor_prototype::list_for_target),
         )
         .route("/v1/event", post(controllers::event::new))
-        .route("/v1/targets", get(controllers::target::list))
-        .route("/v1/target", post(controllers::target::new))
+        .route(
+            "/v1/targets",
+            get(controllers::target::list),
+        )
         .route(
             "/v1/targets/of/prototype/:id",
             get(controllers::target::list_for_prototype),
@@ -185,6 +191,10 @@ pub async fn router(url: &str) -> Router {
             "/v1/organization/:id/collection/:id/device/:id",
             get(controllers::device::find),
         )
+        .route(
+            "/v1/organization/:id/collection/:id/device/:id/events/:limit",
+            get(controllers::event::list),
+        )
         .route("/v1/log", post(controllers::device_log::new)) //.and(warp::body::content_length_limit(2048))
         .route(
             "/v1/organization/:id/collection/:id/device/:id/log/last/:limit",
@@ -199,6 +209,10 @@ pub async fn router(url: &str) -> Router {
         .route(
             "/v1/organization/:id/collection/:id/device/:id/update",
             post(controllers::update::new), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
+        )
+        .route(
+            "/v1/organization/:id/collection/:id/device/:id/firmwares",
+            get(controllers::firmware::list), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
         )
         .route(
             "/v1/update",

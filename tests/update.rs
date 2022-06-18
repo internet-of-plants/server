@@ -1,10 +1,13 @@
-use server::test_helpers::{find_collection, find_organization, list_organizations, login, signup, find_device, send_update, find_update};
-use server::{db::user::Login, db::user::NewUser, test_router, controllers::update::NewUpdate};
-use server::extractor::{MacAddress, Version};
 use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
 };
+use server::extractor::{MacAddress, Version};
+use server::test_helpers::{
+    find_collection, find_device, find_organization, find_update, list_organizations, login,
+    send_update, signup,
+};
+use server::{controllers::update::NewUpdate, db::user::Login, db::user::NewUser, test_router};
 use std::fmt::Write;
 use tower::ServiceExt; // for `app.oneshot()`
 
@@ -34,7 +37,7 @@ async fn update() {
         Some(version.0.clone()),
     )
     .await;
-    
+
     let orgs = list_organizations(app.clone(), &token).await;
     let org = find_organization(app.clone(), &token, *orgs[0].id()).await;
 
@@ -44,8 +47,15 @@ async fn update() {
     let col = find_collection(app.clone(), &token, org.id, *collection.id()).await;
     assert_eq!(col.id, *collection.id());
     assert_eq!(col.devices.len(), 1);
-    
-    let dev = find_device(app.clone(), &token, org.id, *collection.id(), *col.devices[0].id()).await;
+
+    let dev = find_device(
+        app.clone(),
+        &token,
+        org.id,
+        *collection.id(),
+        *col.devices[0].id(),
+    )
+    .await;
     assert_eq!(dev.id, *col.devices[0].id());
 
     // No update was created
@@ -53,9 +63,7 @@ async fn update() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(
-                    "/v1/update",
-                )
+                .uri("/v1/update")
                 .header("Authorization", format!("Basic {}", token.0))
                 .header("x-ESP8266-sketch-md5", "abc")
                 .method(Method::GET)
@@ -66,7 +74,7 @@ async fn update() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
 
-    let file = vec![1, 2, 3, 4, 5, 6, 7, 8];
+    let mut file = vec![1, 2, 3, 4, 5, 6, 7, 8];
 
     let md5 = md5::compute(&file);
     let md5 = &*md5;
@@ -98,6 +106,7 @@ async fn update() {
     assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
 
     // Different version means there is an update to download
+    file.push(9);
     let update = NewUpdate {
         version: "".to_owned(),
         file: file.clone(),

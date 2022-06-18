@@ -1,19 +1,17 @@
+use crate::db::code_generation::CompilationView;
 use crate::db::user::{AuthToken, Login, NewUser};
 use crate::extractor::{MacAddress, Version};
 use crate::{
-    controllers::compiler::{CompilationView, NewCompiler},
+    controllers::compiler::NewCompiler,
     controllers::sensor::SensorView,
     controllers::sensor_prototype::SensorPrototypeView,
-    controllers::target::NewTarget,
     controllers::target::TargetView,
-    controllers::target_prototype::TargetPrototypeView,
     controllers::update::NewUpdate,
-    db::board::BoardId,
     db::code_generation::CompilationId,
     db::device_panic::NewDevicePanic,
     db::sensor::NewSensor,
     db::sensor_prototype::SensorPrototypeId,
-    db::target_prototype::TargetPrototypeId,
+    db::target_prototype::{TargetPrototype, TargetPrototypeId},
     CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView, NewEvent,
     Organization, OrganizationId, OrganizationView,
 };
@@ -277,7 +275,7 @@ pub async fn send_event(
                 .header("VCC", "1")
                 .header("FREE_STACK", "10000")
                 .header("FREE_DRAM", "10000")
-                .header("BIGGEST_DRAM_BLOCK", "10000")
+                .header("BIGGEST_BLOCK_DRAM", "10000")
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
                 .body(Body::from(serde_json::to_vec(&new_event).unwrap()))
@@ -356,7 +354,7 @@ pub async fn find_update(app: Router, token: &AuthToken, file_hash: &Version) ->
     body.as_ref().to_owned()
 }
 
-pub async fn list_target_prototypes(app: Router, token: &AuthToken) -> Vec<TargetPrototypeView> {
+pub async fn list_target_prototypes(app: Router, token: &AuthToken) -> Vec<TargetPrototype> {
     let response = app
         .oneshot(
             Request::builder()
@@ -377,7 +375,7 @@ pub async fn find_target_prototype(
     app: Router,
     token: &AuthToken,
     id: TargetPrototypeId,
-) -> TargetPrototypeView {
+) -> TargetPrototype {
     let response = app
         .oneshot(
             Request::builder()
@@ -385,35 +383,6 @@ pub async fn find_target_prototype(
                 .header("Authorization", format!("Basic {}", token.0))
                 .method(Method::GET)
                 .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    serde_json::from_slice(&body).unwrap()
-}
-
-pub async fn create_target(
-    app: Router,
-    token: &AuthToken,
-    id: TargetPrototypeId,
-    board_id: BoardId,
-) -> TargetView {
-    let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/v1/target")
-                .header("Authorization", format!("Basic {}", token.0))
-                .method(Method::POST)
-                .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                .body(Body::from(
-                    serde_json::to_vec(&NewTarget {
-                        target_prototype_id: id,
-                        board_id,
-                    })
-                    .unwrap(),
-                ))
                 .unwrap(),
         )
         .await

@@ -98,7 +98,7 @@ impl ConfigType {
                 let mut first = true;
                 for id in target_ids {
                     let target = Target::find_by_id(txn, *id).await?;
-                    let pins = target.board(txn).await?.pins(txn).await?;
+                    let pins = target.pins(txn).await?;
                     if first {
                         first = false;
                         targets.extend(pins);

@@ -35,7 +35,7 @@ where
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
             let auth = User::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0))
                 .await
-                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+                .map_err(|_| (StatusCode::UNAUTHORIZED, "Internal Server Error"))?;
             txn.commit()
                 .await
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
@@ -217,7 +217,7 @@ impl headers_core::Header for FreeDram {
 #[derive(Debug)]
 pub struct BiggestDramBlock(pub String);
 
-const BIGGEST_DRAM_BLOCK_NAME: &str = "biggest_dram_block";
+const BIGGEST_DRAM_BLOCK_NAME: &str = "biggest_block_dram";
 impl headers_core::Header for BiggestDramBlock {
     fn name() -> &'static headers_core::HeaderName {
         thread_local! {
@@ -329,7 +329,7 @@ impl headers_core::Header for FreeIram {
 #[derive(Debug)]
 pub struct BiggestIramBlock(pub String);
 
-const BIGGEST_IRAM_BLOCK_NAME: &str = "biggest_iram_block";
+const BIGGEST_IRAM_BLOCK_NAME: &str = "biggest_block_iram";
 impl headers_core::Header for BiggestIramBlock {
     fn name() -> &'static headers_core::HeaderName {
         thread_local! {
