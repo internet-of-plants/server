@@ -1,6 +1,6 @@
 use crate::db::user::Login;
 use crate::extractor::{MacAddress, Version};
-use crate::prelude::*;
+use crate::{prelude::*, Device};
 use crate::{NewDevice, NewUser, User};
 use axum::extract::{Extension, Json, TypedHeader};
 use controllers::Result;
@@ -20,7 +20,6 @@ pub async fn new(
             email: user.email,
             password: user.password,
         },
-        None,
     )
     .await?;
     txn.commit().await?;
@@ -37,9 +36,9 @@ pub async fn login(
     let mut txn = pool.begin().await?;
     let token = if let (Some(mac), Some(file_hash)) = (mac, file_hash) {
         let (mac, file_hash) = (mac.0 .0, file_hash.0 .0);
-        User::login(&mut txn, user, Some(NewDevice { mac, file_hash })).await?
+        Device::login(&mut txn, user, NewDevice { mac, file_hash }).await?
     } else {
-        User::login(&mut txn, user, None).await?
+        User::login(&mut txn, user).await?
     };
     txn.commit().await?;
     Ok(token.0)

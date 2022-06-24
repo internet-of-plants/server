@@ -1,3 +1,4 @@
+/*
 use server::controllers::target::TargetView;
 use server::db::target::Target;
 use server::test_helpers::{
@@ -51,3 +52,4 @@ async fn sensor_prototype() {
         find_sensor_prototype(app.clone(), &token, sensor_prototypes[0].id, Some(target)).await
     );
 }
+*/

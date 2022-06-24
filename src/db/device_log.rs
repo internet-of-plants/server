@@ -1,6 +1,5 @@
 use crate::db::timestamp::{now, DateTime};
-use crate::prelude::*;
-use crate::DeviceId;
+use crate::{prelude::*, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -16,12 +15,11 @@ pub struct DeviceLog {
 }
 
 impl DeviceLog {
-    pub async fn new(txn: &mut Transaction<'_>, device_id: &DeviceId, log: String) -> Result<Self> {
-        // TODO: auditing event with history actor
-        info!("Log (device_id: {:?}): {}", device_id, log);
+    pub async fn new(txn: &mut Transaction<'_>, device: &Device, log: String) -> Result<Self> {
+        info!("Log (device_id: {:?}): {}", device.id(), log);
         let (id,): (DeviceLogId,) =
             sqlx::query_as("INSERT INTO device_logs (device_id, log) VALUES ($1, $2) RETURNING id")
-                .bind(device_id)
+                .bind(device.id())
                 .bind(&log)
                 .fetch_one(txn)
                 .await?;
@@ -34,24 +32,24 @@ impl DeviceLog {
 
     pub async fn first_n_from_device(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
+        device: &Device,
         limit: i32,
     ) -> Result<Vec<Self>> {
+        if limit > 10000 {
+            return Err(Error::BadData);
+        }
+
         let device_logs: Vec<DeviceLog> = sqlx::query_as(
-            "SELECT id, log, created_at
+            "SELECT device_logs.id, device_logs.log, device_logs.created_at
             FROM device_logs
             WHERE device_id = $1
-            ORDER BY created_at DESC
+            ORDER BY device_logs.created_at DESC
             LIMIT $2",
         )
-        .bind(device_id)
-        .bind(&limit)
-        .fetch_all(txn)
-        .await?;
+            .bind(device.id())
+            .bind(limit)
+            .fetch_all(txn)
+            .await?;
         Ok(device_logs.into_iter().rev().collect())
-    }
-
-    pub fn log(&self) -> &str {
-        &self.log
     }
 }

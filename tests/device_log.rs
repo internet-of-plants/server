@@ -1,3 +1,4 @@
+/*
 use server::test_helpers::{
     find_collection, find_organization, list_device_logs, list_organizations, login,
     send_device_log, signup,
@@ -53,3 +54,4 @@ async fn device_log() {
     assert_eq!(logs.len(), 1);
     assert_eq!(logs[0].log(), log);
 }
+*/

@@ -1,17 +1,19 @@
-use crate::extractor::Authorization;
+use crate::extractor::{Device, User};
 use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DeviceLog, OrganizationId};
-use axum::extract::{Extension, Json, Path, RawBody};
+use crate::{DeviceId, DeviceLog};
+use axum::extract::{Extension, Json, RawBody};
 use axum::http::StatusCode;
 use controllers::Result;
 use futures::StreamExt;
+use serde::Deserialize;
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
-    Authorization(auth): Authorization,
+    Device(device): Device,
     RawBody(mut log): RawBody,
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
+
     let mut log_buffer = Vec::new();
     for log in log.next().await {
         log_buffer.extend(&log?);
@@ -19,24 +21,30 @@ pub async fn new(
     let log = String::from_utf8_lossy(log_buffer.as_ref())
         .trim()
         .to_owned();
-    if let Some(device_id) = auth.device_id {
-        DeviceLog::new(&mut txn, &device_id, log).await?;
-    } else {
-        return Err(Error::Forbidden)?;
-    }
+
+    DeviceLog::new(&mut txn, &device, log).await?;
+
     txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
-type IndexPath = (OrganizationId, CollectionId, DeviceId, u16);
-pub async fn index(
-    Path((_organization_id, _collection_id, device_id, limit)): Path<IndexPath>,
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListRequest {
+    device_id: DeviceId,
+    limit: u16,
+}
+
+pub async fn list(
     Extension(pool): Extension<&'static Pool>,
-    Authorization(_auth): Authorization,
+    User(user): User,
+    Json(request): Json<ListRequest>,
 ) -> Result<Json<Vec<DeviceLog>>> {
-    // TODO: enforce ownerships
     let mut txn = pool.begin().await?;
-    let logs = DeviceLog::first_n_from_device(&mut txn, &device_id, limit as i32).await?;
+
+    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let logs = DeviceLog::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
+
     txn.commit().await?;
     Ok(Json(logs))
 }

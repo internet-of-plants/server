@@ -1,22 +1,17 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
-use crate::DeviceId;
 use derive_more::FromStr;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
+use super::device::Device;
 use super::firmware::Firmware;
-use super::sensor::MeasurementType;
+use super::sensor::measurement::MeasurementView;
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
 pub struct EventId(i64);
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct MeasurementView {
-    name: String,
-    ty: MeasurementType,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -27,35 +22,10 @@ pub struct EventView {
 }
 
 impl EventView {
-    pub async fn new(txn: &mut Transaction<'_>, event: Event) -> Result<Self> {
-        // TODO: fix error types
-        let firmware = Firmware::try_find_by_hash(txn, &event.firmware_hash).await?;
-        let compilation = if let Some(firmware) = firmware {
-            firmware.compilation(txn).await?
-        } else {
-            None
-        };
-        let metadata = if let Some(compilation) = compilation {
-            let compiler = compilation.compiler(txn).await?;
-            let sensors = compiler.sensors(txn).await?;
-            let mut measurements = Vec::new();
-            for sensor in sensors {
-                let prototype = sensor.prototype(txn).await?;
-                measurements.extend(prototype.measurements(txn).await?);
-            }
-            measurements
-        } else {
-            Vec::new()
-        };
+    pub fn new(event: Event) -> Result<Self> {
         Ok(Self {
             measurements: event.measurements,
-            metadatas: metadata
-                .into_iter()
-                .map(|m| MeasurementView {
-                    name: m.name,
-                    ty: m.ty,
-                })
-                .collect(),
+            metadatas: serde_json::from_value(event.metadatas)?,
             created_at: event.created_at,
         })
     }
@@ -65,11 +35,10 @@ impl EventView {
 pub struct Event {
     pub id: EventId,
     pub measurements: serde_json::Value,
+    pub metadatas: serde_json::Value,
     pub firmware_hash: String,
     pub created_at: DateTime,
 }
-
-pub type NewEvent = serde_json::Value;
 
 impl Event {
     pub fn id(&self) -> &EventId {
@@ -78,22 +47,52 @@ impl Event {
 
     pub async fn new(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
-        measurements: NewEvent,
+        device: &Device,
+        measurements: serde_json::Value,
         firmware_hash: String,
     ) -> Result<Self> {
+        let firmware = Firmware::try_find_by_hash(txn, &firmware_hash).await?;
+        let compilation = if let Some(firmware) = firmware {
+            firmware.compilation(txn).await?
+        } else {
+            None
+        };
+        let metadatas = if let Some(compilation) = compilation {
+            let compiler = compilation.compiler(txn).await?;
+            let sensors = compiler.sensors(txn, device).await?;
+            let mut measurements = Vec::new();
+            for (index, sensor) in sensors.into_iter().enumerate() {
+                let prototype = &sensor.prototype;
+                measurements.extend(
+                    prototype.measurements
+                        .iter()
+                        .map(|m| {
+                            let reg = Handlebars::new();
+                            let name = reg.render_template(&m.name, &json!({ "index": index }))?;
+                            Ok(MeasurementView::new(m.clone(), name))
+                        })
+                        .collect::<Result<Vec<_>, Error>>()?,
+                );
+            }
+            measurements
+        } else {
+            Vec::new()
+        };
+        let metadatas = serde_json::to_value(metadatas)?;
+
         //db::plant::owns(txn, user_id, farm_id).await?;
-        // TODO: log error if something is NaN
         let (id,): (EventId,) =
-            sqlx::query_as("INSERT INTO events (device_id, measurements, firmware_hash) VALUES ($1, $2, $3) RETURNING id")
-                .bind(device_id)
+            sqlx::query_as("INSERT INTO events (device_id, measurements, metadatas, firmware_hash) VALUES ($1, $2, $3, $4) RETURNING id")
+                .bind(device.id())
                 .bind(&measurements)
+                .bind(&metadatas)
                 .bind(&firmware_hash)
                 .fetch_one(&mut *txn)
                 .await?;
         Ok(Self {
             id,
             measurements,
+            metadatas,
             firmware_hash,
             created_at: now(), // TODO: fix this
         })
@@ -101,15 +100,15 @@ impl Event {
 
     pub async fn last_from_device(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
+        device: &Device,
     ) -> Result<Option<Self>> {
         let event: Option<Event> = sqlx::query_as(
-            "SELECT id, measurements, firmware_hash, created_at
+            "SELECT id, measurements, metadatas, firmware_hash, created_at
             FROM events
             WHERE device_id = $1
             ORDER BY created_at DESC",
         )
-        .bind(device_id)
+        .bind(device.id())
         .fetch_optional(txn)
         .await?;
         debug!("Last Event: {:?}", event);
@@ -118,43 +117,20 @@ impl Event {
 
     pub async fn list(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
+        device: &Device,
         limit: u32,
     ) -> Result<Vec<Self>> {
         let event: Vec<Event> = sqlx::query_as(
-            "SELECT id, measurements, firmware_hash, created_at
+            "SELECT id, measurements, metadatas, firmware_hash, created_at
             FROM events
             WHERE device_id = $1
             ORDER BY created_at DESC
             LIMIT $2",
         )
-        .bind(device_id)
+        .bind(device.id())
         .bind(limit as i64)
         .fetch_all(txn)
         .await?;
         Ok(event)
     }
-
-    //pub async fn list_for_compiler(
-    //    txn: &mut Transaction<'_>,
-    //    device_id: &DeviceId,
-    //    compiler_id: &CompilerId,
-    //    limit: u32,
-    //) -> Result<Vec<Self>> {
-    //    let event: Vec<Event> = sqlx::query_as(
-    //        "SELECT events.id, events.measurements, events.firmware_hash, events.created_at
-    //        FROM events
-    //        INNER JOIN devices ON devices.id = events.device_id
-    //        WHERE events.device_id = $1
-    //              devices.compiler_id = $2
-    //        ORDER BY events.created_at DESC
-    //        LIMIT $3",
-    //    )
-    //    .bind(device_id)
-    //    .bind(compiler_id)
-    //    .bind(limit as i64)
-    //    .fetch_all(txn)
-    //    .await?;
-    //    Ok(event)
-    //}
 }

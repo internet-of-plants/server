@@ -1,3 +1,4 @@
+/*
 use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
@@ -116,3 +117,4 @@ async fn update() {
     let up = find_update(app.clone(), &token, &version).await;
     assert_eq!(up, file);
 }
+*/

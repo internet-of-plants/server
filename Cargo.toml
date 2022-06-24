@@ -49,3 +49,5 @@ once_cell = "1.1"
 tempfile = "3"
 
 mime = "0.3"
+
+handlebars = "4"

@@ -1,36 +1,43 @@
-use crate::extractor::Authorization;
-use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DeviceView, OrganizationId};
-use axum::extract::{Extension, Json, Path};
+use crate::extractor::User;
+use crate::{prelude::*, Device};
+use crate::{DeviceId, DeviceView};
+use axum::extract::{Extension, Json};
 use controllers::Result;
+use serde::Deserialize;
 
-type FindPath = (OrganizationId, CollectionId, DeviceId);
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FindRequest {
+    device_id: DeviceId,
+}
+
 pub async fn find(
-    Path((_organization_id, _collection_id, device_id)): Path<FindPath>,
     Extension(pool): Extension<&'static Pool>,
-    Authorization(_auth): Authorization,
+    User(user): User,
+    Json(request): Json<FindRequest>,
 ) -> Result<Json<DeviceView>> {
     let mut txn = pool.begin().await?;
-    let device = DeviceView::find_by_id(&mut txn, /*auth.user_id,*/ &device_id).await?;
+    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let device = DeviceView::new(&mut txn, device).await?;
     txn.commit().await?;
     Ok(Json(device))
 }
 
-//#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-//pub struct RequestHistory {
-//    pub id: i64,
-//    pub since_secs_ago: u64,
-//}
-//pub async fn history(pool: &'static Pool, auth: Auth, req: RequestHistory) -> Result<impl Reply> {
-//    let mut txn = pool.begin().await?;
-//    // TODO: easy DOS channel
-//    let history = db::plant::history(
-//        &mut txn,
-//        auth.user_id,
-//        DeviceId::new(req.id),
-//        Duration::from_secs(req.since_secs_ago),
-//    )
-//    .await?;
-//    txn.commit().await?;
-//    Ok(warp::reply::json(&history))
-//}
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SetNameRequest {
+    device_id: DeviceId,
+    name: String,
+}
+
+pub async fn set_name(
+    Extension(pool): Extension<&'static Pool>,
+    User(user): User,
+    Json(request): Json<SetNameRequest>,
+) -> Result<Json<()>> {
+    let mut txn = pool.begin().await?;
+    let mut device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    device.set_name(&mut txn, request.name).await?;
+    txn.commit().await?;
+    Ok(Json(()))
+}

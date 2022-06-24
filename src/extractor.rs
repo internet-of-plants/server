@@ -1,4 +1,4 @@
-use crate::db::user::{AuthToken, User};
+use crate::db::user::AuthToken;
 use crate::prelude::*;
 use axum::{
     async_trait,
@@ -6,10 +6,51 @@ use axum::{
     http::StatusCode,
 };
 
-pub struct Authorization(pub Auth);
+pub struct Device(pub super::Device);
 
 #[async_trait]
-impl<B> FromRequest<B> for Authorization
+impl<B> FromRequest<B> for Device
+where
+    B: Send,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let Extension(pool) = Extension::<&'static Pool>::from_request(req)
+            .await
+            .expect("`Pool` extension missing");
+
+        let mac = Option::<TypedHeader<MacAddress>>::from_request(req)
+            .await
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "No authorization"))?
+            .ok_or((StatusCode::UNAUTHORIZED, "No authorization"))?;
+        let mut token = TypedHeader::<AuthorizationHeader>::from_request(req)
+            .await
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "No authorization"))?;
+        if token.0 .0.starts_with("Basic ") {
+            token.0 .0.drain(.."Basic ".len());
+            let mut txn = pool
+                .begin()
+                .await
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+            let device =
+                crate::Device::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0), mac.0 .0)
+                    .await
+                    .map_err(|_| (StatusCode::UNAUTHORIZED, "Internal Server Error"))?;
+            txn.commit()
+                .await
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+            Ok(Self(device))
+        } else {
+            Err((StatusCode::UNAUTHORIZED, "Invalid authorization"))
+        }
+    }
+}
+
+pub struct User(pub super::User);
+
+#[async_trait]
+impl<B> FromRequest<B> for User
 where
     B: Send,
 {
@@ -25,21 +66,17 @@ where
             .map_err(|_| (StatusCode::UNAUTHORIZED, "No authorization"))?;
         if token.0 .0.starts_with("Basic ") {
             token.0 .0.drain(.."Basic ".len());
-            // TODO: we should check if the MAC_ADDRESS header is the same as in the db
-            // TODO: we could check for updates here, but we don't want to lose the
-            // payload, think about a middleware (although it's unclear what to do with
-            // failures)
             let mut txn = pool
                 .begin()
                 .await
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
-            let auth = User::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0))
+            let user = crate::User::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0))
                 .await
                 .map_err(|_| (StatusCode::UNAUTHORIZED, "Internal Server Error"))?;
             txn.commit()
                 .await
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
-            Ok(Authorization(auth))
+            Ok(Self(user))
         } else {
             Err((StatusCode::UNAUTHORIZED, "Invalid authorization"))
         }

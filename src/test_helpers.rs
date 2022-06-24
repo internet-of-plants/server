@@ -1,18 +1,16 @@
-use crate::db::code_generation::CompilationView;
+use crate::db::compilation::{CompilationView, CompilationId};
+use crate::db::sensor::SensorView;
+use crate::db::sensor_prototype::SensorPrototypeView;
+use crate::db::target::TargetView;
 use crate::db::user::{AuthToken, Login, NewUser};
 use crate::extractor::{MacAddress, Version};
 use crate::{
     controllers::compiler::NewCompiler,
-    controllers::sensor::SensorView,
-    controllers::sensor_prototype::SensorPrototypeView,
-    controllers::target::TargetView,
-    controllers::update::NewUpdate,
-    db::code_generation::CompilationId,
     db::device_panic::NewDevicePanic,
     db::sensor::NewSensor,
     db::sensor_prototype::SensorPrototypeId,
     db::target_prototype::{TargetPrototype, TargetPrototypeId},
-    CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView, NewEvent,
+    CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView,
     Organization, OrganizationId, OrganizationView,
 };
 use axum::{
@@ -262,7 +260,7 @@ pub async fn send_event(
     token: &AuthToken,
     version: &Version,
     mac_address: &MacAddress,
-    new_event: &NewEvent,
+    new_event: &serde_json::Value,
 ) {
     let response = app
         .oneshot(
@@ -286,6 +284,7 @@ pub async fn send_event(
     assert_eq!(response.status(), StatusCode::OK);
 }
 
+/*
 pub async fn send_update(
     app: Router,
     token: &AuthToken,
@@ -353,6 +352,7 @@ pub async fn find_update(app: Router, token: &AuthToken, file_hash: &Version) ->
     let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
     body.as_ref().to_owned()
 }
+*/
 
 pub async fn list_target_prototypes(app: Router, token: &AuthToken) -> Vec<TargetPrototype> {
     let response = app

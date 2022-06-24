@@ -1,19 +1,29 @@
-use crate::extractor::Authorization;
-use crate::prelude::*;
-use crate::{Collection, CollectionId, CollectionView, Device, OrganizationId};
-use axum::extract::{Extension, Json, Path};
+use crate::extractor::User;
+use crate::{prelude::*, DeviceView};
+use crate::{Collection, CollectionId, CollectionView, Device};
+use axum::extract::{Extension, Json};
 use controllers::Result;
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FindRequest {
+    collection_id: CollectionId,
+}
 
 pub async fn find(
-    Path((_organization_id, collection_id)): Path<(OrganizationId, CollectionId)>,
     Extension(pool): Extension<&'static Pool>,
-    Authorization(_auth): Authorization,
+    User(user): User,
+    Json(request): Json<FindRequest>,
 ) -> Result<Json<CollectionView>> {
     let mut txn = pool.begin().await?;
-    // TODO: check that collection belongs to organization and user belongs to organization
-    let collection = Collection::find_by_id(&mut txn, &collection_id).await?;
-    let devices = Device::from_collection(&mut txn, &collection_id).await?;
-    let collection = CollectionView::new_from_collection_and_devices(collection, devices)?;
+    let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
+    let devices = Device::from_collection(&mut txn, request.collection_id, &user).await?;
+    let mut device_views = Vec::with_capacity(devices.len());
+    for device in devices {
+        device_views.push(DeviceView::new(&mut txn, device).await?);
+    }
+    let collection = CollectionView::new_from_collection_and_devices(collection, device_views)?;
     txn.commit().await?;
     Ok(Json(collection))
 }

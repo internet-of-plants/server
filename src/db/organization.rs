@@ -1,6 +1,6 @@
 use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
-use crate::{Collection, User, UserId, Username};
+use crate::{Collection, User, Username};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -27,19 +27,18 @@ pub struct OrganizationView {
 }
 
 impl OrganizationView {
-    pub async fn find_by_id(
+    pub async fn new(
         txn: &mut Transaction<'_>,
-        organization_id: &OrganizationId,
+        organization: &Organization,
     ) -> Result<Self> {
         // TODO: this is dumb, we are making too many roundtrips to the db, but it's less complex,
         // let's optimize later
-        let organization = Organization::find_by_id(&mut *txn, organization_id).await?;
-        let collections = Collection::from_organization(&mut *txn, organization_id).await?;
-        let members = User::from_organization(&mut *txn, organization_id).await?;
+        let collections = Collection::from_organization(&mut *txn, organization).await?;
+        let members = User::from_organization(&mut *txn, organization).await?;
         Ok(Self {
             id: organization.id,
-            name: organization.name,
-            description: organization.description,
+            name: organization.name.clone(),
+            description: organization.description.clone(),
             collections,
             members,
             created_at: organization.created_at,
@@ -58,10 +57,6 @@ pub struct Organization {
 }
 
 impl Organization {
-    pub fn id(&self) -> &OrganizationId {
-        &self.id
-    }
-
     pub async fn new(txn: &mut Transaction<'_>, name: String) -> Result<Self> {
         if name.is_empty() {
             return Err(Error::BadData);
@@ -71,7 +66,7 @@ impl Organization {
             "INSERT INTO organizations (name) VALUES ($1) RETURNING id",
         )
         .bind(&name)
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(Self {
             id,
@@ -82,44 +77,51 @@ impl Organization {
         })
     }
 
-    pub async fn default_for_user(txn: &mut Transaction<'_>, user_id: &UserId) -> Result<Self> {
+    pub async fn default_for_user(txn: &mut Transaction<'_>, user: &User) -> Result<Self> {
         let organization: Self = sqlx::query_as(
             "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
              FROM organizations as w 
              INNER JOIN users as u ON u.default_organization_id = w.id
              WHERE w.id = $1",
         )
-        .bind(user_id)
-        .fetch_one(&mut *txn)
+        .bind(user.id())
+        .fetch_one(txn)
         .await?;
         Ok(organization)
     }
 
-    pub async fn from_user(txn: &mut Transaction<'_>, user_id: &UserId) -> Result<Vec<Self>> {
+    pub async fn find_by_id(
+        txn: &mut Transaction<'_>,
+        organization_id: OrganizationId,
+        user: &User,
+    ) -> Result<Self> {
+        let organization: Self = sqlx::query_as(
+            "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
+             FROM organizations as w
+             INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = w.id
+             WHERE w.id = $1 AND bt.user_id = $2",
+        )
+            .bind(organization_id)
+            .bind(user.id())
+            .fetch_one(&mut *txn)
+            .await?;
+        Ok(organization)
+    }
+
+    pub async fn from_user(txn: &mut Transaction<'_>, user: &User) -> Result<Vec<Self>> {
         let organizations: Vec<Organization> = sqlx::query_as(
             "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
              FROM organizations as w
              INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = w.id
              WHERE bt.user_id = $1",
         )
-        .bind(user_id)
+        .bind(user.id())
         .fetch_all(&mut *txn)
         .await?;
         Ok(organizations)
     }
 
-    pub async fn find_by_id(
-        txn: &mut Transaction<'_>,
-        organization_id: &OrganizationId,
-    ) -> Result<Self> {
-        let organization: Self = sqlx::query_as(
-            "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
-             FROM organizations as w
-             WHERE w.id = $1",
-        )
-        .bind(organization_id)
-        .fetch_one(&mut *txn)
-        .await?;
-        Ok(organization)
+    pub fn id(&self) -> &OrganizationId {
+        &self.id
     }
 }

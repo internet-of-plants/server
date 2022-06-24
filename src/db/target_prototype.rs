@@ -2,8 +2,6 @@ use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-use super::target::Target;
-
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
 pub struct TargetPrototypeId(pub i64);
@@ -19,7 +17,6 @@ impl TargetPrototypeId {
 pub struct TargetPrototype {
     pub id: TargetPrototypeId,
     pub arch: String,
-    //kind: CompilationType,
     pub build_flags: String,
     pub build_unflags: Option<String>,
     pub platform: String,
@@ -33,7 +30,6 @@ impl TargetPrototype {
     pub async fn new(
         txn: &mut Transaction<'_>,
         arch: String,
-        //kind: CompilationType,
         build_flags: String,
         platform: String,
         framework: Option<String>,
@@ -56,7 +52,6 @@ impl TargetPrototype {
         Ok(Self {
             id,
             arch,
-            //kind,
             build_flags,
             build_unflags: None,
             platform,
@@ -65,18 +60,6 @@ impl TargetPrototype {
             extra_platformio_params,
             ldf_mode,
         })
-    }
-
-    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
-        Ok(sqlx::query_as(
-            "SELECT id, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes"
-        )
-            .fetch_all(&mut *txn)
-            .await?)
-    }
-
-    pub async fn targets(&self, txn: &mut Transaction<'_>) -> Result<Vec<Target>> {
-        Target::list_by_prototype(txn, self.id).await
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetPrototypeId) -> Result<Self> {
@@ -100,5 +83,9 @@ impl TargetPrototype {
             .await?;
         self.build_unflags = build_unflags;
         Ok(())
+    }
+
+    pub fn id(&self) -> TargetPrototypeId {
+        self.id
     }
 }

@@ -1,26 +1,34 @@
 use crate::db::device_panic::NewDevicePanic;
-use crate::extractor::Authorization;
+use crate::extractor::{Device, User};
 use crate::prelude::*;
-use crate::{CollectionId, DeviceId, DevicePanic, DevicePanicId, OrganizationId};
-use axum::extract::{Extension, Json, Path};
+use crate::{DeviceId, DevicePanic, DevicePanicId};
+use axum::extract::{Extension, Json};
 use axum::http::StatusCode;
 use controllers::Result;
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SolveRequest {
+    device_id: DeviceId,
+    panic_id: DevicePanicId,
+}
 
 pub async fn solve(
-    Path(id): Path<DevicePanicId>,
     Extension(pool): Extension<&'static Pool>,
-    Authorization(_auth): Authorization,
+    User(user): User,
+    Json(request): Json<SolveRequest>,
 ) -> Result<StatusCode> {
-    // TODO: enforce ownerships
     let mut txn = pool.begin().await?;
-    DevicePanic::solve(&mut txn, id).await?;
+    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    DevicePanic::solve(&mut txn, &device, request.panic_id).await?;
     txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
-    Authorization(auth): Authorization,
+    Device(device): Device,
     Json(mut error): Json<NewDevicePanic>,
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
@@ -28,30 +36,26 @@ pub async fn new(
     if error.msg.trim() != error.msg {
         error.msg = error.msg.trim().to_owned();
     }
-    if let Some(device_id) = auth.device_id {
-        DevicePanic::new(&mut txn, &device_id, error).await?;
-    } else {
-        return Err(Error::Forbidden)?;
-    }
+    DevicePanic::new(&mut txn, &device, error).await?;
 
     txn.commit().await?;
     Ok(StatusCode::OK)
 }
 
-type IndexPath = (OrganizationId, CollectionId, DeviceId, u16);
-pub async fn index(
-    Path((_organization_id, _collection_id, device_id, limit)): Path<IndexPath>,
-    Extension(pool): Extension<&'static Pool>,
-    Authorization(_auth): Authorization,
-) -> Result<Json<Vec<DevicePanic>>> {
-    // TODO: enforce ownerships
-    let mut txn = pool.begin().await?;
-    let panics = DevicePanic::first_n_from_device(&mut txn, &device_id, limit as i32).await?;
-    Ok(Json(panics))
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListRequest {
+    device_id: DeviceId,
+    limit: u16,
 }
 
-//pub async fn index(pool: &'static Pool, auth: Auth) -> Result<impl Reply> {
-//    Ok(warp::reply::json(
-//        &db::device_panic::index(pool, auth.user_id, None).await?,
-//    ))
-//}
+pub async fn list(
+    Extension(pool): Extension<&'static Pool>,
+    User(user): User,
+    Json(request): Json<ListRequest>,
+) -> Result<Json<Vec<DevicePanic>>> {
+    let mut txn = pool.begin().await?;
+    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let panics = DevicePanic::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
+    Ok(Json(panics))
+}

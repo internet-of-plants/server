@@ -1,6 +1,5 @@
 use crate::db::timestamp::{now, DateTime};
-use crate::prelude::*;
-use crate::{Device, OrganizationId};
+use crate::{prelude::*, DeviceView, Organization, User};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -14,13 +13,13 @@ impl CollectionId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionView {
     pub id: CollectionId,
     pub name: String,
     pub description: Option<String>,
-    pub devices: Vec<Device>,
+    pub devices: Vec<DeviceView>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
@@ -28,7 +27,7 @@ pub struct CollectionView {
 impl CollectionView {
     pub fn new_from_collection_and_devices(
         collection: Collection,
-        devices: Vec<Device>,
+        devices: Vec<DeviceView>,
     ) -> Result<Self> {
         Ok(Self {
             id: collection.id,
@@ -51,14 +50,10 @@ pub struct Collection {
 }
 
 impl Collection {
-    pub fn id(&self) -> &CollectionId {
-        &self.id
-    }
-
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: String,
-        organization_id: &OrganizationId,
+        organization: &Organization,
     ) -> Result<Self> {
         if name.is_empty() {
             return Err(Error::BadData);
@@ -70,59 +65,70 @@ impl Collection {
         .bind(&name)
         .fetch_one(&mut *txn)
         .await?;
-        Self::associate_to_organization(&mut *txn, &id, organization_id).await?;
-        Ok(Self {
+
+        let col = Self {
             id,
             name,
             description: None,
             created_at: now(), // TODO: fix this
             updated_at: now(), // TODO: fix this
-        })
-    }
+        };
+        col.associate_to_organization(txn, organization).await?;
 
-    pub async fn associate_to_organization(
-        txn: &mut Transaction<'_>,
-        collection_id: &CollectionId,
-        organization_id: &OrganizationId,
-    ) -> Result<()> {
-        sqlx::query(
-            "INSERT INTO collection_belongs_to_organization (collection_id, organization_id) VALUES ($1, $2)",
-        )
-        .bind(collection_id)
-        .bind(organization_id)
-        .execute(&mut *txn)
-        .await?;
-        Ok(())
+        Ok(col)
     }
 
     pub async fn find_by_id(
         txn: &mut Transaction<'_>,
-        collection_id: &CollectionId,
+        collection_id: CollectionId,
+        user: &User,
     ) -> Result<Self> {
         let collection: Self = sqlx::query_as(
             "SELECT col.id, col.name, col.description, col.created_at, col.updated_at
              FROM collections as col
-             WHERE col.id = $1",
+             INNER JOIN collection_belongs_to_organization cbt ON cbt.collection_id = col.id
+             INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
+             WHERE col.id = $1 AND ubt.user_id = $2",
         )
-        .bind(collection_id)
-        .fetch_one(&mut *txn)
-        .await?;
+            .bind(collection_id)
+            .bind(user.id())
+            .fetch_one(&mut *txn)
+            .await?;
         Ok(collection)
     }
 
     pub async fn from_organization(
         txn: &mut Transaction<'_>,
-        organization_id: &OrganizationId,
+        organization: &Organization,
     ) -> Result<Vec<Self>> {
         let collections: Vec<Self> = sqlx::query_as(
             "SELECT col.id, col.name, col.description, col.created_at, col.updated_at
-                FROM collections as col
-                INNER JOIN collection_belongs_to_organization as bt ON bt.collection_id = col.id
-                WHERE bt.organization_id = $1",
+             FROM collections as col
+             INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = col.id
+             WHERE cbt.organization_id = $1",
         )
-        .bind(organization_id)
+        .bind(organization.id())
         .fetch_all(&mut *txn)
         .await?;
         Ok(collections)
+    }
+
+    pub fn id(&self) -> CollectionId {
+        self.id
+    }
+
+    pub async fn associate_to_organization(
+        &self,
+        txn: &mut Transaction<'_>,
+        organization: &Organization,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO collection_belongs_to_organization (collection_id, organization_id) VALUES ($1, $2)",
+        )
+        .bind(self.id)
+        .bind(organization.id())
+        .execute(&mut *txn)
+        .await?;
+        Ok(())
     }
 }

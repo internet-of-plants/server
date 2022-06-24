@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS events (
   device_id     BIGINT                NOT NULL,
   -- TODO: add type-safety
   measurements  JSONB                 NOT NULL,
+  metadatas     JSONB                 NOT NULL,
   firmware_hash VARCHAR(255)          NOT NULL,
   created_at    TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   FOREIGN KEY (device_id) REFERENCES devices (id)
@@ -143,14 +144,16 @@ CREATE TABLE IF NOT EXISTS device_logs (
 
 CREATE TABLE IF NOT EXISTS authentications (
   id         BIGSERIAL PRIMARY KEY NOT NULL,
-  user_id    BIGINT NOT NULL,
+  user_id    BIGINT,
   device_id  BIGINT,
+  mac        CHAR(17),
   token      VARCHAR(255) NOT NULL,
   expired    BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users (id),
   FOREIGN KEY (device_id) REFERENCES devices (id)
+  FOREIGN KEY (mac) REFERENCES devices (mac)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_prototypes (
@@ -187,10 +190,11 @@ CREATE TABLE IF NOT EXISTS config_type_selection_options (
 
 CREATE TABLE IF NOT EXISTS config_requests (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
-  type_id             BIGINT NOT NULL,
-  name                TEXT NOT NULL,
-  sensor_prototype_id BIGINT NOT NULL,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  type_id             BIGINT                NOT NULL,
+  name                TEXT                  NOT NULL,
+  human_name          TEXT                  NOT NULL,
+  sensor_prototype_id BIGINT                NOT NULL,
+  created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   FOREIGN KEY (type_id) REFERENCES config_types (id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
@@ -244,21 +248,30 @@ CREATE TYPE MeasurementType AS ENUM (
   'FloatCelsius', 'Percentage', 'RawAnalogRead'
 );
 
+CREATE TYPE MeasurementKind AS ENUM (
+  'SoilTemperature', 'SoilMoisture', 'AirTemperature', 'AirHumidity'
+);
+
 CREATE TABLE IF NOT EXISTS sensor_prototype_measurements (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   name                TEXT                  NOT NULL,
+  human_name          TEXT                  NOT NULL,
   value               TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
   ty                  MeasurementType       NOT NULL,
+  kind                MeasurementKind       NOT NULL,
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_belongs_to_compiler (
   id          BIGSERIAL PRIMARY KEY NOT NULL,
-  compiler_id BIGINT NOT NULL,
-  sensor_id   BIGINT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  compiler_id BIGINT                NOT NULL,
+  sensor_id   BIGINT                NOT NULL,
+  device_id     BIGINT                NOT NULL,
+  alias       TEXT                  NOT NULL,
+  created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE (compiler_id, sensor_id),
+  FOREIGN KEY (device_id) REFERENCES devices (id),
   FOREIGN KEY (compiler_id) REFERENCES compilers (id),
   FOREIGN KEY (sensor_id) REFERENCES sensors (id)
 );

@@ -4,6 +4,36 @@ use crate::prelude::*;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct TargetView {
+    pub id: TargetId,
+    pub arch: String,
+    pub build_flags: String,
+    pub platform: String,
+    pub framework: Option<String>,
+    pub platform_packages: Option<String>,
+    pub extra_platformio_params: Option<String>,
+    pub ldf_mode: Option<String>,
+    pub board: Option<String>,
+}
+
+impl TargetView {
+    pub async fn new(txn: &mut Transaction<'_>, target: Target) -> Result<Self> {
+        let prototype = target.prototype(&mut *txn).await?;
+        Ok(Self {
+            id: target.id(),
+            arch: prototype.arch,
+            build_flags: prototype.build_flags,
+            platform: prototype.platform,
+            framework: prototype.framework,
+            platform_packages: prototype.platform_packages,
+            extra_platformio_params: prototype.extra_platformio_params,
+            ldf_mode: prototype.ldf_mode,
+            board: target.board().map(ToOwned::to_owned),
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
 pub struct TargetId(pub i64);
@@ -29,13 +59,13 @@ impl Target {
         board: Option<String>,
         pins: Vec<String>,
         pin_hpp: String,
-        target_prototype_id: TargetPrototypeId,
+        target_prototype: &TargetPrototype,
     ) -> Result<Self> {
         let (id,): (TargetId,) = sqlx::query_as(
             "INSERT INTO targets (board, target_prototype_id, pin_hpp) VALUES ($1, $2, $3) RETURNING id",
         )
         .bind(&board)
-        .bind(&target_prototype_id)
+        .bind(target_prototype.id())
         .bind(&pin_hpp)
         .fetch_one(&mut *txn)
         .await?;
@@ -50,9 +80,28 @@ impl Target {
             id,
             board,
             pin_hpp,
-            target_prototype_id,
+            target_prototype_id: target_prototype.id(),
             build_flags: None,
         })
+    }
+
+    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+        Ok(sqlx::query_as(
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
+            FROM targets",
+        )
+        .fetch_all(&mut *txn)
+        .await?)
+    }
+
+    pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetId) -> Result<Self> {
+        let target = sqlx::query_as(
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
+        )
+        .bind(&id)
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(target)
     }
 
     pub fn id(&self) -> TargetId {
@@ -94,39 +143,6 @@ impl Target {
 
     pub async fn prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
         TargetPrototype::find_by_id(txn, self.target_prototype_id).await
-    }
-
-    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
-        Ok(sqlx::query_as(
-            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
-            FROM targets",
-        )
-        .fetch_all(&mut *txn)
-        .await?)
-    }
-
-    pub async fn list_by_prototype(
-        txn: &mut Transaction<'_>,
-        target_prototype_id: TargetPrototypeId,
-    ) -> Result<Vec<Self>> {
-        Ok(sqlx::query_as(
-            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
-            FROM targets
-            WHERE target_prototype_id = $1",
-        )
-        .bind(&target_prototype_id)
-        .fetch_all(&mut *txn)
-        .await?)
-    }
-
-    pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetId) -> Result<Self> {
-        let target = sqlx::query_as(
-            "SELECT id, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
-        )
-        .bind(&id)
-        .fetch_one(&mut *txn)
-        .await?;
-        Ok(target)
     }
 
     pub async fn compile_platformio_ini(

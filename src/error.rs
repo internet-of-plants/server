@@ -13,17 +13,16 @@ pub enum Error {
     Sqlx(sqlx::error::Error),
     Bcrypt(bcrypt::BcryptError),
     Join(tokio::task::JoinError),
+    Json(serde_json::Error),
     IO(std::io::Error),
     Fmt(std::fmt::Error),
     Utf8(std::str::Utf8Error),
+    Handlebars(handlebars::RenderError),
     Forbidden,
     BadData,
-    NotModified,
     NothingFound,
-    CorruptBinary,
     ParseInt(std::num::ParseIntError),
     MissingHeader(&'static str),
-    InvalidUpdateFound,
     Hyper(hyper::Error),
     InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
     Http(axum::http::Error),
@@ -44,6 +43,10 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::Hyper(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Json(error) => {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
@@ -71,20 +74,16 @@ impl IntoResponse for Error {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
+            Self::Handlebars(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
             Self::InvalidHeaderValue(error) => {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::ParseInt(error) => {
                 error!("{:?} {}", error, error);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            }
-            Self::InvalidUpdateFound => {
-                error!("Corrupt Binary");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            }
-            Self::CorruptBinary => {
-                error!("Corrupt Binary");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::Forbidden => {
@@ -99,7 +98,6 @@ impl IntoResponse for Error {
                 warn!("Bad Data");
                 (StatusCode::BAD_REQUEST, "Bad Request")
             }
-            Self::NotModified => (StatusCode::NOT_MODIFIED, "Not modified"),
             Self::NothingFound => {
                 warn!("Nothing Found");
                 (StatusCode::NOT_FOUND, "Not found")

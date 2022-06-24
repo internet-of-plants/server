@@ -1,6 +1,5 @@
 use crate::db::timestamp::{now, DateTime};
-use crate::prelude::*;
-use crate::DeviceId;
+use crate::{prelude::*, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -12,25 +11,6 @@ pub struct NewDevicePanic {
     pub msg: String,
 }
 
-//#[exec_time]
-//#[cache(valid_for = 3600)]
-//pub async fn owns(txn: &mut Transaction<'_>, user_id: i64, error_id: i64) -> Result<()> {
-//    let exists: Option<(i32,)> = sqlx::query_as(
-//        "SELECT 1
-//        FROM device_panics
-//        WHERE device_panics.owner_id = $1
-//              AND device_panics.id = $2",
-//    )
-//    .bind(user_id)
-//    .bind(error_id)
-//    .fetch_optional(txn)
-//    .await?;
-//    match exists {
-//        Some(_) => Ok(()),
-//        None => Err(Error::NothingFound),
-//    }
-//}
-//
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
 pub struct DevicePanicId(i64);
@@ -48,13 +28,12 @@ pub struct DevicePanic {
 impl DevicePanic {
     pub async fn new(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
+        device: &Device,
         new_device_panic: NewDevicePanic,
     ) -> Result<Self> {
-        // TODO: auditing event with history actor
-        info!("Log (device_id: {:?}): {:?}", device_id, new_device_panic);
+        info!("Log (device_id: {:?}): {:?}", device.id(), new_device_panic);
         let (id,): (DevicePanicId,) = sqlx::query_as("INSERT INTO device_panics (device_id, \"file\", line, func, msg) VALUES ($1, $2, $3, $4, $5) RETURNING id")
-            .bind(device_id)
+            .bind(device.id())
             .bind(&new_device_panic.file)
             .bind(new_device_panic.line)
             .bind(&new_device_panic.func)
@@ -73,7 +52,7 @@ impl DevicePanic {
 
     pub async fn first_n_from_device(
         txn: &mut Transaction<'_>,
-        device_id: &DeviceId,
+        device: &Device,
         limit: i32,
     ) -> Result<Vec<Self>> {
         let device_panics: Vec<DevicePanic> = sqlx::query_as(
@@ -83,17 +62,17 @@ impl DevicePanic {
             ORDER BY p.created_at DESC
             LIMIT $2",
         )
-        .bind(device_id)
+        .bind(device.id())
         .bind(&limit)
         .fetch_all(txn)
         .await?;
         Ok(device_panics.into_iter().rev().collect())
     }
 
-    pub async fn solve(txn: &mut Transaction<'_>, device_panic_id: DevicePanicId) -> Result<()> {
-        //db::device_panic::owns(txn, user_id, error_id).await?;
-        sqlx::query("UPDATE device_panics SET is_solved = TRUE WHERE id = $1")
-            .bind(&device_panic_id)
+    pub async fn solve(txn: &mut Transaction<'_>, device: &Device, device_panic_id: DevicePanicId) -> Result<()> {
+        sqlx::query("UPDATE device_panics SET is_solved = TRUE WHERE id = $1 AND device_id = $2")
+            .bind(device_panic_id)
+            .bind(device.id())
             .execute(txn)
             .await?;
         Ok(())

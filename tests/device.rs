@@ -1,3 +1,4 @@
+/*
 use server::test_helpers::{
     find_collection, find_device, find_organization, list_organizations, login, signup,
 };
@@ -48,3 +49,4 @@ async fn device() {
     .await;
     assert_eq!(dev.id, *col.devices[0].id());
 }
+*/

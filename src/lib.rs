@@ -8,17 +8,16 @@ pub mod utils;
 pub use crate::db::{
     collection::{Collection, CollectionId, CollectionView},
     device::{Device, DeviceId, DeviceView, NewDevice},
-    device_log::{DeviceLog, DeviceLogId},
+    device_log::DeviceLog,
     device_panic::{DevicePanic, DevicePanicId},
-    event::{Event, EventId, NewEvent},
+    event::Event,
     organization::{Organization, OrganizationId, OrganizationView},
-    update::{Update, UpdateId},
-    user::{NewUser, User, UserId, Username},
+    user::{NewUser, User, Username},
 };
 
 pub mod prelude {
     pub use crate::error::{Error, Result};
-    pub use crate::{controllers, db, utils};
+    pub(crate) use crate::{controllers, db, utils};
     pub use axum::response::IntoResponse;
     #[allow(unused_imports)]
     pub use log::{debug, error, info, trace, warn};
@@ -28,14 +27,15 @@ pub mod prelude {
     pub type Pool = sqlx::PgPool;
     pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 
-    use crate::db::device::DeviceId;
-    use crate::db::user::UserId;
+    use crate::db::device::Device;
     use serde::Serialize;
+
+    use self::db::user::User;
 
     #[derive(sqlx::FromRow, Debug, Clone, PartialEq, Serialize)]
     pub struct Auth {
-        pub user_id: UserId,
-        pub device_id: Option<DeviceId>,
+        pub user: User,
+        pub device: Option<Device>,
     }
 }
 
@@ -43,7 +43,7 @@ use crate::prelude::*;
 use axum::{
     extract::Extension,
     http::{header::HeaderName, header::HeaderValue, Method},
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use once_cell::sync::Lazy;
@@ -137,92 +137,32 @@ pub async fn router(url: &str) -> Router {
     let app = Router::new()
         .route("/v1/user/login", post(controllers::user::login))
         .route("/v1/user", post(controllers::user::new))
-        //.route("/v1/sensor", post(controllers::sensor::new))
-        //.route(
-        //    "/v1/sensors/of/prototype/:id",
-        //    get(controllers::sensor::list_for_prototype),
-        //)
-        //.route("/v1/sensors", get(controllers::sensor::list))
+        .route("/v1/targets", get(controllers::target::list))
         .route(
-            "/v1/sensor/prototype/:id",
-            get(controllers::sensor_prototype::find),
-        )
-        .route(
-            "/v1/sensor/prototypes",
-            get(controllers::sensor_prototype::list),
-        )
-        .route(
-            "/v1/target/:id/sensor/prototypes",
+            "/v1/target/sensor/prototypes",
             get(controllers::sensor_prototype::list_for_target),
         )
-        .route("/v1/event", post(controllers::event::new))
-        .route(
-            "/v1/targets",
-            get(controllers::target::list),
-        )
-        .route(
-            "/v1/targets/of/prototype/:id",
-            get(controllers::target::list_for_prototype),
-        )
-        .route(
-            "/v1/target/prototypes",
-            get(controllers::target_prototype::index),
-        )
-        .route(
-            "/v1/target/prototype/:id",
-            get(controllers::target_prototype::find),
-        )
+        .route("/v1/sensor/set/alias", post(controllers::sensor::set_alias))
         .route("/v1/compiler", post(controllers::compiler::new))
-        .route("/v1/compilations", get(controllers::compiler::compilations))
-        .route(
-            "/v1/compile/:id",
-            post(controllers::compiler::compile_firmware),
-        )
         .route(
             "/v1/organizations",
             get(controllers::organization::from_user),
         )
-        .route("/v1/organization/:id", get(controllers::organization::find))
+        .route("/v1/organization", get(controllers::organization::find))
+        .route("/v1/collection", get(controllers::collection::find))
+        .route("/v1/device", get(controllers::device::find))
+        .route("/v1/device/name", post(controllers::device::set_name))
+        .route("/v1/device/events", get(controllers::event::list))
+        .route("/v1/device/logs", get(controllers::device_log::list))
+        .route("/v1/device/panics", get(controllers::device_panic::list))
         .route(
-            "/v1/organization/:id/collection/:id",
-            get(controllers::collection::find),
+            "/v1/device/panic/solve",
+            post(controllers::device_panic::solve),
         )
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id",
-            get(controllers::device::find),
-        )
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id/events/:limit",
-            get(controllers::event::list),
-        )
+        .route("/v1/event", post(controllers::event::new))
         .route("/v1/log", post(controllers::device_log::new)) //.and(warp::body::content_length_limit(2048))
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id/log/last/:limit",
-            get(controllers::device_log::index),
-        )
         .route("/v1/panic", post(controllers::device_panic::new))
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id/panic/last/:limit",
-            get(controllers::device_panic::index),
-        )
-        .route("/v1/panic/:id", delete(controllers::device_panic::solve))
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id/update",
-            post(controllers::update::new), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
-        )
-        .route(
-            "/v1/organization/:id/collection/:id/device/:id/firmwares",
-            get(controllers::firmware::list), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
-        )
-        .route(
-            "/v1/update",
-            get(controllers::update::get), //.and(warp::filters::multipart::form().max_length(8 * 1024 * 1024))
-        )
         .layer(Extension(pool))
         .layer(cors);
-    //.route("/v1/updates", get(controllers::update::index))
-    //.route("/v1/plant/index", get(controllers::plant::index))
-    //.route("/v1/plant/history", get(controllers::plant::history))
-    //.route("/v1/plant", get(controllers::plant::get))
     app
 }
