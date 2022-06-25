@@ -162,6 +162,7 @@ pub async fn router(url: &str) -> Router {
         .route("/v1/event", post(controllers::event::new))
         .route("/v1/log", post(controllers::device_log::new)) //.and(warp::body::content_length_limit(2048))
         .route("/v1/panic", post(controllers::device_panic::new))
+        .route("/v1/update", get(controllers::firmware::update))
         .layer(Extension(pool))
         .layer(cors);
     app

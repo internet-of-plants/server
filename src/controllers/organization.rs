@@ -1,7 +1,7 @@
 use crate::extractor::User;
 use crate::prelude::*;
 use crate::{Organization, OrganizationId, OrganizationView};
-use axum::extract::{Extension, Json};
+use axum::extract::{Extension, Json, Query};
 use controllers::Result;
 use serde::Deserialize;
 
@@ -14,7 +14,7 @@ pub struct FindRequest {
 pub async fn find(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
-    Json(request): Json<FindRequest>,
+    Query(request): Query<FindRequest>,
 ) -> Result<Json<OrganizationView>> {
     let mut txn = pool.begin().await?;
     let organization = Organization::find_by_id(&mut txn, request.organization_id, &user).await?;

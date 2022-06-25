@@ -2,7 +2,7 @@ use crate::db::device_panic::NewDevicePanic;
 use crate::extractor::{Device, User};
 use crate::prelude::*;
 use crate::{DeviceId, DevicePanic, DevicePanicId};
-use axum::extract::{Extension, Json};
+use axum::extract::{Extension, Json, Query};
 use axum::http::StatusCode;
 use controllers::Result;
 use serde::Deserialize;
@@ -52,7 +52,7 @@ pub struct ListRequest {
 pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
-    Json(request): Json<ListRequest>,
+    Query(request): Query<ListRequest>,
 ) -> Result<Json<Vec<DevicePanic>>> {
     let mut txn = pool.begin().await?;
     let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;

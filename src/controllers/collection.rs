@@ -1,7 +1,7 @@
 use crate::extractor::User;
 use crate::{prelude::*, DeviceView};
 use crate::{Collection, CollectionId, CollectionView, Device};
-use axum::extract::{Extension, Json};
+use axum::extract::{Extension, Json, Query};
 use controllers::Result;
 use serde::Deserialize;
 
@@ -14,7 +14,7 @@ pub struct FindRequest {
 pub async fn find(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
-    Json(request): Json<FindRequest>,
+    Query(request): Query<FindRequest>,
 ) -> Result<Json<CollectionView>> {
     let mut txn = pool.begin().await?;
     let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;

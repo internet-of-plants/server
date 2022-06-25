@@ -7,7 +7,7 @@ use crate::extractor::{
 };
 use crate::prelude::*;
 use crate::{DeviceId, Event};
-use axum::extract::{Extension, Json, TypedHeader};
+use axum::extract::{Extension, Json, TypedHeader, Query};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
 use controllers::Result;
 use handlebars::Handlebars;
@@ -156,7 +156,7 @@ pub struct ListRequest {
 pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
-    Json(request): Json<ListRequest>,
+    Query(request): Query<ListRequest>,
 ) -> Result<Json<Vec<EventView>>> {
     let mut txn = pool.begin().await?;
     let mut events = Vec::new();

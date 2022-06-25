@@ -153,7 +153,6 @@ CREATE TABLE IF NOT EXISTS authentications (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users (id),
   FOREIGN KEY (device_id) REFERENCES devices (id)
-  FOREIGN KEY (mac) REFERENCES devices (mac)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_prototypes (

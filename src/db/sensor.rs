@@ -179,7 +179,7 @@ impl Sensor {
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, sensor_id: SensorId) -> Result<Self> {
-        let sensor = sqlx::query_as("SELECT id, prototype_id WHERE id = $1")
+        let sensor = sqlx::query_as("SELECT id, prototype_id FROM sensors WHERE id = $1")
             .bind(&sensor_id)
             .fetch_one(&mut *txn)
             .await?;

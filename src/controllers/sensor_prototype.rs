@@ -2,7 +2,7 @@ use crate::db::sensor_prototype::{SensorPrototype, SensorPrototypeView};
 use crate::db::target::{TargetId, Target};
 use crate::extractor::User;
 use crate::prelude::*;
-use axum::extract::{Extension, Json};
+use axum::extract::{Extension, Json, Query};
 use controllers::Result;
 use serde::Deserialize;
 
@@ -15,7 +15,7 @@ pub struct ListForTargetRequest {
 pub async fn list_for_target(
     Extension(pool): Extension<&'static Pool>,
     User(_user): User,
-    Json(request): Json<ListForTargetRequest>
+    Query(request): Query<ListForTargetRequest>
 ) -> Result<Json<Vec<SensorPrototypeView>>> {
     let mut txn = pool.begin().await?;
 

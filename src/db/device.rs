@@ -226,7 +226,7 @@ impl Device {
         new_device: NewDevice,
     ) -> Result<AuthToken> {
         let hash: Option<(UserId, String, String, DateTime, DateTime, String)> = sqlx::query_as(
-            "SELECT password_hash
+            "SELECT id, email, username, created_at, updated_at, password_hash
             FROM users
             WHERE email = $1",
         )

@@ -1,7 +1,7 @@
 use crate::extractor::{Device, User};
 use crate::prelude::*;
 use crate::{DeviceId, DeviceLog};
-use axum::extract::{Extension, Json, RawBody};
+use axum::extract::{Extension, Json, RawBody, Query};
 use axum::http::StatusCode;
 use controllers::Result;
 use futures::StreamExt;
@@ -38,7 +38,7 @@ pub struct ListRequest {
 pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
-    Json(request): Json<ListRequest>,
+    Query(request): Query<ListRequest>,
 ) -> Result<Json<Vec<DeviceLog>>> {
     let mut txn = pool.begin().await?;
 
