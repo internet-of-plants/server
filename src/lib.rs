@@ -142,7 +142,7 @@ pub async fn router(url: &str) -> Router {
             "/v1/target/sensor/prototypes",
             get(controllers::sensor_prototype::list_for_target),
         )
-        .route("/v1/sensor/set/alias", post(controllers::sensor::set_alias))
+        .route("/v1/sensor/alias", post(controllers::sensor::set_alias))
         .route("/v1/compiler", post(controllers::compiler::new))
         .route(
             "/v1/organizations",
@@ -151,10 +151,10 @@ pub async fn router(url: &str) -> Router {
         .route("/v1/organization", get(controllers::organization::find))
         .route("/v1/collection", get(controllers::collection::find))
         .route("/v1/device", get(controllers::device::find))
-        .route("/v1/device/name", post(controllers::device::set_name))
         .route("/v1/device/events", get(controllers::event::list))
         .route("/v1/device/logs", get(controllers::device_log::list))
         .route("/v1/device/panics", get(controllers::device_panic::list))
+        .route("/v1/device/name", post(controllers::device::set_name))
         .route(
             "/v1/device/panic/solve",
             post(controllers::device_panic::solve),
