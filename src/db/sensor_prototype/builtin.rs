@@ -226,7 +226,11 @@ async fn posix_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     -Wpedantic
     -pedantic-errors
     -fstack-protector
-    -Wstack-protector"
+    -Wstack-protector
+
+    -D IOP_SSL
+    -lcrypto
+    -lssl"
             .to_owned(),
         "native".to_owned(),
         None,
