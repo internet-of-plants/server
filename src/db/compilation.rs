@@ -192,7 +192,7 @@ impl Compilation {
 
             // This is a big hack
             let mut filename = "firmware.bin";
-            if env_name == "posix" {
+            if env_name == "linux" {
                 filename = "program";
             }
 

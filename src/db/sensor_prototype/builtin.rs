@@ -15,8 +15,8 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
     let esp32_target_prototype = esp32_target(&mut *txn).await?;
     esp32dev_esp32_target(&mut *txn, &esp32_target_prototype).await?;
 
-    let posix_target_prototype = posix_target(&mut *txn).await?;
-    native_posix_target(&mut *txn, &posix_target_prototype).await?;
+    let linux_target_prototype = linux_target(&mut *txn).await?;
+    native_linux_target(&mut *txn, &linux_target_prototype).await?;
 
     dht(&mut *txn).await?;
     soil_resistivity(&mut *txn).await?;
@@ -218,10 +218,10 @@ async fn esp32dev_esp32_target(
     .await?)
 }
 
-async fn posix_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+async fn linux_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     let prototype = TargetPrototype::new(
         txn,
-        "posix".to_owned(),
+        "linux".to_owned(),
         "-Wextra
     -Wpedantic
     -pedantic-errors
@@ -229,6 +229,7 @@ async fn posix_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     -Wstack-protector
 
     -D IOP_SSL
+    -lpthread
     -lcrypto
     -lssl"
             .to_owned(),
@@ -242,7 +243,7 @@ async fn posix_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     Ok(prototype)
 }
 
-async fn native_posix_target(
+async fn native_linux_target(
     txn: &mut Transaction<'_>,
     target_prototype: &TargetPrototype,
 ) -> Result<Target> {
@@ -259,7 +260,7 @@ async fn native_posix_target(
         "#ifndef PIN_HPP
 #define PIN_HPP
 
-/// Dummy pin mapping for POSIX mock
+/// Dummy pin mapping for LINUX mock
 enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 
 #endif"
@@ -272,7 +273,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             txn,
             Some(
                 "
-    -D IOP_POSIX_MOCK
+    -D IOP_LINUX_MOCK
     -D IOP_USERNAME=\"admin\"
     -D IOP_PASSWORD=\"admin\""
                     .to_owned(),
