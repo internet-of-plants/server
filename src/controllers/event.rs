@@ -72,6 +72,7 @@ pub async fn new(
     }
 
     // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
+    let obj = event.as_object().ok_or(Error::BadData)?;
     if let Some(compiler) = device.compiler(&mut txn).await? {
         let sensors = compiler.sensors(&mut txn, &device).await?;
         let mut measurements = Vec::new();
@@ -91,7 +92,6 @@ pub async fn new(
         }
         debug!("Expected Measurements: {:?}", measurements);
 
-        let obj = event.as_object().ok_or(Error::BadData)?;
         if obj.len() != measurements.len() {
             error!("Invalid number of json arguments");
             return Err(Error::BadData);

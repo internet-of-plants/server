@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS target_prototypes (
 
 CREATE TABLE IF NOT EXISTS targets (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
+  name                TEXT,
   board               TEXT,
   pin_hpp             TEXT                  NOT NULL,
   build_flags         TEXT,

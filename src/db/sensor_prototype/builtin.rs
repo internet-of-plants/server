@@ -17,6 +17,7 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
 
     let linux_target_prototype = linux_target(&mut *txn).await?;
     native_linux_target(&mut *txn, &linux_target_prototype).await?;
+    native_linux_local_debugging_target(&mut *txn, &linux_target_prototype).await?;
 
     dht(&mut *txn).await?;
     soil_resistivity(&mut *txn).await?;
@@ -274,6 +275,49 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             Some(
                 "
     -D IOP_LINUX_MOCK
+    -D IOP_DEBUG
+    -D IOP_USERNAME=\"admin\"
+    -D IOP_PASSWORD=\"admin\""
+                    .to_owned(),
+            ),
+        )
+        .await?;
+    Ok(target)
+}
+
+async fn native_linux_local_debugging_target(
+    txn: &mut Transaction<'_>,
+    target_prototype: &TargetPrototype,
+) -> Result<Target> {
+    let mut target = Target::new(
+        txn,
+        None,
+        vec![
+            "Pin::D1".to_owned(),
+            "Pin::D2".to_owned(),
+            "Pin::D5".to_owned(),
+            "Pin::D6".to_owned(),
+            "Pin::D7".to_owned(),
+        ],
+        "#ifndef PIN_HPP
+#define PIN_HPP
+
+/// Dummy pin mapping for LINUX mock
+enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
+
+#endif"
+            .to_owned(),
+        target_prototype,
+    )
+    .await?;
+    target.set_name(txn, Some("mock".to_owned())).await?;
+    target
+        .set_build_flags(
+            txn,
+            Some(
+                "
+    -D IOP_LINUX_MOCK
+    -D IOP_DEBUG
     -D IOP_USERNAME=\"admin\"
     -D IOP_PASSWORD=\"admin\""
                     .to_owned(),

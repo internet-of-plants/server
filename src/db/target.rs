@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct TargetView {
     pub id: TargetId,
     pub arch: String,
+    pub name: Option<String>,
     pub build_flags: String,
     pub platform: String,
     pub framework: Option<String>,
@@ -30,6 +31,7 @@ impl TargetView {
             extra_platformio_params: prototype.extra_platformio_params,
             ldf_mode: prototype.ldf_mode,
             board: target.board().map(ToOwned::to_owned),
+            name: target.name,
         })
     }
 }
@@ -47,6 +49,7 @@ impl TargetId {
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Target {
     id: TargetId,
+    pub name: Option<String>,
     board: Option<String>,
     target_prototype_id: TargetPrototypeId,
     pin_hpp: String,
@@ -78,6 +81,7 @@ impl Target {
         }
         Ok(Self {
             id,
+            name: None,
             board,
             pin_hpp,
             target_prototype_id: target_prototype.id(),
@@ -87,7 +91,7 @@ impl Target {
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
-            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
+            "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags
             FROM targets",
         )
         .fetch_all(&mut *txn)
@@ -96,7 +100,7 @@ impl Target {
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetId) -> Result<Self> {
         let target = sqlx::query_as(
-            "SELECT id, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
+            "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
         )
         .bind(&id)
         .fetch_one(&mut *txn)
@@ -112,6 +116,10 @@ impl Target {
         &self.pin_hpp
     }
 
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
     pub fn board(&self) -> Option<&str> {
         self.board.as_deref()
     }
@@ -125,6 +133,20 @@ impl Target {
             .map(|(name,)| name)
             .collect();
         Ok(pins)
+    }
+
+    pub async fn set_name(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        name: Option<String>,
+    ) -> Result<()> {
+        sqlx::query("UPDATE targets SET name = $1 WHERE id = $2")
+            .bind(&name)
+            .bind(&self.id)
+            .execute(&mut *txn)
+            .await?;
+        self.name = name;
+        Ok(())
     }
 
     pub async fn set_build_flags(
