@@ -275,9 +275,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             Some(
                 "
     -D IOP_LINUX_MOCK
-    -D IOP_DEBUG
-    -D IOP_USERNAME=\"admin\"
-    -D IOP_PASSWORD=\"admin\""
+    -D IOP_DEBUG"
                     .to_owned(),
             ),
         )
@@ -317,9 +315,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             Some(
                 "
     -D IOP_LINUX_MOCK
-    -D IOP_DEBUG
-    -D IOP_USERNAME=\"admin\"
-    -D IOP_PASSWORD=\"admin\""
+    -D IOP_DEBUG"
                     .to_owned(),
             ),
         )
