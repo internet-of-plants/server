@@ -20,7 +20,7 @@ if [ $? -eq 0 ]; then
   echo "Build failed, bailing out"
   exit
 fi
-cp $SCRIPTPATH/target/debug/server $FOLDER/
+cp $SCRIPTPATH/target/debug/server-bin $FOLDER/server
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
 
 ln -s $1 $FOLDER/run.log

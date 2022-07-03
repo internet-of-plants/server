@@ -28,7 +28,12 @@ async fn main() {
     let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
     let router = router(url).await;
 
+    #[cfg(debug_assertions)]
     let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
+
+    #[cfg(not(debug_assertions))]
+    let addr = SocketAddr::from(([0, 0, 0, 0], 443));
+
     tracing::info!("Listening on {}", addr);
 
     axum::Server::bind(&addr)

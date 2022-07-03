@@ -27,14 +27,13 @@ echo "Setup firewall"
 ufw disable
 ufw default deny
 ufw allow 22/tcp
-ufw allow 80/tcp
 ufw allow 443/tcp
-ufw allow 4001/tcp
 ufw --force enable
 
 echo "Install ubuntu dependencies needed"
 apt-get -q -y update < /dev/null
-apt-get -q -y install postgresql postgresql-contrib snap firejail < /dev/null;
+apt-get -q -y install postgresql postgresql-contrib snap firejail libssl-dev < /dev/null;
+python3 -c "$(curl -fsSL https://raw.githubusercontent.com/platformio/platformio/master/scripts/get-platformio.py)"
 
 if [ ! -z "$DOMAIN" ]; then
   echo "Setup certbot"
