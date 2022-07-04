@@ -143,6 +143,7 @@ pub async fn router(url: &str) -> Router {
             get(controllers::sensor_prototype::list_for_target),
         )
         .route("/v1/sensor/alias", post(controllers::sensor::set_alias))
+        .route("/v1/sensor/color", post(controllers::sensor::set_color))
         .route("/v1/compiler", post(controllers::compiler::new))
         .route(
             "/v1/organizations",

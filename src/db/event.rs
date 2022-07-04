@@ -70,7 +70,7 @@ impl Event {
                         .map(|m| {
                             let reg = Handlebars::new();
                             let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                            Ok(MeasurementView::new(m.clone(), name))
+                            Ok(MeasurementView::new(m.clone(), name, sensor.color.clone()))
                         })
                         .collect::<Result<Vec<_>, Error>>()?,
                 );

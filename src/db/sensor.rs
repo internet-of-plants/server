@@ -9,11 +9,14 @@ use crate::db::sensor::config::Config;
 use crate::db::sensor_prototype::*;
 use crate::prelude::*;
 use derive_more::FromStr;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
+use self::config::ConfigView;
 use self::config::NewConfig;
 use self::config_request::ConfigRequest;
-use self::{config::ConfigView, measurement::Measurement};
+use self::measurement::MeasurementView;
 
 use super::compiler::Compiler;
 use super::device::Device;
@@ -26,16 +29,17 @@ pub struct NewSensor {
     pub configs: Vec<NewConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub struct SensorView {
     pub id: SensorId,
     pub name: String,
     pub alias: String,
+    pub color: String,
     pub dependencies: Vec<String>,
     pub includes: Vec<String>,
     pub definitions: Vec<String>,
     pub setups: Vec<String>,
-    pub measurements: Vec<Measurement>,
+    pub measurements: Vec<MeasurementView>,
     pub configurations: Vec<ConfigView>,
     pub prototype: SensorPrototypeView,
 }
@@ -46,12 +50,13 @@ impl SensorView {
         compiler: &Compiler,
         device: &Device,
     ) -> Result<Vec<Self>> {
-        let sensors_metadata: Vec<(SensorId, SensorPrototypeId, String)> = sqlx::query_as(
-            "SELECT sensors.id, sensors.prototype_id, bt.alias
+        let sensors_metadata: Vec<(SensorId, SensorPrototypeId, String, String)> = sqlx::query_as(
+            "SELECT DISTINCT(sensors.id), sensors.prototype_id, bt.alias, bt.color
              FROM sensors
              INNER JOIN sensor_prototypes ON sensor_prototypes.id = sensors.prototype_id
              INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
-             WHERE bt.compiler_id = $1 AND bt.device_id = $2",
+             WHERE bt.compiler_id = $1 AND bt.device_id = $2
+             ORDER BY sensors.id ASC",
         )
         .bind(compiler.id())
         .bind(device.id())
@@ -61,7 +66,7 @@ impl SensorView {
         let target = compiler.target(txn).await?;
 
         let mut sensors = Vec::with_capacity(sensors_metadata.len());
-        for (id, prototype_id, alias) in sensors_metadata {
+        for (index, (id, prototype_id, alias, color)) in sensors_metadata.into_iter().enumerate() {
             let sensor = Sensor { id, prototype_id };
             let prototype = sensor.prototype(txn).await?;
             let sensor_configs = sensor.configs(txn).await?;
@@ -75,11 +80,21 @@ impl SensorView {
                 id: sensor.id(),
                 name: prototype.name().to_owned(),
                 alias,
+                color: color.clone(),
                 dependencies: prototype.dependencies(txn).await?,
                 includes: prototype.includes(txn).await?,
                 definitions: prototype.definitions(txn).await?,
                 setups: prototype.setups(txn).await?,
-                measurements: prototype.measurements(txn).await?,
+                measurements: prototype
+                    .measurements(txn)
+                    .await?
+                    .iter()
+                    .map(|m| {
+                        let reg = Handlebars::new();
+                        let name = reg.render_template(&m.name, &json!({ "index": index }))?;
+                        Ok(MeasurementView::new(m.clone(), name, color.clone()))
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?,
                 configurations,
                 prototype: SensorPrototypeView::new(txn, prototype, &[&target]).await?,
             });

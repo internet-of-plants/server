@@ -32,6 +32,6 @@ async fn collection() {
     assert_eq!(org.collections.len(), 1);
     let collection = org.collections.into_iter().next().unwrap();
 
-    let col = find_collection(app.clone(), &token, org.id, *collection.id()).await;
-    assert_eq!(col.id, *collection.id());
+    let col = find_collection(app.clone(), &token, org.id, collection.id()).await;
+    assert_eq!(col.id, collection.id());
 }

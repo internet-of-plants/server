@@ -9,7 +9,7 @@ use super::{
     device::Device,
 };
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilationView {
     pub id: CompilationId,

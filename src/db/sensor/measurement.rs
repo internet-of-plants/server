@@ -18,19 +18,21 @@ pub enum MeasurementType {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MeasurementView {
-    name: String,
-    human_name: String,
-    ty: MeasurementType,
-    kind: MeasurementKind,
+    pub name: String,
+    pub human_name: String,
+    pub ty: MeasurementType,
+    pub kind: MeasurementKind,
+    pub color: String
 }
 
 impl MeasurementView {
-    pub fn new(m: Measurement, name: String) -> Self {
+    pub fn new(m: Measurement, name: String, color: String) -> Self {
         Self {
             human_name: m.human_name,
             name,
             ty: m.ty,
             kind: m.kind,
+            color
         }
     }
 }

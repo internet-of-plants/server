@@ -349,4 +349,21 @@ impl Device {
             .await?;
         Ok(())
     }
+
+    pub async fn set_color(
+        &self,
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+        sensor: &Sensor,
+        color: String,
+    ) -> Result<()> {
+        sqlx::query("UPDATE sensor_belongs_to_compiler SET color = $1 WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
+            .bind(color)
+            .bind(sensor.id())
+            .bind(compiler.id())
+            .bind(self.id())
+            .execute(txn)
+            .await?;
+        Ok(())
+    }
 }

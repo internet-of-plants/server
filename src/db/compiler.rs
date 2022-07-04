@@ -3,6 +3,7 @@ use crate::db::target::*;
 use crate::prelude::*;
 use derive_more::FromStr;
 use handlebars::Handlebars;
+use random_color::RandomColor;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -12,7 +13,7 @@ use super::firmware::FirmwareView;
 use super::sensor::config_request::ConfigRequest;
 use super::sensor::SensorView;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilerView {
     pub id: CompilerId,
@@ -103,12 +104,14 @@ impl Compiler {
             id
         };
         for (sensor, alias) in sensors_and_alias {
+            let color = RandomColor::new().to_hsl_string();
             sqlx::query(
-                    "INSERT INTO sensor_belongs_to_compiler (sensor_id, compiler_id, alias, device_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+                    "INSERT INTO sensor_belongs_to_compiler (sensor_id, compiler_id, alias, color, device_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
                 )
                     .bind(sensor.id())
                     .bind(&id)
                     .bind(&alias)
+                    .bind(&color)
                     .bind(device.id())
                     .execute(&mut *txn)
                     .await?;

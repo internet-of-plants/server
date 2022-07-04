@@ -31,3 +31,29 @@ pub async fn set_alias(
     txn.commit().await?;
     Ok(Json(()))
 }
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SetColorRequest {
+    device_id: DeviceId,
+    sensor_id: SensorId,
+    color: String,
+}
+
+pub async fn set_color(
+    Extension(pool): Extension<&'static Pool>,
+    User(user): User,
+    Json(request): Json<SetColorRequest>,
+) -> Result<Json<()>> {
+    let mut txn = pool.begin().await?;
+    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    if let Some(compiler) = device.compiler(&mut txn).await? {
+        let sensor = Sensor::find_by_id(&mut txn, request.sensor_id).await?;
+        device
+            .set_color(&mut txn, &compiler, &sensor, request.color)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(Json(()))
+}

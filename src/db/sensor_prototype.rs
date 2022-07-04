@@ -11,6 +11,7 @@ use super::sensor::{Definition, Dependency, Include, Setup};
 use super::target::Target;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct SensorPrototypeView {
     pub id: SensorPrototypeId,
     pub name: String,
