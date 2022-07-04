@@ -36,6 +36,10 @@ scp $SCRIPTPATH/run-server.sh root@$DOMAIN:/opt/iop/
 ssh root@$DOMAIN "chmod 120 /opt/iop/run-server.sh"
 ssh root@$DOMAIN "chown iop.root /opt/iop/run-server.sh"
 
+scp $SCRIPTPATH/run-server-with-logging.sh root@$DOMAIN:/opt/iop/
+ssh root@$DOMAIN "chmod 120 /opt/iop/run-server-with-logging.sh"
+ssh root@$DOMAIN "chown iop.root /opt/iop/run-server-with-logging.sh"
+
 scp $SCRIPTPATH/../target/release/server-bin root@$DOMAIN:/opt/iop/server
 ssh root@$DOMAIN "chmod 120 /opt/iop/server"
 ssh root@$DOMAIN "chown iop.root /opt/iop/server"

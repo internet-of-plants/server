@@ -102,10 +102,7 @@ impl User {
         user.ok_or(Error::Forbidden)
     }
 
-    pub async fn login(
-        txn: &mut Transaction<'_>,
-        client: Login,
-    ) -> Result<AuthToken> {
+    pub async fn login(txn: &mut Transaction<'_>, client: Login) -> Result<AuthToken> {
         let hash: Option<(UserId, String, String, DateTime, DateTime, String)> = sqlx::query_as(
             "SELECT id, email, username, created_at, updated_at, password_hash
             FROM users
@@ -117,7 +114,7 @@ impl User {
         let is_auth = match &hash {
             Some((_, _, _, _, _, hash)) => utils::verify_password(&client.password, hash)?,
             // Avoids timing attacks to detect usernames
-            None => utils::hash_password(&client.password)? == "abc"
+            None => utils::hash_password(&client.password)? == "abc",
         };
 
         match (hash, is_auth) {
@@ -131,16 +128,14 @@ impl User {
                 };
 
                 let token = AuthToken::random();
-                sqlx::query(
-                    "INSERT INTO authentications (user_id, token) VALUES ($1, $2)",
-                )
-                .bind(user.id())
-                .bind(&token)
-                .execute(&mut *txn)
-                .await?;
+                sqlx::query("INSERT INTO authentications (user_id, token) VALUES ($1, $2)")
+                    .bind(user.id())
+                    .bind(&token)
+                    .execute(&mut *txn)
+                    .await?;
                 Ok(token)
             }
-            _ => Err(Error::Forbidden)
+            _ => Err(Error::Forbidden),
         }
     }
 

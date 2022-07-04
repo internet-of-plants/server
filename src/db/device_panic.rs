@@ -69,7 +69,11 @@ impl DevicePanic {
         Ok(device_panics.into_iter().rev().collect())
     }
 
-    pub async fn solve(txn: &mut Transaction<'_>, device: &Device, device_panic_id: DevicePanicId) -> Result<()> {
+    pub async fn solve(
+        txn: &mut Transaction<'_>,
+        device: &Device,
+        device_panic_id: DevicePanicId,
+    ) -> Result<()> {
         sqlx::query("UPDATE device_panics SET is_solved = TRUE WHERE id = $1 AND device_id = $2")
             .bind(device_panic_id)
             .bind(device.id())

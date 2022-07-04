@@ -1,7 +1,7 @@
 use server::extractor::{MacAddress, Version};
 use server::test_helpers::{
-    login, signup
-    //find_collection, find_device, find_organization, list_organizations, login, send_event, signup,
+    login,
+    signup, //find_collection, find_device, find_organization, list_organizations, login, send_event, signup,
 };
 use server::{db::user::Login, db::user::NewUser, test_router};
 

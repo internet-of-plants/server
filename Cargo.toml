@@ -18,6 +18,7 @@ path = "src/main.rs"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = "0.1"
 axum = { version = "0.5", features = ["headers", "multipart"] }
+axum-server = { version = "0.4", features = ["tls-rustls"] }
 headers-core = "0.2"
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process"] }

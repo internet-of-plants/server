@@ -1,7 +1,7 @@
 use crate::extractor::{Device, User};
 use crate::prelude::*;
 use crate::{DeviceId, DeviceLog};
-use axum::extract::{Extension, Json, RawBody, Query};
+use axum::extract::{Extension, Json, Query, RawBody};
 use axum::http::StatusCode;
 use controllers::Result;
 use futures::StreamExt;

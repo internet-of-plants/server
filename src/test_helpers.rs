@@ -1,4 +1,4 @@
-use crate::db::compilation::{CompilationView, CompilationId};
+use crate::db::compilation::{CompilationId, CompilationView};
 use crate::db::sensor::SensorView;
 use crate::db::sensor_prototype::SensorPrototypeView;
 use crate::db::target::TargetView;
@@ -10,8 +10,8 @@ use crate::{
     db::sensor::NewSensor,
     db::sensor_prototype::SensorPrototypeId,
     db::target_prototype::{TargetPrototype, TargetPrototypeId},
-    CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView,
-    Organization, OrganizationId, OrganizationView,
+    CollectionId, CollectionView, DeviceId, DeviceLog, DevicePanic, DeviceView, Organization,
+    OrganizationId, OrganizationView,
 };
 use axum::{
     body::Body,

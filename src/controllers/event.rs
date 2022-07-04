@@ -7,7 +7,7 @@ use crate::extractor::{
 };
 use crate::prelude::*;
 use crate::{DeviceId, Event};
-use axum::extract::{Extension, Json, TypedHeader, Query};
+use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
 use controllers::Result;
 use handlebars::Handlebars;

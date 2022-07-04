@@ -96,12 +96,11 @@ impl Firmware {
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: FirmwareId) -> Result<Self> {
-        let firmware = sqlx::query_as(
-            "SELECT id, compilation_id, binary_hash FROM firmwares WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_one(txn)
-        .await?;
+        let firmware =
+            sqlx::query_as("SELECT id, compilation_id, binary_hash FROM firmwares WHERE id = $1")
+                .bind(id)
+                .fetch_one(txn)
+                .await?;
         Ok(firmware)
     }
 

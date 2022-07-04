@@ -27,10 +27,7 @@ pub struct OrganizationView {
 }
 
 impl OrganizationView {
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        organization: &Organization,
-    ) -> Result<Self> {
+    pub async fn new(txn: &mut Transaction<'_>, organization: &Organization) -> Result<Self> {
         // TODO: this is dumb, we are making too many roundtrips to the db, but it's less complex,
         // let's optimize later
         let collections = Collection::from_organization(&mut *txn, organization).await?;
@@ -101,10 +98,10 @@ impl Organization {
              INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = w.id
              WHERE w.id = $1 AND bt.user_id = $2",
         )
-            .bind(organization_id)
-            .bind(user.id())
-            .fetch_one(&mut *txn)
-            .await?;
+        .bind(organization_id)
+        .bind(user.id())
+        .fetch_one(&mut *txn)
+        .await?;
         Ok(organization)
     }
 

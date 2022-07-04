@@ -1,10 +1,13 @@
 use crate::db::firmware::Firmware;
 use crate::prelude::*;
-use serde::{Deserialize, Serialize};
 use derive_more::FromStr;
+use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use super::{compiler::{CompilerView, CompilerId, Compiler}, device::Device};
+use super::{
+    compiler::{Compiler, CompilerId, CompilerView},
+    device::Device,
+};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +20,11 @@ pub struct CompilationView {
 }
 
 impl CompilationView {
-    pub async fn new(txn: &mut Transaction<'_>, compilation: Compilation, device: &Device) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        compilation: Compilation,
+        device: &Device,
+    ) -> Result<Self> {
         let compiler = compilation.compiler(txn).await?;
         Ok(Self {
             id: compilation.id(),
@@ -196,6 +203,7 @@ impl Compilation {
                 filename = "program";
             }
 
+            println!("Read firmware");
             fs::read(
                 dir.path()
                     .join(".pio")

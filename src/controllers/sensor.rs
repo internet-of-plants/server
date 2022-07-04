@@ -23,7 +23,9 @@ pub async fn set_alias(
     let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
     if let Some(compiler) = device.compiler(&mut txn).await? {
         let sensor = Sensor::find_by_id(&mut txn, request.sensor_id).await?;
-        device.set_alias(&mut txn, &compiler, &sensor, request.alias).await?;
+        device
+            .set_alias(&mut txn, &compiler, &sensor, request.alias)
+            .await?;
     }
 
     txn.commit().await?;

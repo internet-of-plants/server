@@ -32,7 +32,20 @@ impl ConfigRequestView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Hash, PartialOrd, Ord)]
+#[derive(
+    Serialize,
+    Deserialize,
+    sqlx::Type,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    FromStr,
+    Hash,
+    PartialOrd,
+    Ord,
+)]
 #[sqlx(transparent)]
 pub struct ConfigRequestId(pub i64);
 
@@ -93,7 +106,7 @@ impl ConfigRequest {
             id,
             type_id: ty.id(),
             name,
-            human_name
+            human_name,
         })
     }
 

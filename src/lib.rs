@@ -98,7 +98,7 @@ pub async fn router(url: &str) -> Router {
     let allowed_origin = vec![
         HeaderValue::from_static("http://localhost:8080"),
         HeaderValue::from_static("https://web.internet-of-plants.org"),
-        HeaderValue::from_static("https://api.internet-of-plants.org"),
+        HeaderValue::from_static("https://api.internet-of-plants.org:4001"),
     ];
 
     let cors = CorsLayer::new()

@@ -6,8 +6,8 @@ use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
 use super::sensor::config_request::ConfigRequestView;
-use super::sensor::{Dependency, Include, Definition, Setup};
 use super::sensor::measurement::Measurement;
+use super::sensor::{Definition, Dependency, Include, Setup};
 use super::target::Target;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -237,7 +237,6 @@ impl SensorPrototype {
         .await?;
         Ok(list)
     }
-
 }
 
 #[cfg(test)]

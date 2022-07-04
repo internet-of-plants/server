@@ -32,8 +32,7 @@ ufw --force enable
 
 echo "Install ubuntu dependencies needed"
 apt-get -q -y update < /dev/null
-apt-get -q -y install postgresql postgresql-contrib snap firejail libssl-dev < /dev/null;
-python3 -c "$(curl -fsSL https://raw.githubusercontent.com/platformio/platformio/master/scripts/get-platformio.py)"
+apt-get -q -y install postgresql postgresql-contrib snap firejail libssl-dev binutils build-essential < /dev/null;
 
 if [ ! -z "$DOMAIN" ]; then
   echo "Setup certbot"
@@ -65,7 +64,7 @@ mkdir -p /var/log/iop
 
 echo "Setting filesystem permissions"
 touch /var/log/iop/certbot.log
-chmod 660 /var/log/iop/certbot.log
+chmod 640 /var/log/iop/certbot.log
 chown iop.root /var/log/iop/certbot.log
 
 touch /var/log/iop/monitor.log
@@ -73,7 +72,7 @@ chmod 640 /var/log/iop/monitor.log
 chown iop.root /var/log/iop/monitor.log
 
 touch /var/log/iop/run-server.cron.log
-chmod 460 /var/log/iop/run-server.cron.log
+chmod 640 /var/log/iop/run-server.cron.log
 chown iop.root /var/log/iop/run-server.cron.log
 
 chmod 770 /var/log/iop

@@ -7,7 +7,7 @@ use server::test_helpers::{
     list_targets, signup,
 };
 use server::{
-    controllers::compiler::NewCompiler, db::sensor::config_type::WidgetKind, 
+    controllers::compiler::NewCompiler, db::sensor::config_type::WidgetKind,
     db::sensor::NewSensor, db::sensor_prototype::SensorPrototype, db::user::NewUser, test_router,
 };
 use sqlx::Connection;

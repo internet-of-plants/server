@@ -46,10 +46,10 @@ impl DeviceLog {
             ORDER BY device_logs.created_at DESC
             LIMIT $2",
         )
-            .bind(device.id())
-            .bind(limit)
-            .fetch_all(txn)
-            .await?;
+        .bind(device.id())
+        .bind(limit)
+        .fetch_all(txn)
+        .await?;
         Ok(device_logs.into_iter().rev().collect())
     }
 }

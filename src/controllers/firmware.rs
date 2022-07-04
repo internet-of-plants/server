@@ -1,9 +1,14 @@
 use crate::{
+    error,
     extractor::{Device, Esp8266Md5},
-    prelude::{Error, Pool, Result}, error,
+    prelude::{Error, Pool, Result},
+};
+use axum::{
+    body::{Bytes, Full},
+    response::IntoResponse,
+    Extension, TypedHeader,
 };
 use std::fmt::Write;
-use axum::{response::IntoResponse, Extension, TypedHeader, body::{Full, Bytes}};
 
 pub async fn update(
     Extension(pool): Extension<&'static Pool>,

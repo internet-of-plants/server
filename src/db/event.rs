@@ -64,7 +64,8 @@ impl Event {
             for (index, sensor) in sensors.into_iter().enumerate() {
                 let prototype = &sensor.prototype;
                 measurements.extend(
-                    prototype.measurements
+                    prototype
+                        .measurements
                         .iter()
                         .map(|m| {
                             let reg = Handlebars::new();
@@ -115,11 +116,7 @@ impl Event {
         Ok(event)
     }
 
-    pub async fn list(
-        txn: &mut Transaction<'_>,
-        device: &Device,
-        limit: u32,
-    ) -> Result<Vec<Self>> {
+    pub async fn list(txn: &mut Transaction<'_>, device: &Device, limit: u32) -> Result<Vec<Self>> {
         let event: Vec<Event> = sqlx::query_as(
             "SELECT id, measurements, metadatas, firmware_hash, created_at
             FROM events

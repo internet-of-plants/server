@@ -1,7 +1,5 @@
-use crate::db::sensor::measurement::{Measurement, MeasurementType, MeasurementKind};
-use crate::db::sensor::{
-    config_request::NewConfigRequest, config_type::WidgetKind,
-};
+use crate::db::sensor::measurement::{Measurement, MeasurementKind, MeasurementType};
+use crate::db::sensor::{config_request::NewConfigRequest, config_type::WidgetKind};
 use crate::db::target::Target;
 use crate::db::target_prototype::TargetPrototype;
 use crate::prelude::*;
@@ -274,8 +272,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             txn,
             Some(
                 "
-    -D IOP_LINUX_MOCK
-    -D IOP_DEBUG"
+    -D IOP_LINUX_MOCK"
                     .to_owned(),
             ),
         )
@@ -314,8 +311,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             txn,
             Some(
                 "
-    -D IOP_LINUX_MOCK
-    -D IOP_DEBUG"
+    -D IOP_LINUX_MOCK"
                     .to_owned(),
             ),
         )

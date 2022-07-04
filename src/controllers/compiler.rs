@@ -2,7 +2,7 @@ use crate::controllers::Result;
 use crate::db::compilation::CompilationView;
 use crate::db::compiler::Compiler;
 use crate::db::sensor::{NewSensor, Sensor};
-use crate::db::target::{TargetId, Target};
+use crate::db::target::{Target, TargetId};
 use crate::extractor::User;
 use crate::{prelude::*, Device, DeviceId};
 use axum::extract::{Extension, Json};
@@ -32,13 +32,8 @@ pub async fn new(
         sensors_and_alias.push((sensor, alias));
     }
     let target = Target::find_by_id(&mut txn, new_compiler.target_id).await?;
-    let (compiler, compilation) = Compiler::new(
-        &mut txn,
-        &target,
-        &sensors_and_alias,
-        &device,
-    )
-    .await?;
+    let (compiler, compilation) =
+        dbg!(Compiler::new(&mut txn, &target, &sensors_and_alias, &device).await?);
 
     device
         .set_compiler_id(&mut txn, Some(compiler.id()))

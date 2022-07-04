@@ -141,7 +141,7 @@ impl Device {
             description: None,
             mac: new_device.mac,
             created_at: now(),
-            updated_at: now()
+            updated_at: now(),
         })
     }
 

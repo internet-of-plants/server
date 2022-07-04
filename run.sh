@@ -16,7 +16,7 @@ echo $FOLDER
 mkdir -p $FOLDER/migrations
 
 cargo build
-if [ $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
   echo "Build failed, bailing out"
   exit
 fi

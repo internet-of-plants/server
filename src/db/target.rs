@@ -230,7 +230,9 @@ lib_deps =
     {lib_deps}
     https://github.com/internet-of-plants/iop\
 {}",
-            extra_platformio_params.as_ref().map_or_else(String::new, |p| format!("{p}\n")),
+            extra_platformio_params
+                .as_ref()
+                .map_or_else(String::new, |p| format!("{p}\n")),
             platform_packages
                 .as_ref()
                 .map(|p| format!("\nplatform_packages = {p}"))
