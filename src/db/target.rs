@@ -5,6 +5,7 @@ use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TargetView {
     pub id: TargetId,
     pub arch: String,

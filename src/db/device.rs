@@ -271,11 +271,14 @@ impl Device {
     }
 
     pub async fn set_name(&mut self, txn: &mut Transaction<'_>, name: String) -> Result<()> {
-        sqlx::query("UPDATE devices SET name = $1 WHERE id = $2")
-            .bind(&name)
-            .bind(self.id)
-            .execute(txn)
-            .await?;
+        let (updated_at,): (DateTime,) = sqlx::query_as(
+            "UPDATE devices SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
+        )
+        .bind(&name)
+        .bind(self.id)
+        .fetch_one(txn)
+        .await?;
+        self.updated_at = updated_at;
         self.name = name;
         Ok(())
     }
@@ -285,12 +288,13 @@ impl Device {
         txn: &mut Transaction<'_>,
         firmware_id: FirmwareId,
     ) -> Result<()> {
-        self.firmware_id = firmware_id;
-        sqlx::query("UPDATE devices SET firmware_id = $1 WHERE id = $2")
+        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE devices SET firmware_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at")
             .bind(firmware_id)
             .bind(self.id)
-            .execute(txn)
+            .fetch_one(txn)
             .await?;
+        self.updated_at = updated_at;
+        self.firmware_id = firmware_id;
         Ok(())
     }
 
@@ -299,12 +303,59 @@ impl Device {
         txn: &mut Transaction<'_>,
         compiler_id: Option<CompilerId>,
     ) -> Result<()> {
-        self.compiler_id = compiler_id;
-        sqlx::query("UPDATE devices SET compiler_id = $1 WHERE id = $2")
+        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE devices SET compiler_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at")
             .bind(compiler_id)
             .bind(self.id)
+            .fetch_one(txn)
+            .await?;
+        self.updated_at = updated_at;
+        self.compiler_id = compiler_id;
+        Ok(())
+    }
+
+    pub async fn set_alias(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+        sensor: &Sensor,
+        alias: String,
+    ) -> Result<()> {
+        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE sensor_belongs_to_compiler SET alias = $1, updated_at = NOW() WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
+            .bind(alias)
+            .bind(sensor.id())
+            .bind(compiler.id())
+            .bind(self.id())
+            .fetch_one(&mut *txn)
+            .await?;
+        sqlx::query("UPDATE devices SET updated_at = $1 WHERE id = $2")
+            .bind(&updated_at)
+            .bind(self.id())
             .execute(txn)
             .await?;
+        self.updated_at = updated_at;
+        Ok(())
+    }
+
+    pub async fn set_color(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+        sensor: &Sensor,
+        color: String,
+    ) -> Result<()> {
+        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE sensor_belongs_to_compiler SET color = $1, updated_at = NOW() WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
+            .bind(color)
+            .bind(sensor.id())
+            .bind(compiler.id())
+            .bind(self.id())
+            .fetch_one(&mut *txn)
+            .await?;
+        sqlx::query("UPDATE devices SET updated_at = $1 WHERE id = $2")
+            .bind(&updated_at)
+            .bind(self.id())
+            .execute(txn)
+            .await?;
+        self.updated_at = updated_at;
         Ok(())
     }
 
@@ -331,39 +382,5 @@ impl Device {
         } else {
             Ok(None)
         }
-    }
-
-    pub async fn set_alias(
-        &self,
-        txn: &mut Transaction<'_>,
-        compiler: &Compiler,
-        sensor: &Sensor,
-        alias: String,
-    ) -> Result<()> {
-        sqlx::query("UPDATE sensor_belongs_to_compiler SET alias = $1 WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
-            .bind(alias)
-            .bind(sensor.id())
-            .bind(compiler.id())
-            .bind(self.id())
-            .execute(txn)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn set_color(
-        &self,
-        txn: &mut Transaction<'_>,
-        compiler: &Compiler,
-        sensor: &Sensor,
-        color: String,
-    ) -> Result<()> {
-        sqlx::query("UPDATE sensor_belongs_to_compiler SET color = $1 WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
-            .bind(color)
-            .bind(sensor.id())
-            .bind(compiler.id())
-            .bind(self.id())
-            .execute(txn)
-            .await?;
-        Ok(())
     }
 }

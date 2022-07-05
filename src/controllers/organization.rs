@@ -18,7 +18,7 @@ pub async fn find(
 ) -> Result<Json<OrganizationView>> {
     let mut txn = pool.begin().await?;
     let organization = Organization::find_by_id(&mut txn, request.organization_id, &user).await?;
-    let organization = OrganizationView::new(&mut txn, &organization).await?;
+    let organization = OrganizationView::new(&mut txn, &organization, &user).await?;
     txn.commit().await?;
     Ok(Json(organization))
 }
@@ -31,7 +31,7 @@ pub async fn from_user(
     let organizations = Organization::from_user(&mut txn, &user).await?;
     let mut views = Vec::with_capacity(organizations.len());
     for organization in organizations {
-        views.push(OrganizationView::new(&mut txn, &organization).await?);
+        views.push(OrganizationView::new(&mut txn, &organization, &user).await?);
     }
     txn.commit().await?;
     Ok(Json(views))

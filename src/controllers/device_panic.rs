@@ -1,4 +1,4 @@
-use crate::db::device_panic::NewDevicePanic;
+use crate::db::device_panic::{NewDevicePanic, DevicePanicView};
 use crate::extractor::{Device, User};
 use crate::prelude::*;
 use crate::{DeviceId, DevicePanic, DevicePanicId};
@@ -21,7 +21,8 @@ pub async fn solve(
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
     let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    DevicePanic::solve(&mut txn, &device, request.panic_id).await?;
+    let device_panic = DevicePanic::find_by_id(&mut txn, &device, request.panic_id).await?;
+    device_panic.solve(&mut txn).await?;
     txn.commit().await?;
     Ok(StatusCode::OK)
 }
@@ -53,9 +54,9 @@ pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
     Query(request): Query<ListRequest>,
-) -> Result<Json<Vec<DevicePanic>>> {
+) -> Result<Json<Vec<DevicePanicView>>> {
     let mut txn = pool.begin().await?;
     let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let panics = DevicePanic::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
+    let panics = DevicePanicView::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
     Ok(Json(panics))
 }

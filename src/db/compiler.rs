@@ -93,6 +93,7 @@ impl Compiler {
 
         let mut should_compile = false;
         let id = if let Some((id,)) = id {
+            sqlx::query("UPDATE compilers SET updated_at WHERE id = $1").bind(id).execute(&mut *txn).await?;
             id
         } else {
             should_compile = true;

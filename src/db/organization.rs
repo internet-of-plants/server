@@ -1,5 +1,5 @@
 use crate::db::timestamp::{now, DateTime};
-use crate::prelude::*;
+use crate::{prelude::*, CollectionView};
 use crate::{Collection, User, Username};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -14,24 +14,29 @@ impl OrganizationId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OrganizationView {
     pub id: OrganizationId,
     pub name: String,
     pub description: Option<String>,
-    pub collections: Vec<Collection>,
+    pub collections: Vec<CollectionView>,
     pub members: Vec<Username>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
 
 impl OrganizationView {
-    pub async fn new(txn: &mut Transaction<'_>, organization: &Organization) -> Result<Self> {
+pub async fn new(txn: &mut Transaction<'_>, organization: &Organization, user: &User) -> Result<Self> {
         // TODO: this is dumb, we are making too many roundtrips to the db, but it's less complex,
         // let's optimize later
-        let collections = Collection::from_organization(&mut *txn, organization).await?;
-        let members = User::from_organization(&mut *txn, organization).await?;
+        let cols = Collection::from_organization(txn, organization).await?;
+        let mut collections = Vec::with_capacity(cols.len());
+        for col in cols {
+            collections.push(CollectionView::new(txn, col, user).await?);
+        }
+
+        let members = User::from_organization(txn, organization).await?;
         Ok(Self {
             id: organization.id,
             name: organization.name.clone(),

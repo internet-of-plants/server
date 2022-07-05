@@ -5,23 +5,23 @@ FOLDER=/tmp/iop-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '').r
 
 for f in /tmp/iop-*.root; do
   umount -l $f/bin
-  umount -l $f/sbin
-  umount -l $f/var/lock
+  #umount -l $f/sbin
+  #umount -l $f/var/lock
   umount -l $f/var/tmp
-  umount -l $f/var/run
+  #umount -l $f/var/run
   umount -l $f/var/log/iop
   umount -l $f/tmp
-  umount -l $f/sys
+  #umount -l $f/sys
   umount -l $f/usr
-  umount -l $f/dev
-  umount -l $f/proc
+  #umount -l $f/dev
+  #umount -l $f/proc
   umount -l $f/lib
-  umount -l $f/lib32
+  #umount -l $f/lib32
   umount -l $f/lib64
-  umount -l $f/libx32
-  umount -l $f/run
-  umount -l $f/etc
-  umount -l $f/boot
+  #umount -l $f/libx32
+  #umount -l $f/run
+  #umount -l $f/etc
+  #umount -l $f/boot
   rm -rf $f
 done
 
@@ -37,23 +37,31 @@ mkdir -p $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDE
 mkdir -p $FOLDER.tmpfs $FOLDER.var.tmpfs
 mount --bind $FOLDER.tmpfs $FOLDER/tmp
 mount --bind $FOLDER.var.tmpfs $FOLDER/var/tmp
-mount --bind /var/lock $FOLDER/var/lock
-mount --bind /var/run $FOLDER/var/run
+#mount --bind /var/lock $FOLDER/var/lock
+#mount --bind /var/run $FOLDER/var/run
 mount --bind /var/log/iop $FOLDER/var/log/iop
 mount --bind /bin $FOLDER/bin
-mount --bind /sbin $FOLDER/sbin
+#mount --bind /sbin $FOLDER/sbin
 mount --bind /lib $FOLDER/lib
-mount --bind /lib32 $FOLDER/lib32
+#mount --bind /lib32 $FOLDER/lib32
 mount --bind /lib64 $FOLDER/lib64
-mount --bind /libx32 $FOLDER/libx32
-mount --bind /sys $FOLDER/sys
+#mount --bind /libx32 $FOLDER/libx32
+#mount --bind /sys $FOLDER/sys
 mount --bind /usr $FOLDER/usr
-mount --bind /dev $FOLDER/dev
-mount --bind /run $FOLDER/run
-mount --bind /proc $FOLDER/proc
-mount --bind /etc $FOLDER/etc
-mount --bind /boot $FOLDER/boot
+#mount --bind /dev $FOLDER/dev
+#mount --bind /run $FOLDER/run
+#mount --bind /proc $FOLDER/proc
+#mount --bind /etc $FOLDER/etc
+#mount --bind /boot $FOLDER/boot
 
+echo "root:x:0:0:root:/root:/bin/bash" > $FOLDER/etc/passwd
+echo "iop:x:1000:1000::/home/iop:/bin/sh" >> $FOLDER/etc/passwd
+echo "root	ALL=(ALL:ALL) ALL" >> $FOLDER/etc/sudoers
+echo "root:*:16176:0:99999:7:::" > $FOLDER/etc/shadow
+echo "iop:!:19176:0:99999:7:::" >> $FOLDER/etc/shadow
+cp -r /etc/ssl $FOLDER/etc/ssl
+cp -r /etc/pam.d $FOLDER/etc/pam.d
+cp /var/run/utmp $FOLDER/var/run/utmp
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
 cp $SCRIPTPATH/run-server-with-logging.sh $FOLDER/
 cp /root/cert.pem $FOLDER/

@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 #[sqlx(transparent)]
 pub struct DeviceLogId(i64);
 
+pub type DeviceLogView = DeviceLog;
+
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeviceLog {
     id: DeviceLogId,
     log: String,

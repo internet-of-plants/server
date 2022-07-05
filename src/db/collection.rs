@@ -1,5 +1,5 @@
 use crate::db::timestamp::{now, DateTime};
-use crate::{prelude::*, DeviceView, Organization, User};
+use crate::{prelude::*, DeviceView, Organization, User, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -25,10 +25,12 @@ pub struct CollectionView {
 }
 
 impl CollectionView {
-    pub fn new_from_collection_and_devices(
+    pub async fn new(
+        txn: &mut Transaction<'_>,
         collection: Collection,
-        devices: Vec<DeviceView>,
+        user: &User,
     ) -> Result<Self> {
+        let devices = collection.devices(txn, user).await?;
         Ok(Self {
             id: collection.id,
             name: collection.name,
@@ -118,7 +120,7 @@ impl Collection {
     }
 
     pub async fn associate_to_organization(
-        &self,
+        &mut self,
         txn: &mut Transaction<'_>,
         organization: &Organization,
     ) -> Result<()> {
@@ -129,6 +131,23 @@ impl Collection {
         .bind(organization.id())
         .execute(&mut *txn)
         .await?;
+
+        let (updated_at,): (DateTime,) = sqlx::query_as(
+            "UPDATE users SET updated_at = NOW() WHERE id = $1 RETURNING updated_at",
+        )
+        .bind(self.id())
+        .fetch_one(txn)
+        .await?;
+        self.updated_at = updated_at;
         Ok(())
+    }
+
+    pub async fn devices(&self, txn: &mut Transaction<'_>, user: &User) -> Result<Vec<DeviceView>> {
+        let devices = Device::from_collection(txn, self.id, user).await?;
+        let mut device_views = Vec::with_capacity(devices.len());
+        for device in devices {
+            device_views.push(DeviceView::new(txn, device).await?);
+        }
+        Ok(device_views)
     }
 }

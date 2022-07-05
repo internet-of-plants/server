@@ -1,3 +1,4 @@
+use crate::db::device_log::DeviceLogView;
 use crate::extractor::{Device, User};
 use crate::prelude::*;
 use crate::{DeviceId, DeviceLog};
@@ -39,11 +40,11 @@ pub async fn list(
     Extension(pool): Extension<&'static Pool>,
     User(user): User,
     Query(request): Query<ListRequest>,
-) -> Result<Json<Vec<DeviceLog>>> {
+) -> Result<Json<Vec<DeviceLogView>>> {
     let mut txn = pool.begin().await?;
 
     let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let logs = DeviceLog::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
+    let logs = DeviceLogView::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
 
     txn.commit().await?;
     Ok(Json(logs))

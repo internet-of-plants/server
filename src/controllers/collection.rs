@@ -1,6 +1,6 @@
 use crate::extractor::User;
-use crate::{prelude::*, DeviceView};
-use crate::{Collection, CollectionId, CollectionView, Device};
+use crate::prelude::*;
+use crate::{Collection, CollectionId, CollectionView};
 use axum::extract::{Extension, Json, Query};
 use controllers::Result;
 use serde::Deserialize;
@@ -18,12 +18,7 @@ pub async fn find(
 ) -> Result<Json<CollectionView>> {
     let mut txn = pool.begin().await?;
     let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
-    let devices = Device::from_collection(&mut txn, request.collection_id, &user).await?;
-    let mut device_views = Vec::with_capacity(devices.len());
-    for device in devices {
-        device_views.push(DeviceView::new(&mut txn, device).await?);
-    }
-    let collection = CollectionView::new_from_collection_and_devices(collection, device_views)?;
+    let collection = CollectionView::new(&mut txn, collection, &user).await?;
     txn.commit().await?;
     Ok(Json(collection))
 }

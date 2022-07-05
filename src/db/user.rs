@@ -159,7 +159,7 @@ impl User {
     }
 
     pub async fn associate_to_organization(
-        &self,
+        &mut self,
         txn: &mut Transaction<'_>,
         organization: &Organization,
     ) -> Result<()> {
@@ -170,6 +170,14 @@ impl User {
         .bind(organization.id())
         .execute(&mut *txn)
         .await?;
+
+        let (updated_at,): (DateTime,) = sqlx::query_as(
+            "UPDATE users SET updated_at = NOW() WHERE id = $1 RETURNING updated_at",
+        )
+        .bind(self.id())
+        .fetch_one(txn)
+        .await?;
+        self.updated_at = updated_at;
         Ok(())
     }
 
