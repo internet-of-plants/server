@@ -68,7 +68,7 @@ impl Collection {
         .fetch_one(&mut *txn)
         .await?;
 
-        let col = Self {
+        let mut col = Self {
             id,
             name,
             description: None,

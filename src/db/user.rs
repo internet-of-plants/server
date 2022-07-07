@@ -76,7 +76,7 @@ impl User {
         .fetch_one(&mut *txn)
         .await?;
 
-        let user = Self {
+        let mut user = Self {
             id,
             email: user.email,
             username: user.username,

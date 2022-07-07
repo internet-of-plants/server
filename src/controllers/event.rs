@@ -1,4 +1,4 @@
-use crate::db::event::EventView;
+use crate::db::event::{EventView, DeviceStat};
 use crate::db::firmware::Firmware;
 use crate::db::sensor::measurement::MeasurementType;
 use crate::extractor::{
@@ -9,23 +9,12 @@ use crate::prelude::*;
 use crate::{DeviceId, Event};
 use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
+use chrono::{Utc, DateTime};
 use controllers::Result;
 use handlebars::Handlebars;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::iter::FromIterator;
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct DeviceStat {
-    pub version: String,
-    pub time_running: u64,
-    pub vcc: u16,
-    pub free_dram: u64,
-    pub free_iram: Option<u64>,
-    pub free_stack: u32,
-    pub biggest_dram_block: u64,
-    pub biggest_iram_block: Option<u64>,
-}
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
@@ -140,7 +129,7 @@ pub async fn new(
         }
     }
 
-    Event::new(&mut txn, &device, event, stat.version.clone()).await?;
+    Event::new(&mut txn, &device, event, stat).await?;
 
     txn.commit().await?;
     Ok(HeaderMap::new())
@@ -150,7 +139,7 @@ pub async fn new(
 #[serde(rename_all = "camelCase")]
 pub struct ListRequest {
     device_id: DeviceId,
-    limit: u32,
+    since: DateTime<Utc>,
 }
 
 pub async fn list(
@@ -161,7 +150,7 @@ pub async fn list(
     let mut txn = pool.begin().await?;
     let mut events = Vec::new();
     let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    for event in Event::list(&mut txn, &device, request.limit).await? {
+    for event in Event::list(&mut txn, &device, request.since).await? {
         events.push(EventView::new(event)?);
     }
     txn.commit().await?;

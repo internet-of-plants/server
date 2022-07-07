@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS events (
   device_id     BIGINT                NOT NULL,
   -- TODO: add type-safety
   measurements  JSONB                 NOT NULL,
+  stat          JSONB                 NOT NULL,
   metadatas     JSONB                 NOT NULL,
   firmware_hash VARCHAR(255)          NOT NULL,
   created_at    TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
