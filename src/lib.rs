@@ -24,6 +24,7 @@ pub mod prelude {
     pub use sqlx::prelude::*;
     pub use tokio::io::AsyncWriteExt;
 
+    pub type DateTime = chrono::DateTime<chrono::Utc>;
     pub type Pool = sqlx::PgPool;
     pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 

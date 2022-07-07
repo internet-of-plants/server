@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
 use crate::Organization;
 use derive_more::FromStr;
@@ -58,16 +57,16 @@ impl AuthToken {
 
 impl User {
     pub async fn new(txn: &mut Transaction<'_>, user: NewUser) -> Result<Self> {
-        // TODO: improve password rules
-        if user.password.is_empty() {
+        // TODO: improve password rules and error reporting
+        if user.password.len() < 10 {
             return Err(Error::BadData);
         }
 
         let organization = Organization::new(&mut *txn, user.username.clone()).await?;
 
         let hash = utils::hash_password(&user.password)?;
-        let (id,) = sqlx::query_as::<_, (UserId,)>(
-            "INSERT INTO users (email, password_hash, username, default_organization_id) VALUES ($1, $2, $3, $4) RETURNING id",
+        let (id, now) = sqlx::query_as::<_, (UserId, DateTime)>(
+            "INSERT INTO users (email, password_hash, username, default_organization_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at",
         )
         .bind(&user.email)
         .bind(&hash)
@@ -80,8 +79,8 @@ impl User {
             id,
             email: user.email,
             username: user.username,
-            created_at: now(), // TODO: fix this
-            updated_at: now(), // TODO: fix this
+            created_at: now,
+            updated_at: now,
         };
         user.associate_to_organization(&mut *txn, &organization)
             .await?;

@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::{prelude::*, DeviceView, Organization, User, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -61,8 +60,8 @@ impl Collection {
             return Err(Error::BadData);
         }
 
-        let (id,) = sqlx::query_as::<_, (CollectionId,)>(
-            "INSERT INTO collections (name) VALUES ($1) RETURNING id",
+        let (id, now) = sqlx::query_as::<_, (CollectionId, DateTime)>(
+            "INSERT INTO collections (name) VALUES ($1) RETURNING id, created_at",
         )
         .bind(&name)
         .fetch_one(&mut *txn)
@@ -72,8 +71,8 @@ impl Collection {
             id,
             name,
             description: None,
-            created_at: now(), // TODO: fix this
-            updated_at: now(), // TODO: fix this
+            created_at: now,
+            updated_at: now,
         };
         col.associate_to_organization(txn, organization).await?;
 

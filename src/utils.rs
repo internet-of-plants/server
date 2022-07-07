@@ -10,16 +10,31 @@ pub async fn run_migrations(url: &str) {
     use std::path::Path;
     use tokio::fs;
 
-    // TODO: have a lock here otherwise multiple server instances will race
     let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
 
-    let vec: Vec<Migration> = match sqlx::query_as("SELECT id FROM migrations")
-        .fetch_all(&mut connection)
+    let migrations_creation_query = "CREATE TABLE IF NOT EXISTS migrations (
+  id SMALLINT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)";
+    info!("Creating migrations table if needed");
+    debug!("{}", migrations_creation_query);
+    sqlx::query(migrations_creation_query)
+        .execute(&mut connection)
         .await
-    {
-        Ok(vec) => vec,
-        Err(_) => Vec::default(),
-    };
+        .expect(&format!(
+            "Failed to execute query: {}",
+            migrations_creation_query
+        ));
+
+    let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
+
+    sqlx::query("SELECT pg_advisory_xact_lock(9128312731)")
+        .execute(&mut transaction)
+        .await.expect("unable to get migration lock");
+
+    let vec: Vec<Migration> = sqlx::query_as("SELECT id FROM migrations")
+        .fetch_all(&mut transaction)
+        .await.expect("unable to find migrations table");
     let latest = vec.iter().max().map_or(0, |m| m.id);
 
     let mut files = Vec::new();
@@ -44,30 +59,8 @@ pub async fn run_migrations(url: &str) {
     }
     let has_files = files.len() > 0;
     files.sort_unstable();
-    connection.close().await.unwrap();
 
-    if files.get(0) == Some(&1) {
-        let query = "CREATE TABLE IF NOT EXISTS migrations (
-  id SMALLINT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)";
-        let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
-        let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
-
-        info!("Creating migrations table");
-        debug!("{}", query);
-        sqlx::query(&query)
-            .execute(&mut transaction)
-            .await
-            .expect(&format!("Failed to execute query: {}", query));
-
-        // The first transaction creates the migrations table, so we need a new transaction to
-        // insert into it
-        transaction.commit().await.unwrap();
-    }
-    let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
-    let mut transaction = sqlx::Connection::begin(&mut connection).await.unwrap();
-
+    // TODO: store migration query to psql row and check if they match at boot
     for file in files {
         info!("Running migration {}.sql", file);
         let path = Path::new("migrations").join(format!("{}.sql", file));
@@ -88,11 +81,10 @@ pub async fn run_migrations(url: &str) {
             .execute(&mut transaction)
             .await
             .unwrap();
-        let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
         info!(
             "Has migrations: {:?}",
             sqlx::query_as::<_, (i16,)>("SELECT id FROM migrations ORDER BY id ASC")
-                .fetch_all(&mut connection)
+                .fetch_all(&mut transaction)
                 .await
         );
     }
@@ -102,6 +94,7 @@ pub async fn run_migrations(url: &str) {
             .await
             .unwrap();
     }
+
     transaction.commit().await.unwrap();
 }
 

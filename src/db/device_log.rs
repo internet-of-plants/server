@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::{prelude::*, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -20,8 +19,8 @@ pub struct DeviceLog {
 impl DeviceLog {
     pub async fn new(txn: &mut Transaction<'_>, device: &Device, log: String) -> Result<Self> {
         info!("Log (device_id: {:?}): {}", device.id(), log);
-        let (id,): (DeviceLogId,) =
-            sqlx::query_as("INSERT INTO device_logs (device_id, log) VALUES ($1, $2) RETURNING id")
+        let (id, now): (DeviceLogId, DateTime) =
+            sqlx::query_as("INSERT INTO device_logs (device_id, log) VALUES ($1, $2) RETURNING id, created_at")
                 .bind(device.id())
                 .bind(&log)
                 .fetch_one(txn)
@@ -29,7 +28,7 @@ impl DeviceLog {
         Ok(Self {
             id,
             log,
-            created_at: now(),
+            created_at: now,
         })
     }
 

@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::prelude::*;
 use derive_more::FromStr;
 use handlebars::Handlebars;
@@ -10,6 +9,7 @@ use super::firmware::Firmware;
 use super::sensor::measurement::MeasurementView;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct DeviceStat {
     pub version: String,
     pub time_running: u64,
@@ -97,9 +97,8 @@ impl Event {
         let metadatas = serde_json::to_value(metadatas)?;
 
         let stat_json = serde_json::to_value(&stat)?;
-        //db::plant::owns(txn, user_id, farm_id).await?;
-        let (id,): (EventId,) =
-            sqlx::query_as("INSERT INTO events (device_id, measurements, metadatas, firmware_hash, stat) VALUES ($1, $2, $3, $4, $5) RETURNING id")
+        let (id, now): (EventId, DateTime) =
+            sqlx::query_as("INSERT INTO events (device_id, measurements, metadatas, firmware_hash, stat) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at")
                 .bind(device.id())
                 .bind(&measurements)
                 .bind(&metadatas)
@@ -113,7 +112,7 @@ impl Event {
             metadatas,
             stat: stat_json,
             firmware_hash: stat.version,
-            created_at: now(), // TODO: fix this
+            created_at: now,
         })
     }
 

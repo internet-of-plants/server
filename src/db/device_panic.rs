@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::{prelude::*, Device};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -35,7 +34,7 @@ impl DevicePanic {
         new_device_panic: NewDevicePanic,
     ) -> Result<Self> {
         info!("Log (device_id: {:?}): {:?}", device.id(), new_device_panic);
-        let (id,): (DevicePanicId,) = sqlx::query_as("INSERT INTO device_panics (device_id, \"file\", line, func, msg) VALUES ($1, $2, $3, $4, $5) RETURNING id")
+        let (id, now): (DevicePanicId, DateTime) = sqlx::query_as("INSERT INTO device_panics (device_id, \"file\", line, func, msg) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at")
             .bind(device.id())
             .bind(&new_device_panic.file)
             .bind(new_device_panic.line)
@@ -49,7 +48,7 @@ impl DevicePanic {
             line: new_device_panic.line,
             func: new_device_panic.func,
             msg: new_device_panic.msg,
-            created_at: now(),
+            created_at: now,
         })
     }
 

@@ -4,7 +4,6 @@ pub mod device_log;
 pub mod device_panic;
 pub mod event;
 pub mod organization;
-pub mod timestamp;
 pub mod user;
 
 pub mod compilation;

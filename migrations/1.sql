@@ -114,7 +114,6 @@ CREATE TABLE IF NOT EXISTS devices (
 CREATE TABLE IF NOT EXISTS events (
   id            BIGSERIAL PRIMARY KEY NOT NULL,
   device_id     BIGINT                NOT NULL,
-  -- TODO: add type-safety
   measurements  JSONB                 NOT NULL,
   stat          JSONB                 NOT NULL,
   metadatas     JSONB                 NOT NULL,
@@ -173,7 +172,6 @@ CREATE TYPE WidgetKindRaw AS ENUM (
   'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection'
 );
 
--- TODO: we need some kind of tenancy here
 CREATE TABLE IF NOT EXISTS config_types (
   id         BIGSERIAL PRIMARY KEY NOT NULL,
   name       TEXT NOT NULL,
@@ -268,9 +266,10 @@ CREATE TABLE IF NOT EXISTS sensor_belongs_to_compiler (
   id          BIGSERIAL PRIMARY KEY NOT NULL,
   compiler_id BIGINT                NOT NULL,
   sensor_id   BIGINT                NOT NULL,
-  device_id     BIGINT                NOT NULL,
+  device_id   BIGINT                NOT NULL,
   alias       TEXT                  NOT NULL,
   created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE (compiler_id, sensor_id),
   FOREIGN KEY (device_id) REFERENCES devices (id),
   FOREIGN KEY (compiler_id) REFERENCES compilers (id),

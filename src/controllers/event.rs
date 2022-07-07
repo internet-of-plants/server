@@ -50,7 +50,6 @@ pub async fn new(
         device.set_firmware_id(&mut txn, firmware.id()).await?;
     }
 
-    // TODO: check ownership
     if let Some(firmware) = device.update(&mut txn).await? {
         if firmware.hash() != &stat.version {
             return Ok(HeaderMap::from_iter([(

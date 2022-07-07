@@ -1,4 +1,3 @@
-use crate::db::timestamp::{now, DateTime};
 use crate::{prelude::*, CollectionView};
 use crate::{Collection, User, Username};
 use derive_more::FromStr;
@@ -64,8 +63,8 @@ impl Organization {
             return Err(Error::BadData);
         }
 
-        let (id,) = sqlx::query_as::<_, (OrganizationId,)>(
-            "INSERT INTO organizations (name) VALUES ($1) RETURNING id",
+        let (id, now) = sqlx::query_as::<_, (OrganizationId, DateTime)>(
+            "INSERT INTO organizations (name) VALUES ($1) RETURNING id, created_at",
         )
         .bind(&name)
         .fetch_one(txn)
@@ -74,8 +73,8 @@ impl Organization {
             id,
             name,
             description: None,
-            created_at: now(), // TODO: fix this
-            updated_at: now(), // TODO: fix this
+            created_at: now,
+            updated_at: now,
         })
     }
 

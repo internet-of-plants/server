@@ -1,4 +1,3 @@
-use crate::db::timestamp::DateTime;
 use crate::prelude::*;
 use crate::utils::random_string;
 use crate::{Collection, CollectionId, Event, Organization, User};
@@ -9,7 +8,6 @@ use super::compiler::{Compiler, CompilerId, CompilerView};
 use super::event::EventView;
 use super::firmware::{Firmware, FirmwareId, FirmwareView};
 use super::sensor::Sensor;
-use super::timestamp::now;
 use super::user::{AuthToken, Login, UserId};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
@@ -123,8 +121,8 @@ impl Device {
         let collection = Collection::new(txn, new_device.mac.clone(), &organization).await?;
 
         let name = format!("device-{}", random_string(5));
-        let (id,) =
-            sqlx::query_as::<_, (DeviceId,)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id, compiler_id) VALUES ($1, '1', $2, $3, $4, $5) RETURNING id")
+        let (id, now) =
+            sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id, compiler_id) VALUES ($1, '1', $2, $3, $4, $5) RETURNING id, created_at")
                 .bind(&new_device.mac)
                 .bind(collection.id())
                 .bind(&name)
@@ -140,8 +138,8 @@ impl Device {
             name,
             description: None,
             mac: new_device.mac,
-            created_at: now(),
-            updated_at: now(),
+            created_at: now,
+            updated_at: now,
         })
     }
 
@@ -343,7 +341,7 @@ impl Device {
         sensor: &Sensor,
         color: String,
     ) -> Result<()> {
-        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE sensor_belongs_to_compiler SET color = $1, updated_at = NOW() WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4")
+        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE sensor_belongs_to_compiler SET color = $1, updated_at = NOW() WHERE sensor_id = $2 AND compiler_id = $3 AND device_id = $4 RETURNING updated_at")
             .bind(color)
             .bind(sensor.id())
             .bind(compiler.id())
