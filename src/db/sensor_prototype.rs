@@ -1,14 +1,11 @@
 pub mod builtin;
 
-use crate::db::sensor::config_request::{ConfigRequest, NewConfigRequest};
-use crate::prelude::*;
+use crate::{
+    Definition, Dependency, Include, NewSensorConfigRequest, Result, SensorConfigRequest,
+    SensorConfigRequestView, SensorMeasurement, Setup, Target, Transaction,
+};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
-
-use super::sensor::config_request::ConfigRequestView;
-use super::sensor::measurement::Measurement;
-use super::sensor::{Definition, Dependency, Include, Setup};
-use super::target::Target;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -19,8 +16,8 @@ pub struct SensorPrototypeView {
     pub includes: Vec<String>,
     pub definitions: Vec<String>,
     pub setups: Vec<String>,
-    pub measurements: Vec<Measurement>,
-    pub configuration_requests: Vec<ConfigRequestView>,
+    pub measurements: Vec<SensorMeasurement>,
+    pub configuration_requests: Vec<SensorConfigRequestView>,
 }
 
 impl SensorPrototypeView {
@@ -33,7 +30,7 @@ impl SensorPrototypeView {
         let mut configuration_requests_view = Vec::with_capacity(configuration_requests.len());
         for configuration_request in configuration_requests {
             configuration_requests_view
-                .push(ConfigRequestView::new(txn, configuration_request, targets).await?);
+                .push(SensorConfigRequestView::new(txn, configuration_request, targets).await?);
         }
         Ok(Self {
             id: prototype.id(),
@@ -65,6 +62,7 @@ pub struct SensorPrototype {
 }
 
 impl SensorPrototype {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: String,
@@ -72,8 +70,8 @@ impl SensorPrototype {
         includes: Vec<Include>,
         definitions: Vec<Definition>,
         setups: Vec<Setup>,
-        measurements: Vec<Measurement>,
-        new_config_requests: Vec<NewConfigRequest>,
+        measurements: Vec<SensorMeasurement>,
+        new_config_requests: Vec<NewSensorConfigRequest>,
     ) -> Result<Self> {
         let (sensor_prototype_id,) = sqlx::query_as::<_, (SensorPrototypeId,)>(
             "INSERT INTO sensor_prototypes (name) VALUES ($1) RETURNING id",
@@ -81,6 +79,11 @@ impl SensorPrototype {
         .bind(&name)
         .fetch_one(&mut *txn)
         .await?;
+        let sensor_prototype = Self {
+            id: sensor_prototype_id,
+            name,
+        };
+
         for dep in &dependencies {
             sqlx::query(
                 "INSERT INTO sensor_prototype_dependencies (dependency, sensor_prototype_id) VALUES ($1, $2)",
@@ -131,20 +134,17 @@ impl SensorPrototype {
             .await?;
         }
         for config_request in new_config_requests {
-            ConfigRequest::new(
+            SensorConfigRequest::new(
                 &mut *txn,
                 config_request.name,
                 config_request.human_name,
                 config_request.type_name,
                 config_request.widget,
-                sensor_prototype_id,
+                &sensor_prototype,
             )
             .await?;
         }
-        Ok(Self {
-            id: sensor_prototype_id,
-            name,
-        })
+        Ok(sensor_prototype)
     }
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
@@ -215,7 +215,7 @@ impl SensorPrototype {
     }
 
     /// A sensor should execute N measurements and store them in the JSON
-    pub async fn measurements(&self, txn: &mut Transaction<'_>) -> Result<Vec<Measurement>> {
+    pub async fn measurements(&self, txn: &mut Transaction<'_>) -> Result<Vec<SensorMeasurement>> {
         let list = sqlx::query_as(
             "SELECT human_name, name, value, ty, kind FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1 ORDER BY id ASC",
         )
@@ -229,9 +229,9 @@ impl SensorPrototype {
     pub async fn configuration_requests(
         &self,
         txn: &mut Transaction<'_>,
-    ) -> Result<Vec<ConfigRequest>> {
+    ) -> Result<Vec<SensorConfigRequest>> {
         let list = sqlx::query_as(
-            "SELECT id, name, human_name, type_id FROM config_requests WHERE sensor_prototype_id = $1",
+            "SELECT id, name, human_name, type_id FROM sensor_config_requests WHERE sensor_prototype_id = $1",
         )
         .bind(&self.id)
         .fetch_all(&mut *txn)
@@ -247,28 +247,28 @@ mod tests {
     #[test]
     fn all_sensors() {
         //let dht = builtin::dht().build(vec![
-        //    Config {
+        //    SensorConfig {
         //        ty: "Pin".to_owned(),
         //        name: "airTempAndHumidity".to_owned(),
         //        value: "Pin::D6".to_owned(),
         //    },
-        //    Config {
+        //    SensorConfig {
         //        ty: "dht::Version".to_owned(),
         //        name: "dhtVersion".to_owned(),
         //        value: "dht::Version::DHT22".to_owned(),
         //    },
         //]);
-        //let soil_resistivity = builtin::soil_resistivity().build(vec![Config {
+        //let soil_resistivity = builtin::soil_resistivity().build(vec![SensorConfig {
         //    ty: "Pin".to_owned(),
         //    name: "soilResistivityPower".to_owned(),
         //    value: "Pin::D7".to_owned(),
         //}]);
-        //let soil_temperature = builtin::soil_temperature().build(vec![Config {
+        //let soil_temperature = builtin::soil_temperature().build(vec![SensorConfig {
         //    ty: "Pin".to_owned(),
         //    name: "soilTemperature".to_owned(),
         //    value: "Pin::D5".to_owned(),
         //}]);
-        //let factory_reset_button = builtin::factory_reset_button().build(vec![Config {
+        //let factory_reset_button = builtin::factory_reset_button().build(vec![SensorConfig {
         //    ty: "Pin".to_owned(),
         //    name: "factoryResetButton".to_owned(),
         //    value: "Pin::D1".to_owned(),

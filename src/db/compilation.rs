@@ -1,13 +1,9 @@
-use crate::db::firmware::Firmware;
-use crate::prelude::*;
+use crate::{logger::*, Firmware, Result, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use super::{
-    compiler::{Compiler, CompilerId, CompilerView},
-    device::Device,
-};
+use super::compiler::{Compiler, CompilerId, CompilerView};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -20,18 +16,14 @@ pub struct CompilationView {
 }
 
 impl CompilationView {
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        compilation: Compilation,
-        device: &Device,
-    ) -> Result<Self> {
+    pub async fn new(txn: &mut Transaction<'_>, compilation: Compilation) -> Result<Self> {
         let compiler = compilation.compiler(txn).await?;
         Ok(Self {
             id: compilation.id(),
             platformio_ini: compilation.platformio_ini,
             main_cpp: compilation.main_cpp,
             pin_hpp: compilation.pin_hpp,
-            compiler: CompilerView::new(txn, compiler, device).await?,
+            compiler: CompilerView::new(txn, compiler).await?,
         })
     }
 }
@@ -112,7 +104,7 @@ impl Compilation {
 
     pub async fn latest_for_compiler(
         txn: &mut Transaction<'_>,
-        compiler_id: CompilerId,
+        compiler: &Compiler,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
             "
@@ -121,17 +113,27 @@ impl Compilation {
             WHERE compiler_id = $1
             ORDER BY created_at DESC",
         )
-        .bind(compiler_id)
+        .bind(compiler.id())
         .fetch_one(&mut *txn)
         .await?;
         Ok(comp)
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, id: CompilationId) -> Result<Self> {
-        let comp = sqlx::query_as("SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp FROM compilations WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut *txn)
-            .await?;
+    pub async fn find_by_id(
+        txn: &mut Transaction<'_>,
+        firmware: &Firmware,
+        id: CompilationId,
+    ) -> Result<Self> {
+        let comp = sqlx::query_as(
+            "SELECT compilations.id, compiler_id, platformio_ini, main_cpp, pin_hpp
+             FROM compilations
+             INNER JOIN firmwares ON firmwares.compilation_id = compilations.id
+             WHERE compilations.id = $1 AND firmwares.id = $2",
+        )
+        .bind(id)
+        .bind(firmware.id())
+        .fetch_one(&mut *txn)
+        .await?;
         Ok(comp)
     }
 
@@ -144,7 +146,11 @@ impl Compilation {
     }
 
     pub async fn compiler(&self, txn: &mut Transaction<'_>) -> Result<Compiler> {
-        Compiler::find_by_id(txn, self.compiler_id).await
+        Compiler::find_by_compilation(txn, self).await
+    }
+
+    pub fn compiler_id(&self) -> CompilerId {
+        self.compiler_id
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
@@ -161,7 +167,7 @@ impl Compilation {
         let env_name = env_name.join("-");
 
         let firmware = {
-            let dir = tokio::task::spawn_blocking(|| tempfile::tempdir()).await??;
+            let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
             fs::write(
                 dir.path().join("platformio.ini"),
                 self.platformio_ini.as_bytes(),
@@ -182,10 +188,9 @@ impl Compilation {
 
             info!("pio run -e {env_name} -d \"{}\"", dir.path().display());
 
-            // TODO: is dir.path().display() the correct approach?
-            let dir_arg = dir.path().display().to_string();
+            let dir_arg = dir.path().to_string_lossy();
             let mut command = tokio::process::Command::new("pio");
-            command.args(["run", "-e", &env_name, "-d", dir_arg.as_str()]);
+            command.args(["run", "-e", &env_name, "-d", &*dir_arg]);
             // TODO: stream output
             // TODO: check exit code?
             let output = command.spawn()?.wait_with_output().await?;

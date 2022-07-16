@@ -10,5 +10,3 @@ pub mod sensor;
 pub mod sensor_prototype;
 pub mod target;
 pub mod user;
-
-pub type Result<T, E = crate::error::Error> = std::result::Result<T, E>;

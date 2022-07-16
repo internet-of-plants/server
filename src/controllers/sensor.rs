@@ -1,17 +1,13 @@
-use crate::controllers::Result;
-use crate::db::device::DeviceId;
-use crate::db::sensor::{Sensor, SensorId};
-use crate::extractor::User;
-use crate::{prelude::*, Device};
+use crate::{extractor::User, Device, DeviceId, Pool, Result, Sensor, SensorId, Error};
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetAliasRequest {
-    device_id: DeviceId,
-    sensor_id: SensorId,
-    alias: String,
+    pub device_id: DeviceId,
+    pub sensor_id: SensorId,
+    pub alias: String,
 }
 
 pub async fn set_alias(
@@ -20,12 +16,13 @@ pub async fn set_alias(
     Json(request): Json<SetAliasRequest>,
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
-    let mut device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    if let Some(compiler) = device.compiler(&mut txn).await? {
-        let sensor = Sensor::find_by_id(&mut txn, request.sensor_id).await?;
-        device
-            .set_alias(&mut txn, &compiler, &sensor, request.alias)
-            .await?;
+    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+
+    if let Some(mut compiler) = device.compiler(&mut txn).await? {
+        let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;
+        compiler.set_alias(&mut txn, &sensor, request.alias).await?;
+    } else {
+        return Err(Error::Unauthorized);
     }
 
     txn.commit().await?;
@@ -35,9 +32,9 @@ pub async fn set_alias(
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetColorRequest {
-    device_id: DeviceId,
-    sensor_id: SensorId,
-    color: String,
+    pub device_id: DeviceId,
+    pub sensor_id: SensorId,
+    pub color: String,
 }
 
 pub async fn set_color(
@@ -46,12 +43,14 @@ pub async fn set_color(
     Json(request): Json<SetColorRequest>,
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
-    let mut device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    if let Some(compiler) = device.compiler(&mut txn).await? {
-        let sensor = Sensor::find_by_id(&mut txn, request.sensor_id).await?;
-        device
-            .set_color(&mut txn, &compiler, &sensor, request.color)
-            .await?;
+
+    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+
+    if let Some(mut compiler) = device.compiler(&mut txn).await? {
+        let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;
+        compiler.set_color(&mut txn, &sensor, request.color).await?;
+    } else {
+        return Err(Error::Unauthorized);
     }
 
     txn.commit().await?;

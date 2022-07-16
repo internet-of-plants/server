@@ -1,16 +1,15 @@
-use crate::db::user::Login;
-use crate::extractor::{MacAddress, Version};
-use crate::{prelude::*, Device};
-use crate::{NewDevice, NewUser, User};
-use axum::extract::{Extension, Json, TypedHeader};
-use controllers::Result;
+use crate::{
+    extractor::MacAddress, extractor::Version, logger::*, Device, Login, NewDevice, NewUser, Pool,
+    Result, User,
+};
+use axum::{extract::Extension, extract::Json, extract::TypedHeader, response::IntoResponse};
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
     Json(user): Json<NewUser>,
 ) -> Result<impl IntoResponse> {
     // We should fix al the avenues for user abuse before allowing signups
-    //return Result::<&'static str, _>::Err(Error::Forbidden.into());
+    //return Result::<&'static str, _>::Err(Error::Unauthorized.into());
 
     let mut txn = pool.begin().await?;
     User::new(&mut txn, user.clone()).await?;

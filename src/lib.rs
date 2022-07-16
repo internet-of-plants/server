@@ -6,41 +6,42 @@ pub mod test_helpers;
 pub mod utils;
 
 pub use crate::db::{
+    auth::{Auth, AuthToken},
     collection::{Collection, CollectionId, CollectionView},
+    compilation::{Compilation, CompilationId, CompilationView},
+    compiler::{Compiler, CompilerId, CompilerView, NewCompiler},
     device::{Device, DeviceId, DeviceView, NewDevice},
-    device_log::DeviceLog,
-    device_panic::{DevicePanic, DevicePanicId},
-    event::Event,
+    device_log::{DeviceLog, DeviceLogId, DeviceLogView},
+    device_panic::{DevicePanic, DevicePanicId, DevicePanicView, NewDevicePanic},
+    event::{DeviceStat, Event, EventId, EventView},
+    firmware::{Firmware, FirmwareId, FirmwareView},
     organization::{Organization, OrganizationId, OrganizationView},
-    user::{NewUser, User, Username},
+    secret::SecretAlgo,
+    sensor_config::{SensorConfig, SensorConfigId, SensorConfigView, NewSensorConfig},
+    sensor_config_request::{SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView, NewSensorConfigRequest},
+    sensor_config_type::{SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorWidgetKind},
+    sensor_measurement::{SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView},
+    device_config::{DeviceConfig, DeviceConfigId, DeviceConfigView, NewDeviceConfig},
+    device_config_request::{DeviceConfigRequest, DeviceConfigRequestId, DeviceConfigRequestView, NewDeviceConfigRequest},
+    device_config_type::{DeviceConfigType, DeviceConfigTypeId, DeviceConfigTypeView, DeviceWidgetKind},
+    sensor::{Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorView, Setup},
+    sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
+    target::{Target, TargetId, TargetView},
+    target_prototype::{TargetPrototype, TargetPrototypeId},
+    user::{Login, NewUser, User, UserId, Username},
 };
+pub use error::{Error, Result};
 
-pub mod prelude {
-    pub use crate::error::{Error, Result};
-    pub(crate) use crate::{controllers, db, utils};
-    pub use axum::response::IntoResponse;
-    #[allow(unused_imports)]
+pub type DateTime = chrono::DateTime<chrono::Utc>;
+pub type Pool = sqlx::PgPool;
+pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
+
+pub mod logger {
     pub use log::{debug, error, info, trace, warn};
-    pub use sqlx::prelude::*;
-    pub use tokio::io::AsyncWriteExt;
-
-    pub type DateTime = chrono::DateTime<chrono::Utc>;
-    pub type Pool = sqlx::PgPool;
-    pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
-
-    use crate::db::device::Device;
-    use serde::Serialize;
-
-    use self::db::user::User;
-
-    #[derive(sqlx::FromRow, Debug, Clone, PartialEq, Serialize)]
-    pub struct Auth {
-        pub user: User,
-        pub device: Option<Device>,
-    }
 }
 
-use crate::prelude::*;
+use logger::*;
+
 use axum::{
     extract::Extension,
     http::{header::HeaderName, header::HeaderValue, Method},
@@ -48,16 +49,15 @@ use axum::{
     Router,
 };
 use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use sqlx::Connection;
+use tokio::sync::Mutex;
 use tower_http::cors::{CorsLayer, Origin};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
-static INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub async fn test_router() -> Router {
-    static LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
-    let _guard = LOCK.lock().unwrap();
-    if !INITIALIZED.swap(true, Ordering::Relaxed) {
+    static LOCK: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+    let mut guard = LOCK.lock().await;
+    if !std::mem::replace(&mut *guard, true) {
         let url = "postgres://postgres:postgres@127.0.0.1:5432";
         let mut connection = sqlx::PgConnection::connect(url).await.unwrap();
         let _ = sqlx::query("DROP DATABASE iop_test")
@@ -67,12 +67,6 @@ pub async fn test_router() -> Router {
             .execute(&mut connection)
             .await
             .unwrap();
-    }
-    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop_test";
-    router(url).await
-}
-
-pub async fn router(url: &str) -> Router {
     tracing_subscriber::registry()
         .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(
             |_| {
@@ -82,9 +76,15 @@ pub async fn router(url: &str) -> Router {
         )))
         .with(tracing_subscriber::fmt::layer())
         .init();
+    }
+    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop_test";
+    router(url).await
+}
+
+pub async fn router(url: &str) -> Router {
     info!(
         "RUST_LOG is {}",
-        std::env::var("RUST_LOG").ok().unwrap_or_else(String::new)
+        std::env::var("RUST_LOG").ok().unwrap_or_default()
     );
 
     #[cfg(debug_assertions)]
@@ -135,7 +135,7 @@ pub async fn router(url: &str) -> Router {
         .expect("Unable to connect to database");
     let pool: &'static Pool = Box::leak(pool.into());
 
-    let app = Router::new()
+    Router::new()
         .route("/v1/user/login", post(controllers::user::login))
         .route("/v1/user", post(controllers::user::new))
         .route("/v1/targets", get(controllers::target::list))
@@ -166,6 +166,5 @@ pub async fn router(url: &str) -> Router {
         .route("/v1/panic", post(controllers::device_panic::new))
         .route("/v1/update", get(controllers::firmware::update))
         .layer(Extension(pool))
-        .layer(cors);
-    app
+        .layer(cors)
 }

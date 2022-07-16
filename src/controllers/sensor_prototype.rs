@@ -1,9 +1,7 @@
-use crate::db::sensor_prototype::{SensorPrototype, SensorPrototypeView};
-use crate::db::target::{Target, TargetId};
-use crate::extractor::User;
-use crate::prelude::*;
+use crate::{
+    extractor::User, Pool, Result, SensorPrototype, SensorPrototypeView, Target, TargetId,
+};
 use axum::extract::{Extension, Json, Query};
-use controllers::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

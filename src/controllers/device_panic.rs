@@ -1,10 +1,9 @@
-use crate::db::device_panic::{NewDevicePanic, DevicePanicView};
-use crate::extractor::{Device, User};
-use crate::prelude::*;
-use crate::{DeviceId, DevicePanic, DevicePanicId};
+use crate::{
+    extractor::{Device, User},
+    DeviceId, DevicePanic, DevicePanicId, DevicePanicView, NewDevicePanic, Pool, Result,
+};
 use axum::extract::{Extension, Json, Query};
 use axum::http::StatusCode;
-use controllers::Result;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -20,7 +19,7 @@ pub async fn solve(
     Json(request): Json<SolveRequest>,
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
-    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let device = crate::Device::find_by_id(&mut txn, request.device_id, &user).await?;
     let device_panic = DevicePanic::find_by_id(&mut txn, &device, request.panic_id).await?;
     device_panic.solve(&mut txn).await?;
     txn.commit().await?;
@@ -56,7 +55,8 @@ pub async fn list(
     Query(request): Query<ListRequest>,
 ) -> Result<Json<Vec<DevicePanicView>>> {
     let mut txn = pool.begin().await?;
-    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let panics = DevicePanicView::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
+    let device = crate::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let panics =
+        DevicePanicView::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
     Ok(Json(panics))
 }

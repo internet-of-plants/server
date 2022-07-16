@@ -1,10 +1,6 @@
-use crate::db::device_log::DeviceLogView;
-use crate::extractor::{Device, User};
-use crate::prelude::*;
-use crate::{DeviceId, DeviceLog};
+use crate::{extractor::Device, extractor::User, DeviceId, DeviceLog, DeviceLogView, Pool, Result};
 use axum::extract::{Extension, Json, Query, RawBody};
 use axum::http::StatusCode;
-use controllers::Result;
 use futures::StreamExt;
 use serde::Deserialize;
 
@@ -16,7 +12,7 @@ pub async fn new(
     let mut txn = pool.begin().await?;
 
     let mut log_buffer = Vec::new();
-    for log in log.next().await {
+    while let Some(log) = log.next().await {
         log_buffer.extend(&log?);
     }
     let log = String::from_utf8_lossy(log_buffer.as_ref())
@@ -43,7 +39,7 @@ pub async fn list(
 ) -> Result<Json<Vec<DeviceLogView>>> {
     let mut txn = pool.begin().await?;
 
-    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let device = crate::Device::find_by_id(&mut txn, request.device_id, &user).await?;
     let logs = DeviceLogView::first_n_from_device(&mut txn, &device, request.limit as i32).await?;
 
     txn.commit().await?;

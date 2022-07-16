@@ -1,13 +1,5 @@
-use crate::{
-    error,
-    extractor::{Device, Esp8266Md5},
-    prelude::{Error, Pool, Result},
-};
-use axum::{
-    body::{Bytes, Full},
-    response::IntoResponse,
-    Extension, TypedHeader,
-};
+use crate::{extractor::Device, extractor::Esp8266Md5, logger::*, Error, Pool, Result};
+use axum::{body::Bytes, body::Full, response::IntoResponse, Extension, TypedHeader};
 use std::fmt::Write;
 
 pub async fn update(
@@ -28,10 +20,10 @@ pub async fn update(
 
     let firmware = match device.update(&mut txn).await? {
         Some(update) => update,
-        None => return Err(Error::NothingFound)?,
+        None => return Err(Error::NoBinaryAvailable)?,
     };
     if firmware.hash() == md5 {
-        return Err(Error::NothingFound)?;
+        return Err(Error::NoUpdateAvailable)?;
     }
 
     let hash = firmware.hash().to_owned();
@@ -47,7 +39,7 @@ pub async fn update(
                 "Binary md5 didn't match the expected: {} != {}",
                 file_hash, hash,
             );
-            return Err(Error::BadData)?;
+            return Err(Error::CorruptedBinary)?;
         }
         txn.commit().await?;
         let response = axum::http::Response::builder()
@@ -61,6 +53,6 @@ pub async fn update(
             .body(Full::new(Bytes::from(binary)))?;
         Ok(response)
     } else {
-        Err(Error::NothingFound)
+        Err(Error::MissingBinary)?
     }
 }

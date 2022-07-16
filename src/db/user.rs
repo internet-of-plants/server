@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use crate::Organization;
+use crate::{utils, AuthToken, DateTime, Error, Organization, Result, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +27,7 @@ pub struct NewUser {
     pub email: String,
     pub password: String,
     pub username: String,
+    pub organization_name: String,
 }
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -39,30 +39,14 @@ pub struct User {
     pub updated_at: DateTime,
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Debug, PartialEq, Eq)]
-#[sqlx(transparent)]
-pub struct AuthToken(pub String);
-
-impl AuthToken {
-    pub fn random() -> Self {
-        Self(utils::random_string(64))
-    }
-}
-
-impl AuthToken {
-    pub fn new(token: String) -> Self {
-        Self(token)
-    }
-}
-
 impl User {
     pub async fn new(txn: &mut Transaction<'_>, user: NewUser) -> Result<Self> {
         // TODO: improve password rules and error reporting
         if user.password.len() < 10 {
-            return Err(Error::BadData);
+            return Err(Error::InsecurePassword);
         }
 
-        let organization = Organization::new(&mut *txn, user.username.clone()).await?;
+        let organization = Organization::new(&mut *txn, user.organization_name).await?;
 
         let hash = utils::hash_password(&user.password)?;
         let (id, now) = sqlx::query_as::<_, (UserId, DateTime)>(
@@ -98,7 +82,7 @@ impl User {
         .bind(&token)
         .fetch_optional(&mut *txn)
         .await?;
-        user.ok_or(Error::Forbidden)
+        user.ok_or(Error::Unauthorized)
     }
 
     pub async fn login(txn: &mut Transaction<'_>, client: Login) -> Result<AuthToken> {
@@ -134,7 +118,7 @@ impl User {
                     .await?;
                 Ok(token)
             }
-            _ => Err(Error::Forbidden),
+            _ => Err(Error::Unauthorized),
         }
     }
 
@@ -182,5 +166,9 @@ impl User {
 
     pub fn id(&self) -> UserId {
         self.id
+    }
+
+    pub async fn default_organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {
+        Organization::default_for_user(txn, self).await
     }
 }

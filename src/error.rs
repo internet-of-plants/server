@@ -1,11 +1,13 @@
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 use derive_more::{Display, From};
 use log::{error, warn};
 use serde_json::json;
-use axum::response::{IntoResponse, Response};
-use axum::Json;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+// TODO: improve error code returned, send error message in debug builds
 
 #[derive(From, Display, Debug)]
 pub enum Error {
@@ -17,8 +19,23 @@ pub enum Error {
     Fmt(std::fmt::Error),
     Utf8(std::str::Utf8Error),
     Handlebars(handlebars::RenderError),
-    Forbidden,
+    EventMustBeObject,
+    MeasurementMissing,
+    #[display(fmt = "value:{} range:{}", "_0", "_1")]
+    MeasurementOutOfRange(String, String),
+    #[display(fmt = "type:{:?} expected:{}", "_0", "_1")]
+    InvalidMeasurementType(serde_json::Value, String),
+    MissingMeasurement(String),
+    DuplicatedConfig,
+    Unauthorized,
     BadData,
+    InsecurePassword,
+    InvalidName,
+    NoBinaryAvailable,
+    NoUpdateAvailable,
+    AskedForTooMany,
+    CorruptedBinary,
+    MissingBinary,
     NothingFound,
     ParseInt(std::num::ParseIntError),
     MissingHeader(&'static str),
@@ -85,8 +102,8 @@ impl IntoResponse for Error {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
-            Self::Forbidden => {
-                warn!("Forbidden");
+            Self::Unauthorized => {
+                warn!("Unauthorized");
                 (StatusCode::UNAUTHORIZED, "Unauthorized")
             }
             Self::MissingHeader(header) => {
@@ -96,6 +113,58 @@ impl IntoResponse for Error {
             Self::BadData => {
                 warn!("Bad Data");
                 (StatusCode::BAD_REQUEST, "Bad Request")
+            }
+            Self::EventMustBeObject => {
+                warn!("Event Must Be Object");
+                (StatusCode::BAD_REQUEST, "Event Must Be Object")
+            }
+            Self::MeasurementOutOfRange(val, range)=> {
+                warn!("Measurement Out of Range: {val} expected {range}");
+                (StatusCode::BAD_REQUEST, "Measurement Out of Range")
+            }
+            Self::InvalidMeasurementType(json, ty)=> {
+                warn!("Invalid Measurement Type: {json:?} expected {ty}");
+                (StatusCode::BAD_REQUEST, "Invalid Measurement Type")
+            }
+            Self::DuplicatedConfig => {
+                warn!("Duplicated Config");
+                (StatusCode::BAD_REQUEST, "Duplicated Config")
+            }
+            Self::MeasurementMissing=> {
+                warn!("Measurement Missing");
+                (StatusCode::BAD_REQUEST, "Measurement Missing")
+            }
+            Self::MissingMeasurement(m) => {
+                warn!("Measurement Missing: {m}");
+                (StatusCode::BAD_REQUEST, "Measurement Missing")
+            }
+            Self::InsecurePassword => {
+                warn!("Insecure Password");
+                (StatusCode::BAD_REQUEST, "Invalid Password")
+            }
+            Self::MissingBinary => {
+                warn!("Missing Binary");
+                (StatusCode::BAD_REQUEST, "Missing Binary")
+            }
+            Self::InvalidName => {
+                warn!("Invalid Name");
+                (StatusCode::BAD_REQUEST, "Invalid Name")
+            }
+            Self::NoBinaryAvailable => {
+                warn!("No Binary Available");
+                (StatusCode::BAD_REQUEST, "No Binary Available")
+            }
+            Self::NoUpdateAvailable => {
+                warn!("No Update Available");
+                (StatusCode::BAD_REQUEST, "No Update Available")
+            }
+            Self::CorruptedBinary => {
+                warn!("Corrupted Binary");
+                (StatusCode::BAD_REQUEST, "Corrupted Binary")
+            }
+            Self::AskedForTooMany => {
+                warn!("Asked For Too Many");
+                (StatusCode::BAD_REQUEST, "Asked For Too Many")
             }
             Self::NothingFound => {
                 warn!("Nothing Found");

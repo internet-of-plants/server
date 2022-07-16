@@ -1,4 +1,4 @@
-use crate::{prelude::*, DeviceView, Organization, User, Device};
+use crate::{DateTime, Device, DeviceView, Error, Organization, Result, Transaction, User};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -24,12 +24,8 @@ pub struct CollectionView {
 }
 
 impl CollectionView {
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        collection: Collection,
-        user: &User,
-    ) -> Result<Self> {
-        let devices = collection.devices(txn, user).await?;
+    pub async fn new(txn: &mut Transaction<'_>, collection: Collection) -> Result<Self> {
+        let devices = collection.devices(txn).await?;
         Ok(Self {
             id: collection.id,
             name: collection.name,
@@ -38,6 +34,10 @@ impl CollectionView {
             created_at: collection.created_at,
             updated_at: collection.updated_at,
         })
+    }
+
+    pub fn id(&self) -> CollectionId {
+        self.id
     }
 }
 
@@ -57,7 +57,7 @@ impl Collection {
         organization: &Organization,
     ) -> Result<Self> {
         if name.is_empty() {
-            return Err(Error::BadData);
+            return Err(Error::InvalidName);
         }
 
         let (id, now) = sqlx::query_as::<_, (CollectionId, DateTime)>(
@@ -132,7 +132,7 @@ impl Collection {
         .await?;
 
         let (updated_at,): (DateTime,) = sqlx::query_as(
-            "UPDATE users SET updated_at = NOW() WHERE id = $1 RETURNING updated_at",
+            "UPDATE collections SET updated_at = NOW() WHERE id = $1 RETURNING updated_at",
         )
         .bind(self.id())
         .fetch_one(txn)
@@ -141,12 +141,29 @@ impl Collection {
         Ok(())
     }
 
-    pub async fn devices(&self, txn: &mut Transaction<'_>, user: &User) -> Result<Vec<DeviceView>> {
-        let devices = Device::from_collection(txn, self.id, user).await?;
+    pub async fn devices(&self, txn: &mut Transaction<'_>) -> Result<Vec<DeviceView>> {
+        let devices = Device::from_collection(txn, self).await?;
         let mut device_views = Vec::with_capacity(devices.len());
         for device in devices {
             device_views.push(DeviceView::new(txn, device).await?);
         }
         Ok(device_views)
+    }
+
+    pub async fn find_by_device(txn: &mut Transaction<'_>, device: &Device) -> Result<Self> {
+        let collections = sqlx::query_as(
+            "SELECT col.id, col.name, col.description, col.created_at, col.updated_at
+             FROM collections as col
+             INNER JOIN devices ON devices.collection_id = col.id
+             WHERE devices.id = $1",
+        )
+        .bind(device.collection_id())
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(collections)
+    }
+
+    pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {
+        Organization::find_by_collection(txn, self).await
     }
 }

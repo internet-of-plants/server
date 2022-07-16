@@ -1,4 +1,4 @@
-use crate::{prelude::*, Device};
+use crate::{logger::*, DateTime, Device, Result, Transaction, Error};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -60,7 +60,7 @@ impl DevicePanic {
         let panic = sqlx::query_as(
             "SELECT p.id, p.file, p.line, p.func, p.msg, p.created_at
             FROM device_panics as p
-            WHERE p.device_id = $1 AND p.id = $2"
+            WHERE p.device_id = $1 AND p.id = $2",
         )
         .bind(device.id())
         .bind(id)
@@ -74,6 +74,10 @@ impl DevicePanic {
         device: &Device,
         limit: i32,
     ) -> Result<Vec<Self>> {
+        if limit > 10000 {
+            return Err(Error::AskedForTooMany);
+        }
+
         let device_panics: Vec<Self> = sqlx::query_as(
             "SELECT p.id, p.file, p.line, p.func, p.msg, p.created_at
             FROM device_panics as p
@@ -88,10 +92,7 @@ impl DevicePanic {
         Ok(device_panics.into_iter().rev().collect())
     }
 
-    pub async fn solve(
-        self,
-        txn: &mut Transaction<'_>,
-    ) -> Result<()> {
+    pub async fn solve(self, txn: &mut Transaction<'_>) -> Result<()> {
         sqlx::query("UPDATE device_panics SET is_solved = TRUE, updated_at = NOW() WHERE id = $1")
             .bind(self.id)
             .execute(txn)

@@ -1,19 +1,17 @@
-use crate::db::sensor::measurement::{Measurement, MeasurementKind, MeasurementType};
-use crate::db::sensor::{config_request::NewConfigRequest, config_type::WidgetKind};
-use crate::db::target::Target;
-use crate::db::target_prototype::TargetPrototype;
-use crate::prelude::*;
-
-use super::SensorPrototype;
+use crate::{
+    DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest, Result, SecretAlgo,
+    SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorPrototype,
+    SensorWidgetKind, Target, TargetPrototype, Transaction,
+};
 
 pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
-    let esp8266_target_prototype = esp8266_target(&mut *txn).await?;
+    let esp8266_target_prototype = esp8266_target_prototype(&mut *txn).await?;
     nodemcuv2_esp8266_target(&mut *txn, &esp8266_target_prototype).await?;
 
-    let esp32_target_prototype = esp32_target(&mut *txn).await?;
+    let esp32_target_prototype = esp32_target_prototype(&mut *txn).await?;
     esp32dev_esp32_target(&mut *txn, &esp32_target_prototype).await?;
 
-    let linux_target_prototype = linux_target(&mut *txn).await?;
+    let linux_target_prototype = linux_target_prototype(&mut *txn).await?;
     native_linux_target(&mut *txn, &linux_target_prototype).await?;
     native_linux_local_debugging_target(&mut *txn, &linux_target_prototype).await?;
 
@@ -26,7 +24,7 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
 }
 
 async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
-    Ok(SensorPrototype::new(
+    SensorPrototype::new(
         txn,
         "DHT".to_owned(),
         vec!["https://github.com/internet-of-plants/dht".to_owned()],
@@ -38,24 +36,24 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
             "airTempAndHumidity{{index}}.begin();".to_owned()
         ],
         vec![
-            Measurement {
+            SensorMeasurement {
                 human_name: "Air Temperature".to_owned(),
                 name: "air_temperature_celsius{{index}}".to_owned(),
                 value: "airTempAndHumidity{{index}}.measureTemperature();".to_owned(),
-                ty: MeasurementType::FloatCelsius,
-                kind: MeasurementKind::AirTemperature,
+                ty: SensorMeasurementType::FloatCelsius,
+                kind: SensorMeasurementKind::AirTemperature,
             },
-            Measurement {
+            SensorMeasurement {
                 human_name: "Air Humidity".to_owned(),
                 name: "air_humidity_percentage{{index}}".to_owned(),
                 value: "airTempAndHumidity{{index}}.measureHumidity();".to_owned(),
-                ty: MeasurementType::Percentage,
-                kind: MeasurementKind::AirHumidity,
+                ty: SensorMeasurementType::Percentage,
+                kind: SensorMeasurementKind::AirHumidity,
             },
         ],
         vec![
-            NewConfigRequest::new("Data Input".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), WidgetKind::PinSelection),
-            NewConfigRequest::new("Model".to_owned(), "dhtVersion{{index}}".to_owned(), "dht::Version".to_owned(), WidgetKind::Selection(vec![
+            NewSensorConfigRequest::new("Data Input".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Model".to_owned(), "dhtVersion{{index}}".to_owned(), "dht::Version".to_owned(), SensorWidgetKind::Selection(vec![
                 "dht::Version::DHT11".to_owned(),
                 "dht::Version::DHT12".to_owned(),
                 "dht::Version::DHT21".to_owned(),
@@ -63,11 +61,11 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
                 "dht::Version::AM2301".to_owned(),
             ])),
         ],
-    ).await?)
+    ).await
 }
 
 async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
-    Ok(SensorPrototype::new(
+    SensorPrototype::new(
         txn,
         "Dallas Temperature".to_owned(),
         vec!["https://github.com/internet-of-plants/dallas_temperature".to_owned()],
@@ -79,22 +77,22 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
             "soilTemperature{{index}}.begin();".to_owned(),
         ],
         vec![
-            Measurement {
+            SensorMeasurement {
                 human_name: "Soil Temperature".to_owned(),
                 name: "soil_temperature_celsius{{index}}".to_owned(),
                 value: "soilTemperature{{index}}.measure();".to_owned(),
-                ty: MeasurementType::FloatCelsius,
-                kind: MeasurementKind::SoilTemperature,
+                ty: SensorMeasurementType::FloatCelsius,
+                kind: SensorMeasurementKind::SoilTemperature,
             },
         ],
         vec![
-            NewConfigRequest::new("Data Input".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), WidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Data Input".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
         ],
-    ).await?)
+    ).await
 }
 
 async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
-    Ok(SensorPrototype::new(
+    SensorPrototype::new(
         txn,
         "Factory Reset Button".to_owned(),
         vec!["https://github.com/internet-of-plants/factory_reset_button".to_owned()],
@@ -105,18 +103,18 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
             "loop.setInterval(1000, reset::resetIfNeeded);".to_owned(),
         ],
         vec![],
-        vec![NewConfigRequest::new(
+        vec![NewSensorConfigRequest::new(
             "Button".to_owned(),
             "factoryResetButton{{index}}".to_owned(),
             "Pin".to_owned(),
-            WidgetKind::PinSelection,
+            SensorWidgetKind::PinSelection,
         )],
     )
-    .await?)
+    .await
 }
 
 async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
-    Ok(SensorPrototype::new(
+    SensorPrototype::new(
         txn,
         "Soil Resistivity".to_owned(),
         vec!["https://github.com/internet-of-plants/soil_resistivity".to_owned()],
@@ -128,23 +126,23 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
             "soilResistivity{{index}}.begin();".to_owned(),
         ],
         vec![
-            Measurement {
+            SensorMeasurement {
                 human_name: "Soil Resistivity Raw".to_owned(),
                 name: "soil_resistivity_raw{{index}}".to_owned(),
                 value: "soilResistivity{{index}}.measure();".to_owned(),
-                ty: MeasurementType::RawAnalogRead,
-                kind: MeasurementKind::SoilMoisture,
+                ty: SensorMeasurementType::RawAnalogRead,
+                kind: SensorMeasurementKind::SoilMoisture,
             },
         ],
         vec![
             // TODO: we should configure the analog pin here too
-            NewConfigRequest::new("Power".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), WidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Power".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
         ],
-    ).await?)
+    ).await
 }
 
-async fn esp8266_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
-    Ok(TargetPrototype::new(
+async fn esp8266_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+    TargetPrototype::new(
         txn,
         "esp8266".to_owned(),
         "-D IOP_ESP8266\n    -D IOP_SSL".to_owned(),
@@ -153,14 +151,14 @@ async fn esp8266_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
         Some("framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino.git#d5444c4aa38bff01269cfbd98a13a1454d0c62df".to_owned()),
         Some("monitor_filters = esp8266_exception_decoder\nboard_build.f_cpu = 160000000L\nmonitor_speed = 115200".to_owned()),
         Some("deep".to_owned())
-    ).await?)
+    ).await
 }
 
 async fn nodemcuv2_esp8266_target(
     txn: &mut Transaction<'_>,
     target_prototype: &TargetPrototype,
 ) -> Result<Target> {
-    Ok(Target::new(
+    Target::new(
         txn,
         Some("nodemcuv2".to_owned()),
         vec![
@@ -179,11 +177,29 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 #endif"
             .to_owned(),
         target_prototype,
+        vec![
+            NewDeviceConfigRequest::new(
+                "Captive Portal SSID".to_owned(),
+                "SSID".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::SSID,
+                false,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Captive Portal PSK".to_owned(),
+                "PSK".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::PSK,
+                false,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+        ],
     )
-    .await?)
+    .await
 }
 
-async fn esp32_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+async fn esp32_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     let mut prototype = TargetPrototype::new(
         txn,
         "esp32".to_owned(),
@@ -207,18 +223,36 @@ async fn esp32dev_esp32_target(
     txn: &mut Transaction<'_>,
     target_prototype: &TargetPrototype,
 ) -> Result<Target> {
-    Ok(Target::new(
+    Target::new(
         txn,
         Some("esp32dev".to_owned()),
         vec![],
         "".to_owned(),
         target_prototype,
+        vec![
+            NewDeviceConfigRequest::new(
+                "Captive Portal SSID".to_owned(),
+                "SSID".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::SSID,
+                false,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Captive Portal PSK".to_owned(),
+                "PSK".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::PSK,
+                false,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+        ],
     )
-    .await?)
+    .await
 }
 
-async fn linux_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
-    let prototype = TargetPrototype::new(
+async fn linux_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+    TargetPrototype::new(
         txn,
         "linux".to_owned(),
         "-Wextra
@@ -238,8 +272,7 @@ async fn linux_target(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
         None,
         None,
     )
-    .await?;
-    Ok(prototype)
+    .await
 }
 
 async fn native_linux_target(
@@ -265,6 +298,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 #endif"
             .to_owned(),
         target_prototype,
+        vec![],
     )
     .await?;
     target
@@ -303,6 +337,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 #endif"
             .to_owned(),
         target_prototype,
+        vec![],
     )
     .await?;
     target.set_name(txn, Some("mock".to_owned())).await?;

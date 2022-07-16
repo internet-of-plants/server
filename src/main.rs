@@ -6,6 +6,7 @@ use std::path::PathBuf;
 #[cfg(not(debug_assertions))]
 use axum_server::tls_rustls::RustlsConfig;
 
+use tracing_subscriber::{prelude::*, EnvFilter};
 use server::router;
 
 #[tokio::main]
@@ -25,7 +26,15 @@ async fn main() {
         std::env::set_var("RUST_LOG", val);
     }
 
-    //pretty_env_logger::init();
+    tracing_subscriber::registry()
+        .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(
+            |_| {
+                "server=trace,tracing=trace,hyper=info,axum=trace,event=trace,now=trace,timer=trace"
+                    .into()
+            },
+        )))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
     let router = router(url).await;

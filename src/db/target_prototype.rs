@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{Result, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,7 @@ pub struct TargetPrototype {
 }
 
 impl TargetPrototype {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         txn: &mut Transaction<'_>,
         arch: String,

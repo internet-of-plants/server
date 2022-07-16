@@ -1,8 +1,5 @@
-use crate::extractor::User;
-use crate::prelude::*;
-use crate::{Collection, CollectionId, CollectionView};
+use crate::{extractor::User, Collection, CollectionId, CollectionView, Pool, Result};
 use axum::extract::{Extension, Json, Query};
-use controllers::Result;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -18,7 +15,7 @@ pub async fn find(
 ) -> Result<Json<CollectionView>> {
     let mut txn = pool.begin().await?;
     let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
-    let collection = CollectionView::new(&mut txn, collection, &user).await?;
+    let collection = CollectionView::new(&mut txn, collection).await?;
     txn.commit().await?;
     Ok(Json(collection))
 }

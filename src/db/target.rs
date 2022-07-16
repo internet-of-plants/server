@@ -1,6 +1,7 @@
-use crate::db::sensor::Dependency;
-use crate::db::target_prototype::*;
-use crate::prelude::*;
+use crate::{
+    Dependency, DeviceConfigRequest, DeviceConfigRequestView, NewDeviceConfigRequest, Result,
+    TargetPrototype, TargetPrototypeId, Transaction,
+};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -17,11 +18,16 @@ pub struct TargetView {
     pub extra_platformio_params: Option<String>,
     pub ldf_mode: Option<String>,
     pub board: Option<String>,
+    pub config_requests: Vec<DeviceConfigRequestView>,
 }
 
 impl TargetView {
     pub async fn new(txn: &mut Transaction<'_>, target: Target) -> Result<Self> {
         let prototype = target.prototype(&mut *txn).await?;
+        let mut config_requests = Vec::new();
+        for config_request in target.config_requests(&mut *txn).await? {
+            config_requests.push(DeviceConfigRequestView::new(&mut *txn, config_request).await?);
+        }
         Ok(Self {
             id: target.id(),
             arch: prototype.arch,
@@ -33,7 +39,12 @@ impl TargetView {
             ldf_mode: prototype.ldf_mode,
             board: target.board().map(ToOwned::to_owned),
             name: target.name,
+            config_requests,
         })
+    }
+    
+    pub fn id(&self) -> TargetId {
+        self.id
     }
 }
 
@@ -64,6 +75,7 @@ impl Target {
         pins: Vec<String>,
         pin_hpp: String,
         target_prototype: &TargetPrototype,
+        new_config_requests: Vec<NewDeviceConfigRequest>,
     ) -> Result<Self> {
         let (id,): (TargetId,) = sqlx::query_as(
             "INSERT INTO targets (board, target_prototype_id, pin_hpp) VALUES ($1, $2, $3) RETURNING id",
@@ -80,14 +92,28 @@ impl Target {
                 .execute(&mut *txn)
                 .await?;
         }
-        Ok(Self {
+        let target = Self {
             id,
             name: None,
             board,
             pin_hpp,
             target_prototype_id: target_prototype.id(),
             build_flags: None,
-        })
+        };
+        for config_request in new_config_requests {
+            DeviceConfigRequest::new(
+                &mut *txn,
+                config_request.name,
+                config_request.human_name,
+                config_request.type_name,
+                config_request.widget,
+                &target,
+                config_request.optional,
+                config_request.secret_algo,
+            )
+            .await?;
+        }
+        Ok(target)
     }
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
@@ -166,6 +192,10 @@ impl Target {
 
     pub async fn prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
         TargetPrototype::find_by_id(txn, self.target_prototype_id).await
+    }
+
+    pub async fn config_requests(&self, txn: &mut Transaction<'_>) -> Result<Vec<DeviceConfigRequest>> {
+        DeviceConfigRequest::find_by_target(txn, self).await
     }
 
     pub async fn compile_platformio_ini(

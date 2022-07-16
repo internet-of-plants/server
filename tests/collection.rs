@@ -1,25 +1,26 @@
-use server::test_helpers::{find_collection, find_organization, list_organizations, login, signup};
-use server::{db::user::Login, db::user::NewUser, test_router};
+use server::test_helpers::{find_collection, list_organizations, login, signup};
+use server::{Login, NewUser, test_router};
 
 #[tokio::test]
 async fn collection() {
     let app = test_router().await;
 
-    signup(
+    let token = signup(
         app.clone(),
         NewUser {
             email: "bobão3@example.com".to_owned(),
+            organization_name: "bobão3".to_owned(),
             username: "bobão3".to_owned(),
-            password: "bobão".to_owned(),
+            password: "bobão1234".to_owned(),
         },
     )
     .await;
 
-    let token = login(
+    login(
         app.clone(),
         Login {
             email: "bobão3@example.com".to_owned(),
-            password: "bobão".to_owned(),
+            password: "bobão1234".to_owned(),
         },
         Some("aa".to_owned()),
         Some("bb".to_owned()),
@@ -27,11 +28,10 @@ async fn collection() {
     .await;
 
     let orgs = list_organizations(app.clone(), &token).await;
-    let org = find_organization(app.clone(), &token, *orgs[0].id()).await;
 
-    assert_eq!(org.collections.len(), 1);
-    let collection = org.collections.into_iter().next().unwrap();
+    assert_eq!(orgs[0].collections.len(), 1);
+    let collection = orgs[0].collections.iter().next().unwrap();
 
-    let col = find_collection(app.clone(), &token, org.id, collection.id).await;
+    let col = find_collection(app.clone(), &token, collection.id).await;
     assert_eq!(col.id, collection.id);
 }

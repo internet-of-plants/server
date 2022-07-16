@@ -1,32 +1,19 @@
-pub mod config;
-pub mod config_request;
-pub mod config_type;
-pub mod measurement;
-
-use std::collections::HashSet;
-
-use crate::db::sensor::config::Config;
-use crate::db::sensor_prototype::*;
-use crate::prelude::*;
+use crate::{
+    Compiler, Error, NewSensorConfig, Result, SensorConfig, SensorConfigRequest, SensorConfigView,
+    SensorMeasurementView, SensorPrototype, SensorPrototypeId, SensorPrototypeView, Transaction,
+};
 use derive_more::FromStr;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-use self::config::ConfigView;
-use self::config::NewConfig;
-use self::config_request::ConfigRequest;
-use self::measurement::MeasurementView;
-
-use super::compiler::Compiler;
-use super::device::Device;
+use std::collections::HashSet;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewSensor {
     pub prototype_id: SensorPrototypeId,
     pub alias: String,
-    pub configs: Vec<NewConfig>,
+    pub configs: Vec<NewSensorConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -39,8 +26,8 @@ pub struct SensorView {
     pub includes: Vec<String>,
     pub definitions: Vec<String>,
     pub setups: Vec<String>,
-    pub measurements: Vec<MeasurementView>,
-    pub configurations: Vec<ConfigView>,
+    pub measurements: Vec<SensorMeasurementView>,
+    pub configurations: Vec<SensorConfigView>,
     pub prototype: SensorPrototypeView,
 }
 
@@ -48,18 +35,16 @@ impl SensorView {
     pub async fn list_for_compiler(
         txn: &mut Transaction<'_>,
         compiler: &Compiler,
-        device: &Device,
     ) -> Result<Vec<Self>> {
         let sensors_metadata: Vec<(SensorId, SensorPrototypeId, String, String)> = sqlx::query_as(
             "SELECT DISTINCT(sensors.id), sensors.prototype_id, bt.alias, bt.color
              FROM sensors
              INNER JOIN sensor_prototypes ON sensor_prototypes.id = sensors.prototype_id
              INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
-             WHERE bt.compiler_id = $1 AND bt.device_id = $2
+             WHERE bt.compiler_id = $1
              ORDER BY sensors.id ASC",
         )
         .bind(compiler.id())
-        .bind(device.id())
         .fetch_all(&mut *txn)
         .await?;
 
@@ -73,7 +58,7 @@ impl SensorView {
 
             let mut configurations = Vec::with_capacity(sensor_configs.len());
             for config in sensor_configs {
-                configurations.push(ConfigView::new(txn, config).await?);
+                configurations.push(SensorConfigView::new(txn, config).await?);
             }
 
             sensors.push(Self {
@@ -92,9 +77,9 @@ impl SensorView {
                     .map(|m| {
                         let reg = Handlebars::new();
                         let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                        Ok(MeasurementView::new(m.clone(), name, color.clone()))
+                        Ok(SensorMeasurementView::new(m.clone(), name, color.clone()))
                     })
-                    .collect::<Result<Vec<_>, Error>>()?,
+                    .collect::<Result<Vec<_>>>()?,
                 configurations,
                 prototype: SensorPrototypeView::new(txn, prototype, &[&target]).await?,
             });
@@ -134,8 +119,7 @@ impl Sensor {
             .map(|c| c.request_id)
             .all(|x| uniq.insert(x));
         if uniq.len() != new_sensor.configs.len() {
-            // Duplicated configs
-            todo!();
+            return Err(Error::DuplicatedConfig);
         }
 
         new_sensor
@@ -148,14 +132,13 @@ impl Sensor {
             .collect::<Vec<_>>()
             .join(",");
 
-        // TODO: think about using json instead of serialized string (injection/hijacking risks?)
-        // Racy?
+        // TODO: move this to array matching, string has injection risks
         let id: Option<(SensorId,)> = sqlx::query_as(
             "
             SELECT sensor_id
             FROM (SELECT sensor_id, string_agg(concat, ',') as str, COUNT(*) as count
                   FROM (SELECT concat(request_id, '-', value) as concat, sensor_id
-                        FROM configs) as conf
+                        FROM sensor_configs) as conf
                   GROUP BY sensor_id) as sub
             INNER JOIN sensors ON sensors.id = sensor_id
             WHERE prototype_id = $1
@@ -185,19 +168,29 @@ impl Sensor {
                 prototype_id: new_sensor.prototype_id,
             };
             for config in new_sensor.configs {
-                let request = ConfigRequest::find_by_id(&mut *txn, config.request_id).await?;
-                Config::new(&mut *txn, &sensor, &request, config.value).await?;
+                let request = SensorConfigRequest::find_by_id(&mut *txn, config.request_id).await?;
+                SensorConfig::new(&mut *txn, &sensor, &request, config.value).await?;
             }
             sensor
         };
         Ok(sensor)
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, sensor_id: SensorId) -> Result<Self> {
-        let sensor = sqlx::query_as("SELECT id, prototype_id FROM sensors WHERE id = $1")
-            .bind(&sensor_id)
-            .fetch_one(&mut *txn)
-            .await?;
+    pub async fn find_by_id(
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+        sensor_id: SensorId,
+    ) -> Result<Self> {
+        let sensor = sqlx::query_as(
+            "SELECT id, prototype_id
+             FROM sensors
+             INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
+             WHERE id = $1 AND compiler_id = $2",
+        )
+        .bind(sensor_id)
+        .bind(compiler.id())
+        .fetch_one(&mut *txn)
+        .await?;
         Ok(sensor)
     }
 
@@ -209,7 +202,7 @@ impl Sensor {
         SensorPrototype::find_by_id(txn, self.prototype_id).await
     }
 
-    pub async fn configs(&self, txn: &mut Transaction<'_>) -> Result<Vec<Config>> {
-        Config::find_by_sensor(txn, self.id).await
+    pub async fn configs(&self, txn: &mut Transaction<'_>) -> Result<Vec<SensorConfig>> {
+        SensorConfig::find_by_sensor(txn, self).await
     }
 }

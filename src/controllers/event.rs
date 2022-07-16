@@ -1,21 +1,20 @@
-use crate::db::event::{EventView, DeviceStat};
-use crate::db::firmware::Firmware;
-use crate::db::sensor::measurement::MeasurementType;
 use crate::extractor::{
     BiggestDramBlock, BiggestIramBlock, Device, FreeDram, FreeIram, FreeStack, MacAddress,
     TimeRunning, User, Vcc, Version,
 };
-use crate::prelude::*;
-use crate::{DeviceId, Event};
+use crate::{
+    logger::*, DateTime, DeviceId, DeviceStat, Error, Event, EventView, Firmware, Pool, Result,
+    SensorMeasurementType,
+};
 use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
-use chrono::{Utc, DateTime};
-use controllers::Result;
+use axum::response::IntoResponse;
 use handlebars::Handlebars;
 use serde::Deserialize;
 use serde_json::json;
 use std::iter::FromIterator;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
     Device(mut device): Device,
@@ -46,12 +45,14 @@ pub async fn new(
     debug!("New Event: {:?}", event);
     let mut txn = pool.begin().await?;
 
-    if let Some(firmware) = Firmware::try_find_by_hash(&mut txn, &stat.version).await? {
-        device.set_firmware_id(&mut txn, firmware.id()).await?;
+    let collection = device.collection(&mut txn).await?;
+    let organization = collection.organization(&mut txn).await?;
+    if let Some(firmware) = Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await? {
+        device.set_firmware(&mut txn, &firmware).await?;
     }
 
     if let Some(firmware) = device.update(&mut txn).await? {
-        if firmware.hash() != &stat.version {
+        if firmware.hash() != stat.version {
             return Ok(HeaderMap::from_iter([(
                 HeaderName::from_static("latest_version"),
                 HeaderValue::from_str(firmware.hash())?,
@@ -60,9 +61,9 @@ pub async fn new(
     }
 
     // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
-    let obj = event.as_object().ok_or(Error::BadData)?;
+    let obj = event.as_object().ok_or(Error::EventMustBeObject)?;
     if let Some(compiler) = device.compiler(&mut txn).await? {
-        let sensors = compiler.sensors(&mut txn, &device).await?;
+        let sensors = compiler.sensors(&mut txn).await?;
         let mut measurements = Vec::new();
         for (index, sensor) in sensors.into_iter().enumerate() {
             let prototype = sensor.prototype;
@@ -75,55 +76,64 @@ pub async fn new(
                         let name = reg.render_template(&m.name, &json!({ "index": index }))?;
                         Ok((m.ty, name))
                     })
-                    .collect::<Result<Vec<_>, Error>>()?,
+                    .collect::<Result<Vec<_>>>()?,
             );
         }
         debug!("Expected Measurements: {:?}", measurements);
 
         if obj.len() != measurements.len() {
             error!("Invalid number of json arguments");
-            return Err(Error::BadData);
+            return Err(Error::MeasurementMissing);
         }
         for (ty, name) in measurements {
             if let Some(value) = obj.get(&name) {
                 match ty {
-                    MeasurementType::FloatCelsius => {
+                    SensorMeasurementType::FloatCelsius => {
                         if let Some(value) = value.as_f64() {
-                            if value < -100. || value > 100. {
+                            if !(-100. ..=100.).contains(&value) {
                                 error!("Invalid celsius measured (-100 to 100): {}", value);
-                                return Err(Error::BadData);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "-100..=100".to_owned(),
+                                ));
                             }
                         } else {
                             error!("Invalid celsius measured: {:?}", value);
-                            return Err(Error::BadData);
+                            return Err(Error::InvalidMeasurementType(value.clone(), "f64".to_owned()));
                         }
                     }
-                    MeasurementType::RawAnalogRead => {
+                    SensorMeasurementType::RawAnalogRead => {
                         if let Some(value) = value.as_i64() {
-                            if value < 0 || value > 1024 {
+                            if !(0..=1024).contains(&value) {
                                 error!("Invalid raw analog read (0-1024): {}", value);
-                                return Err(Error::BadData);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "0..=1024".to_owned(),
+                                ));
                             }
                         } else {
                             error!("Invalid raw analog read: {:?}", value);
-                            return Err(Error::BadData);
+                            return Err(Error::InvalidMeasurementType(value.clone(), "i64".to_owned()));
                         }
                     }
-                    MeasurementType::Percentage => {
+                    SensorMeasurementType::Percentage => {
                         if let Some(value) = value.as_f64() {
-                            if value < 0. || value > 100. {
+                            if !(0. ..=100.).contains(&value) {
                                 error!("Invalid percentage: {}", value);
-                                return Err(Error::BadData);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "0..=100".to_owned(),
+                                ));
                             }
                         } else {
                             error!("Invalid percentage measured: {:?}", value);
-                            return Err(Error::BadData);
+                            return Err(Error::InvalidMeasurementType(value.clone(), "f64".to_owned()));
                         }
                     }
                 }
             } else {
                 error!("Missing measurement: {}", name);
-                return Err(Error::BadData);
+                return Err(Error::MissingMeasurement(name));
             }
         }
     }
@@ -138,7 +148,7 @@ pub async fn new(
 #[serde(rename_all = "camelCase")]
 pub struct ListRequest {
     device_id: DeviceId,
-    since: DateTime<Utc>,
+    since: DateTime,
 }
 
 pub async fn list(
@@ -148,7 +158,7 @@ pub async fn list(
 ) -> Result<Json<Vec<EventView>>> {
     let mut txn = pool.begin().await?;
     let mut events = Vec::new();
-    let device = db::device::Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let device = crate::Device::find_by_id(&mut txn, request.device_id, &user).await?;
     for event in Event::list(&mut txn, &device, request.since).await? {
         events.push(EventView::new(event)?);
     }

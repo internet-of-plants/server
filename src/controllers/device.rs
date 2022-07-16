@@ -1,9 +1,6 @@
-use crate::extractor::User;
-use crate::{prelude::*, Device};
-use crate::{DeviceId, DeviceView};
+use crate::{extractor::User, Device, DeviceId, DeviceView, Pool, Result};
 use axum::extract::{Extension, Json, Query};
-use controllers::Result;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -23,11 +20,11 @@ pub async fn find(
     Ok(Json(device))
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SetNameRequest {
-    device_id: DeviceId,
-    name: String,
+    pub device_id: DeviceId,
+    pub name: String,
 }
 
 pub async fn set_name(

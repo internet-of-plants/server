@@ -1,5 +1,4 @@
-use crate::db::compilation::{Compilation, CompilationId};
-use crate::prelude::*;
+use crate::{Compilation, CompilationId, Result, Transaction, Device, Organization};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -38,10 +37,11 @@ pub struct Firmware {
 }
 
 impl Firmware {
-    pub async fn new_unknown(txn: &mut Transaction<'_>, binary_hash: String) -> Result<Self> {
+    pub async fn new_unknown(txn: &mut Transaction<'_>, binary_hash: String, organization: &Organization) -> Result<Self> {
         let (id,): (FirmwareId,) =
-            sqlx::query_as("INSERT INTO firmwares (binary_hash) VALUES ($1) RETURNING id")
+            sqlx::query_as("INSERT INTO firmwares (binary_hash, organization_id) VALUES ($1, $2) RETURNING id")
                 .bind(&binary_hash)
+                .bind(organization.id())
                 .fetch_one(txn)
                 .await?;
         Ok(Self {
@@ -56,6 +56,9 @@ impl Firmware {
         compilation: &Compilation,
         bin: Vec<u8>,
     ) -> Result<Self> {
+        let compiler = compilation.compiler(txn).await?;
+        let organization = compiler.organization(txn).await?;
+
         // TODO: move to SHA-256
         let md5 = md5::compute(&bin);
         let md5 = &*md5;
@@ -68,9 +71,9 @@ impl Firmware {
             "
             SELECT id
             FROM firmwares
-            WHERE compilation_id = $1 AND binary_hash = $2",
+            WHERE organization_id = $1 AND binary_hash = $2",
         )
-        .bind(compilation.id())
+        .bind(organization.id())
         .bind(&binary_hash)
         .fetch_optional(&mut *txn)
         .await?;
@@ -79,9 +82,10 @@ impl Firmware {
             id
         } else {
             let (id,): (FirmwareId,) = sqlx::query_as(
-                "INSERT INTO firmwares (compilation_id, bin, binary_hash) VALUES ($1, $2, $3) RETURNING id",
+                "INSERT INTO firmwares (compilation_id, organization_id, bin, binary_hash) VALUES ($1, $2, $3, $4) RETURNING id",
             )
             .bind(compilation.id())
+            .bind(organization.id())
             .bind(&bin)
             .bind(&binary_hash)
             .fetch_one(txn)
@@ -95,20 +99,31 @@ impl Firmware {
         })
     }
 
-    pub async fn find_by_id(txn: &mut Transaction<'_>, id: FirmwareId) -> Result<Self> {
+    pub async fn find_by_device(txn: &mut Transaction<'_>, device: &Device) -> Result<Self> {
         let firmware =
-            sqlx::query_as("SELECT id, compilation_id, binary_hash FROM firmwares WHERE id = $1")
-                .bind(id)
+            sqlx::query_as(
+                "SELECT firmwares.id, compilation_id, binary_hash
+                 FROM firmwares
+                 INNER JOIN devices ON devices.firmware_id = firmwares.id
+                 WHERE firmwares.id = $1 AND devices.id = $2")
+                .bind(device.firmware_id())
+                .bind(device.id())
                 .fetch_one(txn)
                 .await?;
         Ok(firmware)
     }
 
-    pub async fn try_find_by_hash(txn: &mut Transaction<'_>, hash: &str) -> Result<Option<Self>> {
+    pub async fn try_find_by_hash(txn: &mut Transaction<'_>, organization: &Organization, hash: &str) -> Result<Option<Self>> {
         let firmware = sqlx::query_as(
-            "SELECT id, compilation_id, binary_hash FROM firmwares WHERE binary_hash = $1",
+            "SELECT firmwares.id, compilation_id, binary_hash
+             FROM firmwares
+             INNER JOIN devices ON devices.firmware_id = firmwares.id
+             INNER JOIN collections ON collections.id = devices.collection_id
+             INNER JOIN collection_belongs_to_organization cbt ON cbt.collection_id = collections.id
+             WHERE binary_hash = $1 AND cbt.organization_id = $2",
         )
         .bind(hash)
+        .bind(organization.id())
         .fetch_optional(txn)
         .await?;
         Ok(firmware)
@@ -145,7 +160,7 @@ impl Firmware {
 
     pub async fn compilation(&self, txn: &mut Transaction<'_>) -> Result<Option<Compilation>> {
         match self.compilation_id {
-            Some(id) => Ok(Some(Compilation::find_by_id(txn, id).await?)),
+            Some(id) => Ok(Some(Compilation::find_by_id(txn, self, id).await?)),
             None => Ok(None),
         }
     }

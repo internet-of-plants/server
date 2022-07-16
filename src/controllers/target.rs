@@ -1,8 +1,5 @@
-use crate::db::target::{Target, TargetView};
-use crate::extractor::User;
-use crate::prelude::*;
+use crate::{extractor::User, Pool, Result, Target, TargetView};
 use axum::extract::{Extension, Json};
-use controllers::Result;
 
 pub async fn list(
     Extension(pool): Extension<&'static Pool>,

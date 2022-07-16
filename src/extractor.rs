@@ -1,5 +1,4 @@
-use crate::db::user::AuthToken;
-use crate::prelude::*;
+use crate::{AuthToken, Pool};
 use axum::{
     async_trait,
     extract::{Extension, FromRequest, RequestParts, TypedHeader},
@@ -20,13 +19,12 @@ where
             .await
             .expect("`Pool` extension missing");
 
-        let mac = Option::<TypedHeader<MacAddress>>::from_request(req)
-            .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "No authorization"))?
-            .ok_or((StatusCode::UNAUTHORIZED, "No authorization"))?;
         let mut token = TypedHeader::<AuthorizationHeader>::from_request(req)
             .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "No authorization"))?;
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "No auth token"))?;
+        let mac = TypedHeader::<MacAddress>::from_request(req)
+            .await
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "No mac address"))?;
         if token.0 .0.starts_with("Basic ") {
             token.0 .0.drain(.."Basic ".len());
             let mut txn = pool
@@ -36,13 +34,13 @@ where
             let device =
                 crate::Device::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0), mac.0 .0)
                     .await
-                    .map_err(|_| (StatusCode::UNAUTHORIZED, "Internal Server Error"))?;
+                    .map_err(|_| (StatusCode::UNAUTHORIZED, "Device not found"))?;
             txn.commit()
                 .await
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
             Ok(Self(device))
         } else {
-            Err((StatusCode::UNAUTHORIZED, "Invalid authorization"))
+            Err((StatusCode::UNAUTHORIZED, "Invalid authorization header"))
         }
     }
 }

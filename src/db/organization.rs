@@ -1,5 +1,4 @@
-use crate::{prelude::*, CollectionView};
-use crate::{Collection, User, Username};
+use crate::{Collection, CollectionView, DateTime, Error, Result, Transaction, User, Username, Compiler};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -26,13 +25,14 @@ pub struct OrganizationView {
 }
 
 impl OrganizationView {
-pub async fn new(txn: &mut Transaction<'_>, organization: &Organization, user: &User) -> Result<Self> {
-        // TODO: this is dumb, we are making too many roundtrips to the db, but it's less complex,
-        // let's optimize later
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        organization: &Organization,
+    ) -> Result<Self> {
         let cols = Collection::from_organization(txn, organization).await?;
         let mut collections = Vec::with_capacity(cols.len());
         for col in cols {
-            collections.push(CollectionView::new(txn, col, user).await?);
+            collections.push(CollectionView::new(txn, col).await?);
         }
 
         let members = User::from_organization(txn, organization).await?;
@@ -45,6 +45,10 @@ pub async fn new(txn: &mut Transaction<'_>, organization: &Organization, user: &
             created_at: organization.created_at,
             updated_at: organization.updated_at,
         })
+    }
+
+    pub fn id(&self) -> OrganizationId {
+        self.id
     }
 }
 
@@ -60,7 +64,7 @@ pub struct Organization {
 impl Organization {
     pub async fn new(txn: &mut Transaction<'_>, name: String) -> Result<Self> {
         if name.is_empty() {
-            return Err(Error::BadData);
+            return Err(Error::InvalidName);
         }
 
         let (id, now) = sqlx::query_as::<_, (OrganizationId, DateTime)>(
@@ -80,13 +84,13 @@ impl Organization {
 
     pub async fn default_for_user(txn: &mut Transaction<'_>, user: &User) -> Result<Self> {
         let organization: Self = sqlx::query_as(
-            "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
-             FROM organizations as w 
-             INNER JOIN users as u ON u.default_organization_id = w.id
-             WHERE w.id = $1",
+            "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
+             FROM organizations as o 
+             INNER JOIN users as u ON u.default_organization_id = o.id
+             WHERE u.id = $1",
         )
-        .bind(user.id())
-        .fetch_one(txn)
+            .bind(user.id())
+            .fetch_one(txn)
         .await?;
         Ok(organization)
     }
@@ -122,7 +126,39 @@ impl Organization {
         Ok(organizations)
     }
 
-    pub fn id(&self) -> &OrganizationId {
-        &self.id
+    pub async fn find_by_collection(
+        txn: &mut Transaction<'_>,
+        collection: &Collection,
+    ) -> Result<Self> {
+        let organization = sqlx::query_as(
+            "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
+             FROM organizations as o
+             INNER JOIN collection_belongs_to_organization as bt ON bt.organization_id = o.id
+             WHERE bt.collection_id = $1",
+        )
+        .bind(collection.id())
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(organization)
+    }
+
+    pub async fn find_by_compiler(
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+    ) -> Result<Self> {
+        let organization = sqlx::query_as(
+            "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
+             FROM organizations as o
+             INNER JOIN compilers ON compilers.organization_id = o.id
+             WHERE compilers.id = $1",
+        )
+        .bind(compiler.id())
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(organization)
+    }
+
+    pub fn id(&self) -> OrganizationId {
+        self.id
     }
 }

@@ -1,12 +1,8 @@
-use crate::prelude::*;
+use crate::{logger::*, DateTime, Device, Firmware, Result, SensorMeasurementView, Transaction};
 use derive_more::FromStr;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-use super::device::Device;
-use super::firmware::Firmware;
-use super::sensor::measurement::MeasurementView;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -30,7 +26,7 @@ pub struct EventId(i64);
 pub struct EventView {
     pub measurements: serde_json::Value,
     pub stat: DeviceStat,
-    pub metadatas: Vec<MeasurementView>,
+    pub metadatas: Vec<SensorMeasurementView>,
     pub created_at: DateTime,
 }
 
@@ -66,7 +62,10 @@ impl Event {
         measurements: serde_json::Value,
         stat: DeviceStat,
     ) -> Result<Self> {
-        let firmware = Firmware::try_find_by_hash(txn, &stat.version).await?;
+        let collection = device.collection(txn).await?;
+        let organization = collection.organization(txn).await?;
+
+        let firmware = Firmware::try_find_by_hash(txn, &organization, &stat.version).await?;
         let compilation = if let Some(firmware) = firmware {
             firmware.compilation(txn).await?
         } else {
@@ -74,7 +73,7 @@ impl Event {
         };
         let metadatas = if let Some(compilation) = compilation {
             let compiler = compilation.compiler(txn).await?;
-            let sensors = compiler.sensors(txn, device).await?;
+            let sensors = compiler.sensors(txn).await?;
             let mut measurements = Vec::new();
             for (index, sensor) in sensors.into_iter().enumerate() {
                 let prototype = &sensor.prototype;
@@ -85,9 +84,13 @@ impl Event {
                         .map(|m| {
                             let reg = Handlebars::new();
                             let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                            Ok(MeasurementView::new(m.clone(), name, sensor.color.clone()))
+                            Ok(SensorMeasurementView::new(
+                                m.clone(),
+                                name,
+                                sensor.color.clone(),
+                            ))
                         })
-                        .collect::<Result<Vec<_>, Error>>()?,
+                        .collect::<Result<Vec<_>>>()?,
                 );
             }
             measurements
@@ -133,12 +136,16 @@ impl Event {
         Ok(event)
     }
 
-    pub async fn list(txn: &mut Transaction<'_>, device: &Device, since: DateTime) -> Result<Vec<Self>> {
+    pub async fn list(
+        txn: &mut Transaction<'_>,
+        device: &Device,
+        since: DateTime,
+    ) -> Result<Vec<Self>> {
         let event: Vec<Event> = sqlx::query_as(
             "SELECT id, measurements, metadatas, firmware_hash, stat, created_at
             FROM events
             WHERE device_id = $1 AND created_at >= $2
-            ORDER BY created_at DESC"
+            ORDER BY created_at DESC",
         )
         .bind(device.id())
         .bind(since)
