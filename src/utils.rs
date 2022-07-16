@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{logger::*, Result};
 use rand::{distributions::Alphanumeric, Rng};
 use sqlx::Connection;
@@ -67,10 +69,21 @@ pub async fn run_migrations(url: &str) {
             }
             files.push(number);
         } else {
-            let code = fs::read_to_string(entry.file_name())
+            let path = PathBuf::from("migrations").join(entry.file_name());
+            info!("Reading migration file: {:?}", path);
+            let code = fs::read_to_string(path)
                 .await
                 .expect("unable to read migration file");
-            if vec.get((number - 1) as usize) == Some(&Migration { id: number, code }) {
+            let obj = vec.get((number - 1) as usize);
+            if obj.is_some()
+                && obj
+                    != Some(&Migration {
+                        id: number,
+                        code: code.clone(),
+                    })
+            {
+                error!("Migration found: {:#?}", vec.get((number - 1) as usize));
+                error!("Migration expected: {:#?}", Migration { id: number, code });
                 panic!("Migration {} changed", number);
             }
         }
