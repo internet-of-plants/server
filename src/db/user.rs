@@ -23,6 +23,7 @@ impl UserId {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct NewUser {
     pub email: String,
     pub password: String,
