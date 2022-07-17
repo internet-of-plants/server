@@ -168,11 +168,14 @@ impl Compilation {
 
         let firmware = {
             let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
+            info!("Created temp dir {dir:?}");
+
             fs::write(
                 dir.path().join("platformio.ini"),
                 self.platformio_ini.as_bytes(),
             )
             .await?;
+
             fs::create_dir(dir.path().join("src")).await?;
             fs::write(
                 dir.path().join("src").join("main.cpp"),

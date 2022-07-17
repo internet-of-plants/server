@@ -2,7 +2,7 @@ use axum::{body::Body, http, http::Method, http::Request, http::StatusCode};
 use server::controllers::sensor::{SetAliasRequest, SetColorRequest};
 use server::test_helpers::{
     create_compiler, list_organizations, list_sensor_prototypes, list_targets, login,
-    set_sensor_alias, signup, set_sensor_color,
+    set_sensor_alias, set_sensor_color, signup,
 };
 use server::{
     test_router, DeviceWidgetKind, Login, NewCompiler, NewDeviceConfig, NewSensor, NewSensorConfig,
@@ -124,7 +124,7 @@ async fn sensors_alias() {
     }
 
     let mut device_configs = Vec::new();
-    for request in &targets[0].config_requests {
+    for request in &targets[0].configuration_requests {
         let value = match &request.ty.widget {
             DeviceWidgetKind::SSID => "my-ssid".to_owned(),
             DeviceWidgetKind::PSK => "my-psk".to_owned(),
@@ -172,36 +172,44 @@ async fn sensors_alias() {
         .clone();
     assert_eq!("Sensor 1 Alias", alias);
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/alias")
                 .header("Authorization", format!("Basic {}", token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(&SetAliasRequest {
-                    device_id: device_id1,
-                    sensor_id: compilation.compiler.sensors[0].id,
-                    alias: "Sensor 1 Hijack".to_owned()
-                }).unwrap()))
+                .body(Body::from(
+                    serde_json::to_vec(&SetAliasRequest {
+                        device_id: device_id1,
+                        sensor_id: compilation.compiler.sensors[0].id,
+                        alias: "Sensor 1 Hijack".to_owned(),
+                    })
+                    .unwrap(),
+                ))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/alias")
                 .header("Authorization", format!("Basic {}", other_token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(&SetAliasRequest {
-                    device_id,
-                    sensor_id: compilation.compiler.sensors[0].id,
-                    alias: "Sensor 1 Hijack".to_owned()
-                }).unwrap()))
+                .body(Body::from(
+                    serde_json::to_vec(&SetAliasRequest {
+                        device_id,
+                        sensor_id: compilation.compiler.sensors[0].id,
+                        alias: "Sensor 1 Hijack".to_owned(),
+                    })
+                    .unwrap(),
+                ))
                 .unwrap(),
         )
         .await
@@ -323,7 +331,7 @@ async fn sensors_color() {
     }
 
     let mut device_configs = Vec::new();
-    for request in &targets[0].config_requests {
+    for request in &targets[0].configuration_requests {
         let value = match &request.ty.widget {
             DeviceWidgetKind::SSID => "my-ssid".to_owned(),
             DeviceWidgetKind::PSK => "my-psk".to_owned(),
@@ -371,36 +379,44 @@ async fn sensors_color() {
         .clone();
     assert_eq!("Sensor 1 Color", color);
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/color")
                 .header("Authorization", format!("Basic {}", token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(&SetColorRequest {
-                    device_id: device_id1,
-                    sensor_id: compilation.compiler.sensors[0].id,
-                    color: "Sensor 1 Hijack".to_owned()
-                }).unwrap()))
+                .body(Body::from(
+                    serde_json::to_vec(&SetColorRequest {
+                        device_id: device_id1,
+                        sensor_id: compilation.compiler.sensors[0].id,
+                        color: "Sensor 1 Hijack".to_owned(),
+                    })
+                    .unwrap(),
+                ))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/color")
                 .header("Authorization", format!("Basic {}", other_token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(&SetColorRequest {
-                    device_id,
-                    sensor_id: compilation.compiler.sensors[0].id,
-                    color: "Sensor 1 Hijack".to_owned()
-                }).unwrap()))
+                .body(Body::from(
+                    serde_json::to_vec(&SetColorRequest {
+                        device_id,
+                        sensor_id: compilation.compiler.sensors[0].id,
+                        color: "Sensor 1 Hijack".to_owned(),
+                    })
+                    .unwrap(),
+                ))
                 .unwrap(),
         )
         .await

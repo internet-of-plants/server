@@ -47,7 +47,9 @@ pub async fn new(
 
     let collection = device.collection(&mut txn).await?;
     let organization = collection.organization(&mut txn).await?;
-    if let Some(firmware) = Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await? {
+    if let Some(firmware) =
+        Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await?
+    {
         device.set_firmware(&mut txn, &firmware).await?;
     }
 
@@ -99,7 +101,10 @@ pub async fn new(
                             }
                         } else {
                             error!("Invalid celsius measured: {:?}", value);
-                            return Err(Error::InvalidMeasurementType(value.clone(), "f64".to_owned()));
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "f64".to_owned(),
+                            ));
                         }
                     }
                     SensorMeasurementType::RawAnalogRead => {
@@ -113,7 +118,10 @@ pub async fn new(
                             }
                         } else {
                             error!("Invalid raw analog read: {:?}", value);
-                            return Err(Error::InvalidMeasurementType(value.clone(), "i64".to_owned()));
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "i64".to_owned(),
+                            ));
                         }
                     }
                     SensorMeasurementType::Percentage => {
@@ -127,7 +135,10 @@ pub async fn new(
                             }
                         } else {
                             error!("Invalid percentage measured: {:?}", value);
-                            return Err(Error::InvalidMeasurementType(value.clone(), "f64".to_owned()));
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "f64".to_owned(),
+                            ));
                         }
                     }
                 }

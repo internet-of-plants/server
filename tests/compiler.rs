@@ -118,7 +118,7 @@ async fn compiler() {
     }
 
     let mut device_configs = Vec::new();
-    for request in &targets[0].config_requests {
+    for request in &targets[0].configuration_requests {
         let value = match &request.ty.widget {
             DeviceWidgetKind::SSID => "my-ssid".to_owned(),
             DeviceWidgetKind::PSK => "my-psk".to_owned(),

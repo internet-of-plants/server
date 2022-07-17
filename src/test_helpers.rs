@@ -1,5 +1,8 @@
 use crate::{
-    controllers::{device::SetNameRequest, sensor::{SetAliasRequest, SetColorRequest}},
+    controllers::{
+        device::SetNameRequest,
+        sensor::{SetAliasRequest, SetColorRequest},
+    },
     extractor::MacAddress,
     extractor::Version,
     AuthToken, CollectionId, CollectionView, CompilationView, DeviceId, DeviceLogView,
@@ -431,7 +434,7 @@ pub async fn set_sensor_alias(app: Router, token: &AuthToken, request: SetAliasR
                 .header("Authorization", format!("Basic {}", token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(dbg!(&request)).unwrap()))
+                .body(Body::from(serde_json::to_vec(&request).unwrap()))
                 .unwrap(),
         )
         .await
@@ -447,7 +450,7 @@ pub async fn set_sensor_color(app: Router, token: &AuthToken, request: SetColorR
                 .header("Authorization", format!("Basic {}", token.0))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
-                .body(Body::from(serde_json::to_vec(dbg!(&request)).unwrap()))
+                .body(Body::from(serde_json::to_vec(&request).unwrap()))
                 .unwrap(),
         )
         .await

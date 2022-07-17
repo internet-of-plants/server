@@ -18,15 +18,16 @@ pub struct TargetView {
     pub extra_platformio_params: Option<String>,
     pub ldf_mode: Option<String>,
     pub board: Option<String>,
-    pub config_requests: Vec<DeviceConfigRequestView>,
+    pub configuration_requests: Vec<DeviceConfigRequestView>,
 }
 
 impl TargetView {
     pub async fn new(txn: &mut Transaction<'_>, target: Target) -> Result<Self> {
         let prototype = target.prototype(&mut *txn).await?;
-        let mut config_requests = Vec::new();
-        for config_request in target.config_requests(&mut *txn).await? {
-            config_requests.push(DeviceConfigRequestView::new(&mut *txn, config_request).await?);
+        let mut configuration_requests = Vec::new();
+        for config_request in target.configuration_requests(&mut *txn).await? {
+            configuration_requests
+                .push(DeviceConfigRequestView::new(&mut *txn, config_request).await?);
         }
         Ok(Self {
             id: target.id(),
@@ -39,10 +40,10 @@ impl TargetView {
             ldf_mode: prototype.ldf_mode,
             board: target.board().map(ToOwned::to_owned),
             name: target.name,
-            config_requests,
+            configuration_requests,
         })
     }
-    
+
     pub fn id(&self) -> TargetId {
         self.id
     }
@@ -108,7 +109,6 @@ impl Target {
                 config_request.type_name,
                 config_request.widget,
                 &target,
-                config_request.optional,
                 config_request.secret_algo,
             )
             .await?;
@@ -194,7 +194,10 @@ impl Target {
         TargetPrototype::find_by_id(txn, self.target_prototype_id).await
     }
 
-    pub async fn config_requests(&self, txn: &mut Transaction<'_>) -> Result<Vec<DeviceConfigRequest>> {
+    pub async fn configuration_requests(
+        &self,
+        txn: &mut Transaction<'_>,
+    ) -> Result<Vec<DeviceConfigRequest>> {
         DeviceConfigRequest::find_by_target(txn, self).await
     }
 

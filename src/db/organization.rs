@@ -1,4 +1,6 @@
-use crate::{Collection, CollectionView, DateTime, Error, Result, Transaction, User, Username, Compiler};
+use crate::{
+    Collection, CollectionView, Compiler, DateTime, Error, Result, Transaction, User, Username,
+};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -25,10 +27,7 @@ pub struct OrganizationView {
 }
 
 impl OrganizationView {
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        organization: &Organization,
-    ) -> Result<Self> {
+    pub async fn new(txn: &mut Transaction<'_>, organization: &Organization) -> Result<Self> {
         let cols = Collection::from_organization(txn, organization).await?;
         let mut collections = Vec::with_capacity(cols.len());
         for col in cols {
@@ -89,8 +88,8 @@ impl Organization {
              INNER JOIN users as u ON u.default_organization_id = o.id
              WHERE u.id = $1",
         )
-            .bind(user.id())
-            .fetch_one(txn)
+        .bind(user.id())
+        .fetch_one(txn)
         .await?;
         Ok(organization)
     }
@@ -142,10 +141,7 @@ impl Organization {
         Ok(organization)
     }
 
-    pub async fn find_by_compiler(
-        txn: &mut Transaction<'_>,
-        compiler: &Compiler,
-    ) -> Result<Self> {
+    pub async fn find_by_compiler(txn: &mut Transaction<'_>, compiler: &Compiler) -> Result<Self> {
         let organization = sqlx::query_as(
             "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
              FROM organizations as o

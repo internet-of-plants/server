@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS compilers (
 );
 
 -- TODO: add versioning to compilations (and automatically compile when dependencies update)
+-- or certificates
 CREATE TABLE IF NOT EXISTS compilations (
   id             BIGSERIAL PRIMARY KEY NOT NULL,
   compiler_id    BIGINT                NOT NULL,
@@ -88,7 +89,6 @@ CREATE TABLE IF NOT EXISTS compilations (
   FOREIGN KEY (compiler_id) REFERENCES compilers (id)
 );
 
--- TODO: add versioning to firmwares (and automatically compile when dependencies update)
 CREATE TABLE IF NOT EXISTS firmwares (
   id              BIGSERIAL PRIMARY KEY NOT NULL,
   compilation_id  BIGINT,
@@ -248,7 +248,6 @@ CREATE TABLE IF NOT EXISTS device_config_requests (
   name        TEXT                  NOT NULL,
   human_name  TEXT                  NOT NULL,
   target_id   BIGINT                NOT NULL,
-  optional    BOOLEAN               NOT NULL,
   secret_algo SecretAlgo, 
   created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE(type_id, name, target_id),

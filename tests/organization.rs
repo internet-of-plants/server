@@ -1,5 +1,5 @@
 use server::test_helpers::{find_organization, list_organizations, signup};
-use server::{NewUser, test_router};
+use server::{test_router, NewUser};
 
 #[tokio::test]
 async fn organization() {

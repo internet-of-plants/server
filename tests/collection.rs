@@ -1,5 +1,5 @@
 use server::test_helpers::{find_collection, list_organizations, login, signup};
-use server::{Login, NewUser, test_router};
+use server::{test_router, Login, NewUser};
 
 #[tokio::test]
 async fn collection() {

@@ -6,8 +6,8 @@ use std::path::PathBuf;
 #[cfg(not(debug_assertions))]
 use axum_server::tls_rustls::RustlsConfig;
 
-use tracing_subscriber::{prelude::*, EnvFilter};
 use server::router;
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() {

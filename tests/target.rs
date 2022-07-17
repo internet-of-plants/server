@@ -1,5 +1,5 @@
 use server::test_helpers::{list_targets, signup};
-use server::{NewUser, test_router};
+use server::{test_router, NewUser};
 
 #[tokio::test]
 async fn target() {

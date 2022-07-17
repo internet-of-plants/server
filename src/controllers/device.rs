@@ -1,6 +1,6 @@
 use crate::{extractor::User, Device, DeviceId, DeviceView, Pool, Result};
 use axum::extract::{Extension, Json, Query};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -183,7 +183,6 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
                 "SSID".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::SSID,
-                false,
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
@@ -191,7 +190,6 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
-                false,
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
         ],
@@ -235,7 +233,6 @@ async fn esp32dev_esp32_target(
                 "SSID".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::SSID,
-                false,
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
@@ -243,7 +240,6 @@ async fn esp32dev_esp32_target(
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
-                false,
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
         ],
@@ -298,7 +294,22 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 #endif"
             .to_owned(),
         target_prototype,
-        vec![],
+        vec![
+            NewDeviceConfigRequest::new(
+                "Captive Portal SSID".to_owned(),
+                "SSID".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::SSID,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Captive Portal PSK".to_owned(),
+                "PSK".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::PSK,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+        ],
     )
     .await?;
     target
@@ -337,7 +348,22 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 #endif"
             .to_owned(),
         target_prototype,
-        vec![],
+        vec![
+            NewDeviceConfigRequest::new(
+                "Captive Portal SSID".to_owned(),
+                "SSID".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::SSID,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Captive Portal PSK".to_owned(),
+                "PSK".to_owned(),
+                "iop::StaticString".to_owned(),
+                DeviceWidgetKind::PSK,
+                Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+        ],
     )
     .await?;
     target.set_name(txn, Some("mock".to_owned())).await?;

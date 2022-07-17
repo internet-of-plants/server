@@ -1,4 +1,4 @@
-use crate::{SensorConfigRequest, SensorConfigRequestId, Result, Sensor, SensorId, Transaction};
+use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -71,10 +71,7 @@ impl SensorConfig {
         })
     }
 
-    pub async fn find_by_sensor(
-        txn: &mut Transaction<'_>,
-        sensor: &Sensor,
-    ) -> Result<Vec<Self>> {
+    pub async fn find_by_sensor(txn: &mut Transaction<'_>, sensor: &Sensor) -> Result<Vec<Self>> {
         let list: Vec<Self> = sqlx::query_as(
             "SELECT id, sensor_id, request_id, value FROM sensor_configs WHERE sensor_id = $1",
         )

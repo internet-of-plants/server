@@ -1,4 +1,4 @@
-use crate::{logger::*, DateTime, Device, Result, Transaction, Error};
+use crate::{logger::*, DateTime, Device, Error, Result, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 

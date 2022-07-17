@@ -11,20 +11,30 @@ pub use crate::db::{
     compilation::{Compilation, CompilationId, CompilationView},
     compiler::{Compiler, CompilerId, CompilerView, NewCompiler},
     device::{Device, DeviceId, DeviceView, NewDevice},
+    device_config::{DeviceConfig, DeviceConfigId, DeviceConfigView, NewDeviceConfig},
+    device_config_request::{
+        DeviceConfigRequest, DeviceConfigRequestId, DeviceConfigRequestView, NewDeviceConfigRequest,
+    },
+    device_config_type::{
+        DeviceConfigType, DeviceConfigTypeId, DeviceConfigTypeView, DeviceWidgetKind,
+    },
     device_log::{DeviceLog, DeviceLogId, DeviceLogView},
     device_panic::{DevicePanic, DevicePanicId, DevicePanicView, NewDevicePanic},
     event::{DeviceStat, Event, EventId, EventView},
     firmware::{Firmware, FirmwareId, FirmwareView},
     organization::{Organization, OrganizationId, OrganizationView},
     secret::SecretAlgo,
-    sensor_config::{SensorConfig, SensorConfigId, SensorConfigView, NewSensorConfig},
-    sensor_config_request::{SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView, NewSensorConfigRequest},
-    sensor_config_type::{SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorWidgetKind},
-    sensor_measurement::{SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView},
-    device_config::{DeviceConfig, DeviceConfigId, DeviceConfigView, NewDeviceConfig},
-    device_config_request::{DeviceConfigRequest, DeviceConfigRequestId, DeviceConfigRequestView, NewDeviceConfigRequest},
-    device_config_type::{DeviceConfigType, DeviceConfigTypeId, DeviceConfigTypeView, DeviceWidgetKind},
     sensor::{Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorView, Setup},
+    sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView},
+    sensor_config_request::{
+        NewSensorConfigRequest, SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView,
+    },
+    sensor_config_type::{
+        SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorWidgetKind,
+    },
+    sensor_measurement::{
+        SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView,
+    },
     sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
     target::{Target, TargetId, TargetView},
     target_prototype::{TargetPrototype, TargetPrototypeId},
@@ -67,7 +77,7 @@ pub async fn test_router() -> Router {
             .execute(&mut connection)
             .await
             .unwrap();
-    tracing_subscriber::registry()
+        tracing_subscriber::registry()
         .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(
             |_| {
                 "server=trace,tracing=trace,hyper=info,axum=trace,event=trace,now=trace,timer=trace"

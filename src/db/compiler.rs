@@ -225,10 +225,10 @@ impl Compiler {
             // TODO: validate SSID and PSK sizes
             match ty.widget() {
                 DeviceWidgetKind::SSID => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value)
+                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace("\"", "\\\""))
                 ),
                 DeviceWidgetKind::PSK => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value)
+                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace("\"", "\\\""))
                 )
             }
         }
@@ -294,7 +294,7 @@ impl Compiler {
                         "constexpr static {} {} = {};",
                         req.ty(&mut *txn).await?.name,
                         name,
-                        c.value
+                        c.value.replace("\"", "\\\""),
                     ),
                 ));
             }
@@ -341,7 +341,6 @@ constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
 
 auto reportMeasurements(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
   loop.logger().debug(IOP_STR(\"Handle Measurements\"));
-  loop.setAccessPointCredentials(config::SSID, config::PSK);
 
   const auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{\
     {measurements}
@@ -353,6 +352,7 @@ auto reportMeasurements(iop::EventLoop &loop, const iop::AuthToken &token) noexc
 
 namespace iop {{
 auto setup(EventLoop &loop) noexcept -> void {{
+  loop.setAccessPointCredentials(config::SSID, config::PSK);
   {setups}
   loop.setAuthenticatedInterval(config::measurementsInterval, reportMeasurements);
 }}
@@ -374,7 +374,7 @@ auto setup(EventLoop &loop) noexcept -> void {{
         sqlx::query(
             "UPDATE sensor_belongs_to_compiler
              SET alias = $1, updated_at = NOW()
-             WHERE sensor_id = $2 AND compiler_id = $3"
+             WHERE sensor_id = $2 AND compiler_id = $3",
         )
         .bind(alias)
         .bind(sensor.id())

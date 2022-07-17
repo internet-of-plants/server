@@ -1,6 +1,6 @@
 use crate::{
-    SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, Result, Target,
-    Transaction, SensorWidgetKind, SensorPrototype,
+    Result, SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorPrototype,
+    SensorWidgetKind, Target, Transaction,
 };
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};

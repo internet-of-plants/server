@@ -90,7 +90,11 @@ impl SensorConfigType {
         Ok(ty)
     }
 
-    pub async fn new(txn: &mut Transaction<'_>, name: String, widget: SensorWidgetKind) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        name: String,
+        widget: SensorWidgetKind,
+    ) -> Result<Self> {
         let widget_kind_raw = SensorWidgetKindRaw::from(&widget);
         let (id,) = sqlx::query_as::<_, (SensorConfigTypeId,)>(
             "INSERT INTO sensor_config_types (name, widget) VALUES ($1, $2) RETURNING id",

@@ -1,7 +1,7 @@
 use crate::{
     utils, AuthToken, Collection, CollectionId, Compiler, CompilerId, CompilerView, DateTime,
     Error, Event, EventView, Firmware, FirmwareId, FirmwareView, Login, Organization, Result,
-    Transaction, User, UserId, 
+    Transaction, User, UserId,
 };
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};

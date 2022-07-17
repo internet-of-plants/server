@@ -1,4 +1,4 @@
-use crate::{extractor::User, Device, DeviceId, Pool, Result, Sensor, SensorId, Error};
+use crate::{extractor::User, Device, DeviceId, Error, Pool, Result, Sensor, SensorId};
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 

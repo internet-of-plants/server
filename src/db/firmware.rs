@@ -1,4 +1,4 @@
-use crate::{Compilation, CompilationId, Result, Transaction, Device, Organization};
+use crate::{Compilation, CompilationId, Device, Organization, Result, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -37,13 +37,18 @@ pub struct Firmware {
 }
 
 impl Firmware {
-    pub async fn new_unknown(txn: &mut Transaction<'_>, binary_hash: String, organization: &Organization) -> Result<Self> {
-        let (id,): (FirmwareId,) =
-            sqlx::query_as("INSERT INTO firmwares (binary_hash, organization_id) VALUES ($1, $2) RETURNING id")
-                .bind(&binary_hash)
-                .bind(organization.id())
-                .fetch_one(txn)
-                .await?;
+    pub async fn new_unknown(
+        txn: &mut Transaction<'_>,
+        binary_hash: String,
+        organization: &Organization,
+    ) -> Result<Self> {
+        let (id,): (FirmwareId,) = sqlx::query_as(
+            "INSERT INTO firmwares (binary_hash, organization_id) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(&binary_hash)
+        .bind(organization.id())
+        .fetch_one(txn)
+        .await?;
         Ok(Self {
             id,
             compilation_id: None,
@@ -100,27 +105,38 @@ impl Firmware {
     }
 
     pub async fn find_by_device(txn: &mut Transaction<'_>, device: &Device) -> Result<Self> {
-        let firmware =
-            sqlx::query_as(
-                "SELECT firmwares.id, compilation_id, binary_hash
+        let firmware = sqlx::query_as(
+            "SELECT firmwares.id, compilation_id, binary_hash
                  FROM firmwares
                  INNER JOIN devices ON devices.firmware_id = firmwares.id
-                 WHERE firmwares.id = $1 AND devices.id = $2")
-                .bind(device.firmware_id())
-                .bind(device.id())
-                .fetch_one(txn)
-                .await?;
+                 WHERE firmwares.id = $1 AND devices.id = $2",
+        )
+        .bind(device.firmware_id())
+        .bind(device.id())
+        .fetch_one(txn)
+        .await?;
         Ok(firmware)
     }
 
-    pub async fn try_find_by_hash(txn: &mut Transaction<'_>, organization: &Organization, hash: &str) -> Result<Option<Self>> {
+    pub async fn try_find_by_hash(
+        txn: &mut Transaction<'_>,
+        organization: &Organization,
+        hash: &str,
+    ) -> Result<Option<Self>> {
         let firmware = sqlx::query_as(
             "SELECT firmwares.id, compilation_id, binary_hash
              FROM firmwares
              INNER JOIN devices ON devices.firmware_id = firmwares.id
              INNER JOIN collections ON collections.id = devices.collection_id
              INNER JOIN collection_belongs_to_organization cbt ON cbt.collection_id = collections.id
-             WHERE binary_hash = $1 AND cbt.organization_id = $2",
+             WHERE binary_hash = $1 AND cbt.organization_id = $2
+             UNION
+             SELECT firmwares.id, compilation_id, binary_hash
+             FROM firmwares
+             INNER JOIN compilations ON compilations.id = firmwares.compilation_id
+             INNER JOIN compilers ON compilers.id = compilations.compiler_id
+             WHERE binary_hash = $1 AND compilers.organization_id = $2
+",
         )
         .bind(hash)
         .bind(organization.id())

@@ -1,8 +1,8 @@
 use axum::{body::Body, http::Method, http::Request, http::StatusCode};
-use server::NewDevicePanic;
 use server::test_helpers::{
     list_device_panics, list_organizations, login, send_device_panic, signup,
 };
+use server::NewDevicePanic;
 use server::{db::user::Login, db::user::NewUser, test_router};
 use tower::ServiceExt;
 

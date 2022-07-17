@@ -118,11 +118,11 @@ impl IntoResponse for Error {
                 warn!("Event Must Be Object");
                 (StatusCode::BAD_REQUEST, "Event Must Be Object")
             }
-            Self::MeasurementOutOfRange(val, range)=> {
+            Self::MeasurementOutOfRange(val, range) => {
                 warn!("Measurement Out of Range: {val} expected {range}");
                 (StatusCode::BAD_REQUEST, "Measurement Out of Range")
             }
-            Self::InvalidMeasurementType(json, ty)=> {
+            Self::InvalidMeasurementType(json, ty) => {
                 warn!("Invalid Measurement Type: {json:?} expected {ty}");
                 (StatusCode::BAD_REQUEST, "Invalid Measurement Type")
             }
@@ -130,7 +130,7 @@ impl IntoResponse for Error {
                 warn!("Duplicated Config");
                 (StatusCode::BAD_REQUEST, "Duplicated Config")
             }
-            Self::MeasurementMissing=> {
+            Self::MeasurementMissing => {
                 warn!("Measurement Missing");
                 (StatusCode::BAD_REQUEST, "Measurement Missing")
             }
