@@ -26,7 +26,6 @@ pub async fn new(
         let config = DeviceConfig::new(&mut txn, config, &organization).await?;
         device_configs.push(config);
     }
-    // TODO: enforce required configs
     // TODO: encrypt secrets
     let target = Target::find_by_id(&mut txn, new_compiler.target_id).await?;
     let (compiler, compilation) = Compiler::new(
