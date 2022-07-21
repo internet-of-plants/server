@@ -14,13 +14,13 @@ for f in /tmp/iop-*.root; do
   #umount -l $f/sys
   umount -l $f/usr
   #umount -l $f/dev
-  #umount -l $f/proc
+  umount -l $f/proc
   umount -l $f/lib
   #umount -l $f/lib32
   umount -l $f/lib64
   #umount -l $f/libx32
   #umount -l $f/run
-  #umount -l $f/etc
+  umount -l $f/etc
   #umount -l $f/boot
   rm -rf $f
 done
@@ -50,17 +50,18 @@ mount --bind /lib64 $FOLDER/lib64
 mount --bind /usr $FOLDER/usr
 #mount --bind /dev $FOLDER/dev
 #mount --bind /run $FOLDER/run
-#mount --bind /proc $FOLDER/proc
-#mount --bind /etc $FOLDER/etc
+mount --bind /proc $FOLDER/proc
+mount --bind /etc $FOLDER/etc
 #mount --bind /boot $FOLDER/boot
 
-echo "root:x:0:0:root:/root:/bin/bash" > $FOLDER/etc/passwd
-echo "iop:x:1000:1000::/home/iop:/bin/sh" >> $FOLDER/etc/passwd
-echo "root	ALL=(ALL:ALL) ALL" >> $FOLDER/etc/sudoers
-echo "root:*:16176:0:99999:7:::" > $FOLDER/etc/shadow
-echo "iop:!:19176:0:99999:7:::" >> $FOLDER/etc/shadow
-cp -r /etc/ssl $FOLDER/etc/ssl
-cp -r /etc/pam.d $FOLDER/etc/pam.d
+#echo "root:x:0:0:root:/root:/bin/bash" > $FOLDER/etc/passwd
+#echo "iop:x:1000:1000::/home/iop:/bin/sh" >> $FOLDER/etc/passwd
+#echo "root	ALL=(ALL:ALL) ALL" >> $FOLDER/etc/sudoers
+#echo "root:*:16176:0:99999:7:::" > $FOLDER/etc/shadow
+#echo "iop:!:19176:0:99999:7:::" >> $FOLDER/etc/shadow
+#cp -r /etc/ssl $FOLDER/etc/ssl
+#cp -r /etc/pam.d $FOLDER/etc/pam.d
+#cp -r /etc/pam.d $FOLDER/etc/pam.d
 cp /var/run/utmp $FOLDER/var/run/utmp
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
 cp $SCRIPTPATH/run-server-with-logging.sh $FOLDER/
@@ -74,7 +75,7 @@ sudo chmod 400 $FOLDER/privkey.pem
 sudo chmod 400 $FOLDER/migrations/*
 sudo chmod 500 $FOLDER/migrations
 sudo chmod 555 $FOLDER
-sudo chmod 666 $FOLDER/tmp
+sudo chmod 777 $FOLDER/tmp
 sudo chown iop.iop $FOLDER/home/iop
 sudo chown iop.iop $FOLDER/server
 sudo chown iop.iop $FOLDER/run-server-with-logging.sh

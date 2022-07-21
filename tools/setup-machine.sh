@@ -29,6 +29,7 @@ ufw default deny
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
+ufw allow 4001/tcp
 ufw --force enable
 
 echo "Install ubuntu dependencies needed"

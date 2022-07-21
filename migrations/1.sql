@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS device_config_belongs_to_compiler (
   created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE (compiler_id, config_id),
   FOREIGN KEY (compiler_id) REFERENCES compilers (id),
-  FOREIGN KEY (config_id) REFERENCES device_config_requests (id)
+  FOREIGN KEY (config_id) REFERENCES device_configs (id)
 );
 
 CREATE TABLE IF NOT EXISTS pins (
