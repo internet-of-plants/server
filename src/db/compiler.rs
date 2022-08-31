@@ -358,7 +358,14 @@ auto setup(EventLoop &loop) noexcept -> void {{
 }}
 }}",
         );
-        Compilation::new(&mut *txn, self, platformio_ini, main_cpp, pin_hpp).await
+        Compilation::new(
+            &mut *txn,
+            self,
+            dbg!(platformio_ini),
+            dbg!(main_cpp),
+            dbg!(pin_hpp),
+        )
+        .await
     }
 
     pub async fn latest_compilation(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {

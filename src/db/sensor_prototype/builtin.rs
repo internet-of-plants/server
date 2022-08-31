@@ -148,7 +148,8 @@ async fn esp8266_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPro
         "-D IOP_ESP8266\n    -D IOP_SSL".to_owned(),
         "espressif8266".to_owned(),
         Some("arduino".to_owned()),
-        Some("framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino.git#d5444c4aa38bff01269cfbd98a13a1454d0c62df".to_owned()),
+        Some("mcspr/toolchain-xtensa @ ~5.100300.211127
+framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino.git#d5444c4aa38bff01269cfbd98a13a1454d0c62df".to_owned()),
         Some("monitor_filters = esp8266_exception_decoder\nboard_build.f_cpu = 160000000L\nmonitor_speed = 115200".to_owned()),
         Some("deep".to_owned())
     ).await
