@@ -5,7 +5,7 @@ use tokio::fs;
 
 use super::compiler::{Compiler, CompilerId, CompilerView};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilationView {
     pub id: CompilationId,

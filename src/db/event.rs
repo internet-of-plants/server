@@ -4,7 +4,7 @@ use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceStat {
     pub version: String,
@@ -21,7 +21,7 @@ pub struct DeviceStat {
 #[sqlx(transparent)]
 pub struct EventId(i64);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventView {
     pub measurements: serde_json::Value,
@@ -41,7 +41,7 @@ impl EventView {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub id: EventId,
     pub measurements: serde_json::Value,

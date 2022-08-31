@@ -16,7 +16,7 @@ impl DeviceId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceView {
     pub id: DeviceId,
@@ -95,14 +95,14 @@ impl Device {
         organization: &Organization,
         new_device: NewDevice,
     ) -> Result<Device> {
-        let device = Self::try_find_by_mac(txn, &organization, &new_device.mac).await?;
+        let device = Self::try_find_by_mac(txn, organization, &new_device.mac).await?;
 
         let firmware = if let Some(firmware) =
-            Firmware::try_find_by_hash(txn, &organization, &new_device.file_hash).await?
+            Firmware::try_find_by_hash(txn, organization, &new_device.file_hash).await?
         {
             firmware
         } else {
-            Firmware::new_unknown(txn, new_device.file_hash.clone(), &organization).await?
+            Firmware::new_unknown(txn, new_device.file_hash.clone(), organization).await?
         };
 
         let compiler = if let Some(compilation) = firmware.compilation(txn).await? {
@@ -124,7 +124,7 @@ impl Device {
         }
 
         // TODO: if firmware exists put new device in existing collection that has the devices with the same firmware instead of the default
-        let collection = Collection::new(txn, new_device.mac.clone(), &organization).await?;
+        let collection = Collection::new(txn, new_device.mac.clone(), organization).await?;
 
         let name = format!("device-{}", utils::random_string(5));
         let (id, now) =

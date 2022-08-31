@@ -15,7 +15,7 @@ pub enum SensorMeasurementType {
     RawAnalogRead, // (0-1024)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorMeasurementView {
     pub name: String,

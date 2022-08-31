@@ -20,7 +20,7 @@ pub struct NewCompiler {
     pub sensors: Vec<NewSensor>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilerView {
     pub id: CompilerId,
@@ -225,10 +225,10 @@ impl Compiler {
             // TODO: validate SSID and PSK sizes
             match ty.widget() {
                 DeviceWidgetKind::SSID => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace("\"", "\\\""))
+                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace('"', "\\\""))
                 ),
                 DeviceWidgetKind::PSK => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace("\"", "\\\""))
+                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace('"', "\\\""))
                 )
             }
         }
@@ -294,7 +294,7 @@ impl Compiler {
                         "constexpr static {} {} = {};",
                         req.ty(&mut *txn).await?.name,
                         name,
-                        c.value.replace("\"", "\\\""),
+                        c.value.replace('"', "\\\""),
                     ),
                 ));
             }

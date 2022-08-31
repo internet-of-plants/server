@@ -17,7 +17,7 @@ impl AuthToken {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, PartialEq, Serialize)]
+#[derive(sqlx::FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Auth {
     pub user: User,
     pub device: Option<Device>,

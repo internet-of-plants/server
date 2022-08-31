@@ -16,7 +16,7 @@ pub struct NewSensor {
     pub configs: Vec<NewSensorConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct SensorView {
     pub id: SensorId,
     pub name: String,
