@@ -269,7 +269,7 @@ lib_deps =
                 .map_or_else(String::new, |p| format!("{p}\n")),
             platform_packages
                 .as_ref()
-                .map(|p| format!("\nplatform_packages = {p}"))
+                .map(|p| format!("\nplatform_packages =\n    {p}"))
                 .unwrap_or_else(String::new)
         ))
     }
