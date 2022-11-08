@@ -84,7 +84,7 @@ impl Organization {
     pub async fn default_for_user(txn: &mut Transaction<'_>, user: &User) -> Result<Self> {
         let organization: Self = sqlx::query_as(
             "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
-             FROM organizations as o 
+             FROM organizations as o
              INNER JOIN users as u ON u.default_organization_id = o.id
              WHERE u.id = $1",
         )

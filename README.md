@@ -23,7 +23,7 @@ The device can have an empty compiler, providing arbitrary data, although that m
 - All routes, except for `/v1/signup` and `/v1/user/login` require an authentication token
     - `Authorization` header set to `Basic ${token}`
 - POST `/v1/user`: User signup
-    - JSON request: `{ email: string; user: string; password: string }` returns base64 token    
+    - JSON request: `{ email: string; user: string; password: string }` returns base64 token
 - POST `/v1/user/login`: User authentication
     - JSON request: `{ user: string; password: string }` returns base64 token
 - GET `/v1/targets`: List all targets available - to be attached as device metadata

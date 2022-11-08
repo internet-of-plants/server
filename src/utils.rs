@@ -20,7 +20,7 @@ pub async fn run_migrations(url: &str) {
 
     let migrations_creation_query = "CREATE TABLE IF NOT EXISTS migrations (
   id         SMALLINT    NOT NULL UNIQUE,
-  code       TEXT        NOT NULL UNIQUE, 
+  code       TEXT        NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )";
     info!("Creating migrations table if needed");

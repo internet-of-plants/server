@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS events (
   measurements  JSONB                 NOT NULL,
   stat          JSONB                 NOT NULL,
   metadatas     JSONB                 NOT NULL,
-  firmware_hash TEXT                  NOT NULL,       
+  firmware_hash TEXT                  NOT NULL,
   created_at    TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   FOREIGN KEY (device_id) REFERENCES devices (id)
 );
@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS device_config_requests (
   name        TEXT                  NOT NULL,
   human_name  TEXT                  NOT NULL,
   target_id   BIGINT                NOT NULL,
-  secret_algo SecretAlgo, 
+  secret_algo SecretAlgo,
   created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE(type_id, name, target_id),
   FOREIGN KEY (type_id) REFERENCES device_config_types (id),
