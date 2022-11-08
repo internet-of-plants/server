@@ -340,11 +340,12 @@ constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
 {definitions}
 
 auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Json> {
-  loop.logger().debug(IOP_STR(\"Handle Measurements\"));
+  IOP_TRACE();
+  loop.logger().infoln(IOP_STR(\"Handle Measurements\"));
   auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{\
     {measurements}
   }});
-  if (!json) iop_panic(IOP_STR(\"Unable to send measurements, buffer overflow\"));
+  iop_assert(json, IOP_STR(\"Unable to send measurements, OOM or buffer overflow\"));
   return json;
 }
 
