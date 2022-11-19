@@ -24,13 +24,17 @@ pub use crate::db::{
     firmware::{Firmware, FirmwareId, FirmwareView},
     organization::{Organization, OrganizationId, OrganizationView},
     secret::SecretAlgo,
-    sensor::{Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorView, Setup},
+    sensor::{
+        Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorView, Setup,
+        UnauthenticatedAction,
+    },
     sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView},
     sensor_config_request::{
         NewSensorConfigRequest, SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView,
     },
     sensor_config_type::{
-        SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorWidgetKind,
+        SensorConfigType, SensorConfigTypeId, SensorConfigTypeMapId, SensorConfigTypeView,
+        SensorWidgetKind,
     },
     sensor_measurement::{
         SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView,

@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS sensors (
 );
 
 CREATE TYPE SensorWidgetKindRaw AS ENUM (
-  'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection'
+  'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection', 'Moment', 'Map'
 );
 
 CREATE TABLE IF NOT EXISTS sensor_config_types (
@@ -187,13 +187,33 @@ CREATE TABLE IF NOT EXISTS sensor_config_types (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TYPE ParentMetadata AS ENUM (
+  'Key', 'Value'
+);
+
+CREATE TABLE IF NOT EXISTS sensor_config_type_selection_maps (
+  id              BIGSERIAL           PRIMARY KEY NOT NULL,
+  type_id         BIGINT              NOT NULL,
+  parent_id       BIGINT,
+  parent_metadata ParentMetadata,
+  key             SensorWidgetKindRaw NOT NULL,
+  value           SensorWidgetKindRaw NOT NULL,
+  created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
+  UNIQUE(type_id, parent_id, parent_metadata, key),
+  FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
+  FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
+);
+
 CREATE TABLE IF NOT EXISTS sensor_config_type_selection_options (
-  id         BIGSERIAL PRIMARY KEY NOT NULL,
-  type_id    BIGINT NOT NULL,
-  option     TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, option),
-  FOREIGN KEY (type_id) REFERENCES sensor_config_types (id)
+  id                  BIGSERIAL       PRIMARY KEY NOT NULL,
+  type_id             BIGINT          NOT NULL,
+  parent_map_id       BIGINT,
+  parent_map_metadata ParentMetadata,
+  option              TEXT            NOT NULL,
+  created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  UNIQUE(type_id, parent_map_id, parent_map_metadata, option),
+  FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
+  FOREIGN KEY (parent_map_id) REFERENCES sensor_config_type_selection_maps (id)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_config_requests (
@@ -220,7 +240,7 @@ CREATE TABLE IF NOT EXISTS sensor_configs (
 );
 
 CREATE TYPE DeviceWidgetKind AS ENUM (
-  'SSID', 'PSK'
+  'SSID', 'PSK', 'Timezone'
 );
 
 CREATE TABLE IF NOT EXISTS device_config_types (
@@ -307,10 +327,18 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_dependencies (
 );
 
 CREATE TABLE IF NOT EXISTS sensor_prototype_setups (
-  id BIGSERIAL        PRIMARY KEY NOT NULL,
+  id                  BIGSERIAL   PRIMARY KEY NOT NULL,
   setup               TEXT        NOT NULL,
   sensor_prototype_id BIGINT      NOT NULL,
   UNIQUE(setup, sensor_prototype_id),
+  FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
+);
+
+CREATE TABLE IF NOT EXISTS sensor_prototype_unauthenticated_actions (
+  id                     BIGSERIAL   PRIMARY KEY NOT NULL,
+  unauthenticated_action TEXT        NOT NULL,
+  sensor_prototype_id    BIGINT      NOT NULL,
+  UNIQUE(unauthenticated_action, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 

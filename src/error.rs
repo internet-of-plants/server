@@ -27,6 +27,7 @@ pub enum Error {
     InvalidMeasurementType(serde_json::Value, String),
     MissingMeasurement(String),
     DuplicatedConfig,
+    DuplicatedKey,
     Unauthorized,
     BadData,
     InsecurePassword,
@@ -37,6 +38,8 @@ pub enum Error {
     CorruptedBinary,
     MissingBinary,
     NothingFound,
+    #[display(fmt = "invalid timezone _1: _0")]
+    InvalidTimezone(std::num::ParseIntError, String),
     ParseInt(std::num::ParseIntError),
     MissingHeader(&'static str),
     Hyper(hyper::Error),
@@ -130,6 +133,10 @@ impl IntoResponse for Error {
                 warn!("Duplicated Config");
                 (StatusCode::BAD_REQUEST, "Duplicated Config")
             }
+            Self::DuplicatedKey => {
+                warn!("Duplicated Key");
+                (StatusCode::BAD_REQUEST, "Duplicated Key")
+            }
             Self::MeasurementMissing => {
                 warn!("Measurement Missing");
                 (StatusCode::BAD_REQUEST, "Measurement Missing")
@@ -165,6 +172,11 @@ impl IntoResponse for Error {
             Self::AskedForTooMany => {
                 warn!("Asked For Too Many");
                 (StatusCode::BAD_REQUEST, "Asked For Too Many")
+            }
+            Self::InvalidTimezone(err, tz) => {
+
+                warn!("Invalid Timezone {tz}: {err}");
+                (StatusCode::BAD_REQUEST, "Invalid Timezone")
             }
             Self::NothingFound => {
                 warn!("Nothing Found");

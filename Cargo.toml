@@ -28,6 +28,8 @@ tower = "0.4"
 
 md5 = "0.7"
 
+async-recursion = "1"
+
 derive_more = "0.99"
 sqlx = { version = "0.6", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "chrono"] }
 

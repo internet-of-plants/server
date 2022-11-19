@@ -1,7 +1,7 @@
 use crate::{
     Compilation, Device, DeviceConfig, DeviceConfigView, DeviceId, DeviceWidgetKind, FirmwareView,
     NewDeviceConfig, NewSensor, Organization, Result, Sensor, SensorConfigRequest, SensorView,
-    Target, TargetId, TargetView, Transaction,
+    Target, TargetId, TargetView, Transaction,Error,
 };
 use derive_more::FromStr;
 use handlebars::Handlebars;
@@ -219,16 +219,19 @@ impl Compiler {
         let device_configs_raw = self.device_configs(txn).await?;
         let mut device_configs = Vec::with_capacity(device_configs_raw.len());
         // TODO: properly use device config
-        for config in device_configs_raw {
+        for config in &device_configs_raw {
             let request = config.request(txn).await?;
             let ty = request.ty(txn).await?;
-            // TODO: validate SSID and PSK sizes
+            // TODO: validate SSID and PSK sizes and Timezone
             match ty.widget() {
                 DeviceWidgetKind::SSID => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace('"', "\\\""))
+                    format!("constexpr static char SSID_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString SSID = reinterpret_cast<const __FlashStringHelper*>(SSID_ROM_RAW);", config.value.replace('"', "\\\""))
                 ),
                 DeviceWidgetKind::PSK => device_configs.push(
-                    format!("constexpr static char {0}_ROM_RAW[] IOP_ROM = \"{1}\";\nstatic const iop::StaticString {0} = reinterpret_cast<const __FlashStringHelper*>({0}_ROM_RAW);", request.name, config.value.replace('"', "\\\""))
+                    format!("constexpr static char PSK_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString PSK = reinterpret_cast<const __FlashStringHelper*>(PSK_ROM_RAW);", config.value.replace('"', "\\\""))
+                ),
+                DeviceWidgetKind::Timezone => device_configs.push(
+                    format!("constexpr static int8_t timezone = {0};", config.value.parse::<i8>().map_err(|err| Error::InvalidTimezone(err, config.value.clone()))?)
                 )
             }
         }
@@ -239,6 +242,7 @@ impl Compiler {
         let mut definitions = Vec::new();
         let mut measurements = Vec::new();
         let mut setups = Vec::new();
+        let mut unauthenticated_actions = Vec::new();
         let mut configs = Vec::with_capacity(sensors.len());
         for (index, sensor) in sensors.iter().enumerate() {
             let prototype = &sensor.prototype;
@@ -283,6 +287,16 @@ impl Compiler {
                     })
                     .collect::<Result<Vec<String>, _>>()?,
             );
+            unauthenticated_actions.extend(
+                prototype
+                    .unauthenticated_actions
+                    .iter()
+                    .map(|unauthenticated_action| {
+                        let reg = Handlebars::new();
+                        reg.render_template(unauthenticated_action, &json!({ "index": index }))
+                    })
+                    .collect::<Result<Vec<String>, _>>()?,
+            );
 
             for c in &sensor.configurations {
                 let req = SensorConfigRequest::find_by_id(&mut *txn, c.request_id).await?;
@@ -291,10 +305,10 @@ impl Compiler {
                 configs.push((
                     req.name.clone(),
                     format!(
-                        "constexpr static {} {} = {};",
+                        "static const {} {} = {};",
                         req.ty(&mut *txn).await?.name,
                         name,
-                        c.value.replace('"', "\\\""),
+                        c.value,
                     ),
                 ));
             }
@@ -310,6 +324,24 @@ impl Compiler {
         configs.sort_by(|a, b| a.0.cmp(&b.0));
 
         setups.sort_unstable();
+        unauthenticated_actions.sort_unstable();
+
+        // TODO: properly use device config
+        for config in &device_configs_raw {
+            let request = config.request(txn).await?;
+            let ty = request.ty(txn).await?;
+            // TODO: validate SSID and PSK sizes
+            match ty.widget() {
+                DeviceWidgetKind::SSID => setups.insert(
+                    0,
+                    "loop.setAccessPointCredentials(config::SSID, config::PSK);".to_owned(),
+                ),
+                DeviceWidgetKind::PSK => {}
+                DeviceWidgetKind::Timezone => {
+                    setups.insert(0, "loop.setTimezone(config::timezone);".to_owned())
+                }
+            }
+        }
 
         definitions.sort_unstable();
 
@@ -321,6 +353,7 @@ impl Compiler {
         let definitions = definitions.join("\n");
         let measurements = measurements.join("\n    ");
         let setups = setups.join("\n  ");
+        let unauthenticated_actions = unauthenticated_actions.join("\n  ");
         let configs = configs
             .into_iter()
             .map(|c| c.1)
@@ -334,30 +367,38 @@ impl Compiler {
 
 namespace config {{
 constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
+constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;
+
 {device_configs}
 {configs}
 }}
 {definitions}
 
-auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Json> {
+auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Json> {{
   IOP_TRACE();
+
   loop.logger().infoln(IOP_STR(\"Handle Measurements\"));
-  auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{\
+  auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{
     {measurements}
   }});
-  iop_assert(json, IOP_STR(\"Unable to send measurements, OOM or buffer overflow\"));
+  iop_assert(json, IOP_STR(\"Unable to generate request payload, OOM or buffer overflow\"));
   return json;
-}
+}}
 
-auto reportMeasurements(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
+auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
   loop.registerEvent(token, *prepareJson(loop));
+}}
+
+auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{
+  {unauthenticated_actions}
 }}
 
 namespace iop {{
 auto setup(EventLoop &loop) noexcept -> void {{
-  loop.setAccessPointCredentials(config::SSID, config::PSK);
   {setups}
-  loop.setAuthenticatedInterval(config::measurementsInterval, reportMeasurements);
+
+  loop.setInterval(config::unauthenticatedActionsInterval, unauthenticatedAct);
+  loop.setAuthenticatedInterval(config::measurementsInterval, monitor);
 }}
 }}",
         );

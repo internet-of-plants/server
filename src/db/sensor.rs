@@ -1,12 +1,13 @@
 use crate::{
     Compiler, Error, NewSensorConfig, Result, SensorConfig, SensorConfigRequest, SensorConfigView,
     SensorMeasurementView, SensorPrototype, SensorPrototypeId, SensorPrototypeView, Transaction,
+    db::sensor_config::Val,
 };
 use derive_more::FromStr;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashSet;
+use std::{iter::FromIterator, collections::HashSet, collections::VecDeque};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +27,7 @@ pub struct SensorView {
     pub includes: Vec<String>,
     pub definitions: Vec<String>,
     pub setups: Vec<String>,
+    pub unauthenticated_actions: Vec<String>,
     pub measurements: Vec<SensorMeasurementView>,
     pub configurations: Vec<SensorConfigView>,
     pub prototype: SensorPrototypeView,
@@ -70,6 +72,7 @@ impl SensorView {
                 includes: prototype.includes(txn).await?,
                 definitions: prototype.definitions(txn).await?,
                 setups: prototype.setups(txn).await?,
+                unauthenticated_actions: prototype.unauthenticated_actions(txn).await?,
                 measurements: prototype
                     .measurements(txn)
                     .await?
@@ -93,6 +96,7 @@ pub type Dependency = String;
 pub type Include = String;
 pub type Definition = String;
 pub type Setup = String;
+pub type UnauthenticatedAction = String;
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
@@ -113,13 +117,27 @@ pub struct Sensor {
 impl Sensor {
     pub async fn new(txn: &mut Transaction<'_>, mut new_sensor: NewSensor) -> Result<Self> {
         let mut uniq = HashSet::new();
-        new_sensor
-            .configs
-            .iter()
-            .map(|c| c.request_id)
-            .all(|x| uniq.insert(x));
+        for c in &new_sensor.configs {
+            uniq.insert(c.request_id);
+        }
         if uniq.len() != new_sensor.configs.len() {
             return Err(Error::DuplicatedConfig);
+        }
+
+        for config in &new_sensor.configs {
+            let mut queue = VecDeque::from_iter(vec![&config.value]);
+            while let Some(value) = queue.pop_front() { 
+                if let Val::Map(vec) = value {
+                    let mut uniq = HashSet::new();
+                    for c in vec {
+                        uniq.insert(&c.key);
+                        queue.push_back(&c.key)
+                    }
+                    if uniq.len() != vec.len() {
+                        return Err(Error::DuplicatedKey);
+                    }
+                }
+            }
         }
 
         new_sensor
@@ -128,7 +146,7 @@ impl Sensor {
         let serialized = new_sensor
             .configs
             .iter()
-            .map(|c| format!("{}-{}", c.request_id.0, c.value))
+            .map(|c| format!("{}-{}", c.request_id.0, c.value.to_string()))
             .collect::<Vec<_>>()
             .join(",");
 
@@ -169,7 +187,7 @@ impl Sensor {
             };
             for config in new_sensor.configs {
                 let request = SensorConfigRequest::find_by_id(&mut *txn, config.request_id).await?;
-                SensorConfig::new(&mut *txn, &sensor, &request, config.value).await?;
+                SensorConfig::new(&mut *txn, &sensor, &request, config.value.to_string()).await?;
             }
             sensor
         };

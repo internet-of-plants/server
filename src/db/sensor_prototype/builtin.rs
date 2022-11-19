@@ -18,6 +18,7 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
     dht(&mut *txn).await?;
     soil_resistivity(&mut *txn).await?;
     factory_reset_button(&mut *txn).await?;
+    light_relay(&mut *txn).await?;
     dallas_temperature(&mut *txn).await?;
 
     Ok(())
@@ -36,6 +37,8 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
             "airTempAndHumidity{{index}}.begin();".to_owned()
         ],
         vec![
+        ],
+        vec![
             SensorMeasurement {
                 human_name: "Air Temperature".to_owned(),
                 name: "air_temperature_celsius{{index}}".to_owned(),
@@ -52,7 +55,7 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
             },
         ],
         vec![
-            NewSensorConfigRequest::new("Data Input".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Port".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
             NewSensorConfigRequest::new("Model".to_owned(), "dhtVersion{{index}}".to_owned(), "dht::Version".to_owned(), SensorWidgetKind::Selection(vec![
                 "dht::Version::DHT11".to_owned(),
                 "dht::Version::DHT12".to_owned(),
@@ -77,6 +80,9 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
             "soilTemperature{{index}}.begin();".to_owned(),
         ],
         vec![
+
+        ],
+        vec![
             SensorMeasurement {
                 human_name: "Soil Temperature".to_owned(),
                 name: "soil_temperature_celsius{{index}}".to_owned(),
@@ -86,7 +92,7 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
             },
         ],
         vec![
-            NewSensorConfigRequest::new("Data Input".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Port".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
         ],
     ).await
 }
@@ -98,10 +104,8 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
         vec!["https://github.com/internet-of-plants/factory_reset_button".to_owned()],
         vec!["factory_reset_button.hpp".to_owned()],
         vec![],
-        vec![
-            "reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));".to_owned(),
-            "loop.setInterval(1000, reset::resetIfNeeded);".to_owned(),
-        ],
+        vec!["reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));".to_owned()],
+        vec!["reset::resetIfNeeded(loop);".to_owned()],
         vec![],
         vec![NewSensorConfigRequest::new(
             "Button".to_owned(),
@@ -109,6 +113,45 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
             "Pin".to_owned(),
             SensorWidgetKind::PinSelection,
         )],
+    )
+    .await
+}
+
+async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
+    SensorPrototype::new(
+        txn,
+        "Light Relay".to_owned(),
+        vec!["https://github.com/internet-of-plants/light".to_owned()],
+        vec!["light.hpp".to_owned()],
+        vec!["static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));".to_owned()],
+        vec![concat!(
+            "for (const auto &[moment, state]: config::lightActions{{index}}) {\n",
+            "  light{{index}}.setTime(moment, state);\n",
+            "}"
+        )
+        .to_owned()],
+        vec!["light{{index}}.actIfNeeded();".to_owned()],
+        vec![],
+        vec![
+            NewSensorConfigRequest::new(
+                "Port".to_owned(),
+                "light{{index}}".to_owned(),
+                "Pin".to_owned(),
+                SensorWidgetKind::PinSelection,
+            ),
+            NewSensorConfigRequest::new(
+                "Timed Switches".to_owned(),
+                "lightActions{{index}}[]".to_owned(),
+                "std::pair<relay::Moment, relay::State>".to_owned(),
+                SensorWidgetKind::Map(
+                    Box::new(SensorWidgetKind::Moment),
+                    Box::new(SensorWidgetKind::Selection(vec![
+                        "relay::State::ON".to_owned(),
+                        "relay::State::OFF".to_owned(),
+                    ])),
+                ),
+            ),
+        ],
     )
     .await
 }
@@ -126,6 +169,9 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
             "soilResistivity{{index}}.begin();".to_owned(),
         ],
         vec![
+
+        ],
+        vec![
             SensorMeasurement {
                 human_name: "Soil Resistivity Raw".to_owned(),
                 name: "soil_resistivity_raw{{index}}".to_owned(),
@@ -136,7 +182,7 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
         ],
         vec![
             // TODO: we should configure the analog pin here too
-            NewSensorConfigRequest::new("Power".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Port".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
         ],
     ).await
 }
@@ -187,11 +233,18 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
-                "Captive Portal PSK".to_owned(),
+                "Captive Portal Password".to_owned(),
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
                 Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Timezone".to_owned(),
+                "timezone".to_owned(),
+                "int8_t".to_owned(),
+                DeviceWidgetKind::Timezone,
+                None,
             ),
         ],
     )
@@ -237,11 +290,18 @@ async fn esp32dev_esp32_target(
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
-                "Captive Portal PSK".to_owned(),
+                "Captive Portal Password".to_owned(),
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
                 Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Timezone".to_owned(),
+                "timezone".to_owned(),
+                "int8_t".to_owned(),
+                DeviceWidgetKind::Timezone,
+                None,
             ),
         ],
     )
@@ -304,11 +364,18 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
-                "Captive Portal PSK".to_owned(),
+                "Captive Portal Password".to_owned(),
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
                 Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Timezone".to_owned(),
+                "timezone".to_owned(),
+                "int8_t".to_owned(),
+                DeviceWidgetKind::Timezone,
+                None,
             ),
         ],
     )
@@ -318,7 +385,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
             txn,
             Some(
                 "
-    -D IOP_LINUX_MOCK"
+    -D IOP_LINUX"
                     .to_owned(),
             ),
         )
@@ -358,11 +425,18 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
                 Some(SecretAlgo::LibsodiumSealedBox),
             ),
             NewDeviceConfigRequest::new(
-                "Captive Portal PSK".to_owned(),
+                "Captive Portal Password".to_owned(),
                 "PSK".to_owned(),
                 "iop::StaticString".to_owned(),
                 DeviceWidgetKind::PSK,
                 Some(SecretAlgo::LibsodiumSealedBox),
+            ),
+            NewDeviceConfigRequest::new(
+                "Timezone".to_owned(),
+                "timezone".to_owned(),
+                "int8_t".to_owned(),
+                DeviceWidgetKind::Timezone,
+                None,
             ),
         ],
     )

@@ -2,7 +2,7 @@ pub mod builtin;
 
 use crate::{
     Definition, Dependency, Include, NewSensorConfigRequest, Result, SensorConfigRequest,
-    SensorConfigRequestView, SensorMeasurement, Setup, Target, Transaction,
+    SensorConfigRequestView, SensorMeasurement, Setup, Target, Transaction, UnauthenticatedAction,
 };
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,11 @@ use serde::{Deserialize, Serialize};
 pub struct SensorPrototypeView {
     pub id: SensorPrototypeId,
     pub name: String,
-    pub dependencies: Vec<String>,
-    pub includes: Vec<String>,
-    pub definitions: Vec<String>,
-    pub setups: Vec<String>,
+    pub dependencies: Vec<Dependency>,
+    pub includes: Vec<Include>,
+    pub definitions: Vec<Definition>,
+    pub setups: Vec<Setup>,
+    pub unauthenticated_actions: Vec<UnauthenticatedAction>,
     pub measurements: Vec<SensorMeasurement>,
     pub configuration_requests: Vec<SensorConfigRequestView>,
 }
@@ -39,6 +40,7 @@ impl SensorPrototypeView {
             includes: prototype.includes(txn).await?,
             definitions: prototype.definitions(txn).await?,
             setups: prototype.setups(txn).await?,
+            unauthenticated_actions: prototype.unauthenticated_actions(txn).await?,
             measurements: prototype.measurements(txn).await?,
             configuration_requests: configuration_requests_view,
         })
@@ -70,6 +72,7 @@ impl SensorPrototype {
         includes: Vec<Include>,
         definitions: Vec<Definition>,
         setups: Vec<Setup>,
+        unauthenticated_actions: Vec<UnauthenticatedAction>,
         measurements: Vec<SensorMeasurement>,
         new_config_requests: Vec<NewSensorConfigRequest>,
     ) -> Result<Self> {
@@ -116,6 +119,15 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_setups (setup, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(setup)
+            .bind(&sensor_prototype_id)
+            .execute(&mut *txn)
+            .await?;
+        }
+        for unauthenticated_action in &unauthenticated_actions {
+            sqlx::query(
+                "INSERT INTO sensor_prototype_unauthenticated_actions (unauthenticated_action, sensor_prototype_id) VALUES ($1, $2)",
+            )
+            .bind(unauthenticated_action)
             .bind(&sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
@@ -214,6 +226,17 @@ impl SensorPrototype {
         Ok(list.into_iter().map(|(text,)| text).collect())
     }
 
+    /// A sensor may have unauthenticated actions to execute
+    pub async fn unauthenticated_actions(&self, txn: &mut Transaction<'_>) -> Result<Vec<Setup>> {
+        let list = sqlx::query_as(
+            "SELECT unauthenticated_action FROM sensor_prototype_unauthenticated_actions WHERE sensor_prototype_id = $1",
+        )
+        .bind(&self.id)
+        .fetch_all(&mut *txn)
+        .await?;
+        Ok(list.into_iter().map(|(text,)| text).collect())
+    }
+
     /// A sensor should execute N measurements and store them in the JSON
     pub async fn measurements(&self, txn: &mut Transaction<'_>) -> Result<Vec<SensorMeasurement>> {
         let list = sqlx::query_as(
@@ -225,7 +248,7 @@ impl SensorPrototype {
         Ok(list)
     }
 
-    /// A sensor should require 0-N configuration variables to be setup by the user
+    /// A sensor should require 0-N configuration variables to be defined by the user
     pub async fn configuration_requests(
         &self,
         txn: &mut Transaction<'_>,

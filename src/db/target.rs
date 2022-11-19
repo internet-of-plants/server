@@ -241,6 +241,12 @@ impl Target {
         };
         let env_name = env_name.join("-");
 
+        let debug = if cfg!(debug_assertions) {
+            "-D IOP_DEBUG"
+        } else {
+            ""
+        };
+
         Ok(format!(
             "[env:{env_name}]
 build_flags =
@@ -254,6 +260,7 @@ build_flags =
     -Wall
     {build_flags}
     -D IOP_LOG_LEVEL=iop::LogLevel::INFO
+    {debug}
 platform = {platform}
 build_type = {build_type}
 {framework}\

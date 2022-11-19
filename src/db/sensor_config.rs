@@ -1,12 +1,43 @@
 use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct Element {
+    pub key: Val,
+    pub value: Val,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone,  PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum Val {
+    String(String),
+    Map(Vec<Element>)
+}
+
+impl fmt::Display for Val {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Val::String(string) => write!(f, "{}", string.replace("\"", "\\\""))?,
+            Val::Map(vec) => {
+                write!(f, "{{")?;
+                for el in vec.iter() {
+                    write!(f, "\n  std::make_pair({}, {}),", el.key.to_string(), el.value.to_string())?;
+                }
+                write!(f, "}}")?
+            }
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewSensorConfig {
     pub request_id: SensorConfigRequestId,
-    pub value: String, // encoded the way it will be used by C++
+    pub value: Val, // encoded the way it will be used by C++, or a map that becomes a array of std::pair<Key, Value>
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]

@@ -31,6 +31,7 @@ impl DeviceConfigTypeId {
 pub enum DeviceWidgetKind {
     SSID,
     PSK,
+    Timezone,
 }
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
