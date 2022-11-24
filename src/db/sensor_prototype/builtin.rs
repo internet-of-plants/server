@@ -20,6 +20,7 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
     factory_reset_button(&mut *txn).await?;
     light_relay(&mut *txn).await?;
     dallas_temperature(&mut *txn).await?;
+    water_pump(&mut *txn).await?;
 
     Ok(())
 }
@@ -71,7 +72,7 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
     SensorPrototype::new(
         txn,
         "Dallas Temperature".to_owned(),
-        vec!["https://github.com/internet-of-plants/dallas_temperature".to_owned()],
+        vec!["https://github.com/internet-of-plants/dallas-temperature".to_owned()],
         vec!["dallas_temperature.hpp".to_owned()],
         vec![
             "static dallas::TemperatureCollection soilTemperature{{index}}(IOP_PIN_RAW(config::soilTemperature{{index}}));".to_owned(),
@@ -101,7 +102,7 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
     SensorPrototype::new(
         txn,
         "Factory Reset Button".to_owned(),
-        vec!["https://github.com/internet-of-plants/factory_reset_button".to_owned()],
+        vec!["https://github.com/internet-of-plants/factory-reset-button".to_owned()],
         vec!["factory_reset_button.hpp".to_owned()],
         vec![],
         vec!["reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));".to_owned()],
@@ -125,6 +126,7 @@ async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         vec!["light.hpp".to_owned()],
         vec!["static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));".to_owned()],
         vec![concat!(
+            "light{{index}}.begin();\n",
             "for (const auto &[moment, state]: config::lightActions{{index}}) {\n",
             "  light{{index}}.setTime(moment, state);\n",
             "}"
@@ -156,11 +158,48 @@ async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
     .await
 }
 
+async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
+    SensorPrototype::new(
+        txn,
+        "Water Pump".to_owned(),
+        vec!["https://github.com/internet-of-plants/water-pump".to_owned()],
+        vec!["water_pump.hpp".to_owned()],
+        vec!["static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));".to_owned()],
+        vec![concat!(
+            "waterPump{{index}}.begin();\n",
+            "for (const auto &[moment, seconds]: config::waterPumpActions{{index}}) {\n",
+            "  waterPump{{index}}.setTime(moment, seconds);\n",
+            "}"
+        )
+        .to_owned()],
+        vec!["waterPump{{index}}.actIfNeeded();".to_owned()],
+        vec![],
+        vec![
+            NewSensorConfigRequest::new(
+                "Port".to_owned(),
+                "waterPump{{index}}".to_owned(),
+                "Pin".to_owned(),
+                SensorWidgetKind::PinSelection,
+            ),
+            NewSensorConfigRequest::new(
+                "Timed Action".to_owned(),
+                "waterPumpActions{{index}}[]".to_owned(),
+                "std::pair<relay::Moment, iop::time::seconds>".to_owned(),
+                SensorWidgetKind::Map(
+                    Box::new(SensorWidgetKind::Moment),
+                    Box::new(SensorWidgetKind::U32),
+                ),
+            ),
+        ],
+    )
+    .await
+}
+
 async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
     SensorPrototype::new(
         txn,
         "Soil Resistivity".to_owned(),
-        vec!["https://github.com/internet-of-plants/soil_resistivity".to_owned()],
+        vec!["https://github.com/internet-of-plants/soil-resistivity".to_owned()],
         vec!["soil_resistivity.hpp".to_owned()],
         vec![
             "static sensor::SoilResistivity soilResistivity{{index}}(IOP_PIN_RAW(config::soilResistivityPower{{index}}));".to_owned(),
