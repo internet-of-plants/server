@@ -9,6 +9,8 @@ pub async fn update(
 ) -> Result<impl IntoResponse> {
     let mut txn = pool.begin().await?;
 
+    let collection = device.collection(&mut txn).await?;
+
     //let chip_ip = headers.get("x-ESP8266-Chip-ID");
     //let mac_address = headers.get("x-ESP8266-STA-MAC").ok_or(Error::NothingFound)?.to_str().map_err(|_|Error::NothingFound)?;
     //let ap_mac = headers.get("x-ESP8266-AP-MAC");
@@ -18,7 +20,7 @@ pub async fn update(
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
-    let firmware = match device.update(&mut txn).await? {
+    let firmware = match collection.update(&mut txn).await? {
         Some(update) => update,
         None => return Err(Error::NoBinaryAvailable)?,
     };

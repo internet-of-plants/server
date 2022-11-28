@@ -1,13 +1,13 @@
 use crate::{
-    Compiler, Error, NewSensorConfig, Result, SensorConfig, SensorConfigRequest, SensorConfigView,
-    SensorMeasurementView, SensorPrototype, SensorPrototypeId, SensorPrototypeView, Transaction,
-    db::sensor_config::Val,
+    db::sensor_config::Val, Compiler, Error, NewSensorConfig, Result, SensorConfig,
+    SensorConfigRequest, SensorConfigView, SensorMeasurementView, SensorPrototype,
+    SensorPrototypeId, SensorPrototypeView, Transaction,
 };
 use derive_more::FromStr;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{iter::FromIterator, collections::HashSet, collections::VecDeque};
+use std::{collections::HashSet, collections::VecDeque, iter::FromIterator};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -126,7 +126,7 @@ impl Sensor {
 
         for config in &new_sensor.configs {
             let mut queue = VecDeque::from_iter(vec![&config.value]);
-            while let Some(value) = queue.pop_front() { 
+            while let Some(value) = queue.pop_front() {
                 if let Val::Map(vec) = value {
                     let mut uniq = HashSet::new();
                     for c in vec {

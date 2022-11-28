@@ -3,28 +3,25 @@ use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-use super::compiler::{Compiler, CompilerId, CompilerView};
+use super::compiler::{Compiler, CompilerId};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilationView {
     pub id: CompilationId,
-    pub compiler: CompilerView,
     pub platformio_ini: String,
     pub main_cpp: String,
     pub pin_hpp: String,
 }
 
 impl CompilationView {
-    pub async fn new(txn: &mut Transaction<'_>, compilation: Compilation) -> Result<Self> {
-        let compiler = compilation.compiler(txn).await?;
-        Ok(Self {
+    pub fn new(compilation: Compilation) -> Self {
+        Self {
             id: compilation.id(),
             platformio_ini: compilation.platformio_ini,
             main_cpp: compilation.main_cpp,
             pin_hpp: compilation.pin_hpp,
-            compiler: CompilerView::new(txn, compiler).await?,
-        })
+        }
     }
 }
 

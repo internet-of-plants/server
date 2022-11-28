@@ -4,7 +4,7 @@ use crate::extractor::{
 };
 use crate::{
     logger::*, DateTime, DeviceId, DeviceStat, Error, Event, EventView, Firmware, Pool, Result,
-    SensorMeasurementType,
+    SensorMeasurementType, Transaction,Collection
 };
 use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
@@ -45,15 +45,32 @@ pub async fn new(
     debug!("New Event: {:?}", event);
     let mut txn = pool.begin().await?;
 
-    let collection = device.collection(&mut txn).await?;
+    let mut collection = device.collection(&mut txn).await?;
     let organization = collection.organization(&mut txn).await?;
     if let Some(firmware) =
         Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await?
     {
         device.set_firmware(&mut txn, &firmware).await?;
+        if collection.compiler(&mut txn).await?.is_none() {
+            if let Some(compilation) = firmware.compilation(&mut txn).await? {
+                let compiler = compilation.compiler(&mut txn).await?;
+                if let Some(col)= Collection::find_by_compiler(&mut txn, &compiler).await? {
+                    device.set_collection(&mut txn, &col).await?;
+                    collection = col;
+                } else {
+                    collection.set_compiler(&mut txn, Some(&compiler)).await?;
+                }
+            }
+        }
     }
 
-    if let Some(firmware) = device.update(&mut txn).await? {
+    let result = if !event.is_null() {
+        handle_measurements(&mut txn, &collection, &device, stat.clone(), event).await.map(Some)
+    } else {
+        Ok(None)
+    };
+    
+    if let Some(firmware) = collection.update(&mut txn).await? {
         if firmware.hash() != stat.version {
             return Ok(HeaderMap::from_iter([(
                 HeaderName::from_static("latest_version"),
@@ -62,96 +79,8 @@ pub async fn new(
         }
     }
 
-    // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
-    if !event.is_null() {
-        let obj = event.as_object().ok_or(Error::EventMustBeObject)?;
-        if let Some(compiler) = device.compiler(&mut txn).await? {
-            let sensors = compiler.sensors(&mut txn).await?;
-            let mut measurements = Vec::new();
-            for (index, sensor) in sensors.into_iter().enumerate() {
-                let prototype = sensor.prototype;
-                measurements.extend(
-                    prototype
-                        .measurements
-                        .into_iter()
-                        .map(|m| {
-                            let reg = Handlebars::new();
-                            let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                            Ok((m.ty, name))
-                        })
-                        .collect::<Result<Vec<_>>>()?,
-                );
-            }
-            debug!("Expected Measurements: {:?}", measurements);
-
-            if obj.len() != measurements.len() {
-                error!("Invalid number of json arguments");
-                return Err(Error::MeasurementMissing);
-            }
-            for (ty, name) in measurements {
-                if let Some(value) = obj.get(&name) {
-                    match ty {
-                        SensorMeasurementType::FloatCelsius => {
-                            if let Some(value) = value.as_f64() {
-                                if !(-100. ..=100.).contains(&value) {
-                                    error!("Invalid celsius measured (-100 to 100): {}", value);
-                                    return Err(Error::MeasurementOutOfRange(
-                                        value.to_string(),
-                                        "-100..=100".to_owned(),
-                                    ));
-                                }
-                            } else {
-                                error!("Invalid celsius measured: {:?}", value);
-                                return Err(Error::InvalidMeasurementType(
-                                    value.clone(),
-                                    "f64".to_owned(),
-                                ));
-                            }
-                        }
-                        SensorMeasurementType::RawAnalogRead => {
-                            if let Some(value) = value.as_i64() {
-                                if !(0..=1024).contains(&value) {
-                                    error!("Invalid raw analog read (0-1024): {}", value);
-                                    return Err(Error::MeasurementOutOfRange(
-                                        value.to_string(),
-                                        "0..=1024".to_owned(),
-                                    ));
-                                }
-                            } else {
-                                error!("Invalid raw analog read: {:?}", value);
-                                return Err(Error::InvalidMeasurementType(
-                                    value.clone(),
-                                    "i64".to_owned(),
-                                ));
-                            }
-                        }
-                        SensorMeasurementType::Percentage => {
-                            if let Some(value) = value.as_f64() {
-                                if !(0. ..=100.).contains(&value) {
-                                    error!("Invalid percentage: {}", value);
-                                    return Err(Error::MeasurementOutOfRange(
-                                        value.to_string(),
-                                        "0..=100".to_owned(),
-                                    ));
-                                }
-                            } else {
-                                error!("Invalid percentage measured: {:?}", value);
-                                return Err(Error::InvalidMeasurementType(
-                                    value.clone(),
-                                    "f64".to_owned(),
-                                ));
-                            }
-                        }
-                    }
-                } else {
-                    error!("Missing measurement: {}", name);
-                    return Err(Error::MissingMeasurement(name));
-                }
-            }
-        }
-
-        Event::new(&mut txn, &device, event, stat).await?;
-    }
+    // Let's not fail until 
+    result?;
 
     txn.commit().await?;
     Ok(HeaderMap::new())
@@ -177,4 +106,95 @@ pub async fn list(
     }
     txn.commit().await?;
     Ok(Json(events))
+}
+
+async fn handle_measurements(txn: &mut Transaction<'_>, collection: &Collection, device: &crate::Device, stat: DeviceStat, event: serde_json::Value) -> Result<Event> {
+    let obj = event.as_object().ok_or(Error::EventMustBeObject)?;
+    // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
+    if let Some(compiler) = collection.compiler(txn).await? {
+        let sensors = compiler.sensors(txn).await?;
+        let mut measurements = Vec::new();
+        for (index, sensor) in sensors.into_iter().enumerate() {
+            let prototype = sensor.prototype;
+            measurements.extend(
+                prototype
+                    .measurements
+                    .into_iter()
+                    .map(|m| {
+                        let reg = Handlebars::new();
+                        let name = reg.render_template(&m.name, &json!({ "index": index }))?;
+                        Ok((m.ty, name))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            );
+        }
+        debug!("Expected Measurements: {:?}", measurements);
+
+        if obj.len() != measurements.len() {
+            error!("Invalid number of json arguments");
+            return Err(Error::MeasurementMissing);
+        }
+        for (ty, name) in measurements {
+            if let Some(value) = obj.get(&name) {
+                match ty {
+                    SensorMeasurementType::FloatCelsius => {
+                        if let Some(value) = value.as_f64() {
+                            if !(-100. ..=100.).contains(&value) {
+                                error!("Invalid celsius measured (-100 to 100): {}", value);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "-100..=100".to_owned(),
+                                ));
+                            }
+                        } else {
+                            error!("Invalid celsius measured: {:?}", value);
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "f64".to_owned(),
+                            ));
+                        }
+                    }
+                    SensorMeasurementType::RawAnalogRead => {
+                        if let Some(value) = value.as_i64() {
+                            if !(0..=1024).contains(&value) {
+                                error!("Invalid raw analog read (0-1024): {}", value);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "0..=1024".to_owned(),
+                                ));
+                            }
+                        } else {
+                            error!("Invalid raw analog read: {:?}", value);
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "i64".to_owned(),
+                            ));
+                        }
+                    }
+                    SensorMeasurementType::Percentage => {
+                        if let Some(value) = value.as_f64() {
+                            if !(0. ..=100.).contains(&value) {
+                                error!("Invalid percentage: {}", value);
+                                return Err(Error::MeasurementOutOfRange(
+                                    value.to_string(),
+                                    "0..=100".to_owned(),
+                                ));
+                            }
+                        } else {
+                            error!("Invalid percentage measured: {:?}", value);
+                            return Err(Error::InvalidMeasurementType(
+                                value.clone(),
+                                "f64".to_owned(),
+                            ));
+                        }
+                    }
+                }
+            } else {
+                error!("Missing measurement: {}", name);
+                return Err(Error::MissingMeasurement(name));
+            }
+        }
+    }
+
+    Event::new(txn, device, event, stat).await
 }

@@ -10,11 +10,11 @@ pub struct Element {
     pub value: Val,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone,  PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Val {
     String(String),
-    Map(Vec<Element>)
+    Map(Vec<Element>),
 }
 
 impl fmt::Display for Val {
@@ -24,7 +24,12 @@ impl fmt::Display for Val {
             Val::Map(vec) => {
                 write!(f, "{{")?;
                 for el in vec.iter() {
-                    write!(f, "\n  std::make_pair({}, {}),", el.key.to_string(), el.value.to_string())?;
+                    write!(
+                        f,
+                        "\n  std::make_pair({}, {}),",
+                        el.key.to_string(),
+                        el.value.to_string()
+                    )?;
                 }
                 write!(f, "}}")?
             }

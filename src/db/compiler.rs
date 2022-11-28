@@ -1,7 +1,7 @@
 use crate::{
-    Compilation, Device, DeviceConfig, DeviceConfigView, DeviceId, DeviceWidgetKind, FirmwareView,
-    NewDeviceConfig, NewSensor, Organization, Result, Sensor, SensorConfigRequest, SensorView,
-    Target, TargetId, TargetView, Transaction,Error,
+    Collection, Compilation, DeviceConfig, DeviceConfigView, DeviceId,
+    DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization, Result,
+    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,Device
 };
 use derive_more::FromStr;
 use handlebars::Handlebars;
@@ -26,12 +26,19 @@ pub struct CompilerView {
     pub id: CompilerId,
     pub sensors: Vec<SensorView>,
     pub device_configs: Vec<DeviceConfigView>,
+    pub collection_name: String,
+    pub devices_count: usize,
     pub target: TargetView,
     pub latest_firmware: FirmwareView,
 }
 
 impl CompilerView {
     pub async fn new(txn: &mut Transaction<'_>, compiler: Compiler) -> Result<Self> {
+        let collection = match compiler.collection(txn).await? {
+            Some(col) => col,
+            None => return Err(Error::NoCollectionForCompiler(compiler.id())),
+        };
+        let devices = Device::from_collection(txn, &collection).await?;
         let sensors = compiler.sensors(txn).await?;
 
         let mut device_configs = Vec::new();
@@ -52,6 +59,8 @@ impl CompilerView {
             target,
             latest_firmware,
             device_configs,
+            devices_count: devices.len(),
+            collection_name: collection.name().to_owned(),
         })
     }
 }
@@ -78,8 +87,11 @@ impl Compiler {
         target: &Target,
         mut sensors_and_alias: Vec<(Sensor, String)>,
         mut device_configs: Vec<DeviceConfig>,
-        organization: &Organization,
+        device: &mut Device,
     ) -> Result<(Self, Compilation)> {
+        let mut collection = device.collection(txn).await?;
+        let organization = collection.organization(txn).await?;
+
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());
 
@@ -121,6 +133,7 @@ impl Compiler {
             id
         } else {
             should_compile = true;
+
             let (id,): (CompilerId,) = sqlx::query_as(
                 "INSERT INTO compilers (target_id, organization_id) VALUES ($1, $2) RETURNING id",
             )
@@ -158,6 +171,18 @@ impl Compiler {
             id,
             target_id: target.id(),
         };
+
+        if let Some(col) = compiler.collection(txn).await? {
+            collection = col;
+            device.set_collection(txn, &collection).await?;
+        } else if Device::from_collection(txn, &collection).await?.len() == 1 {
+            collection.set_compiler(txn, Some(&compiler)).await?;
+        } else {
+            collection = Collection::new(txn, device.name().to_owned(), &organization).await?;
+            collection.set_compiler(txn, Some(&compiler)).await?;
+            device.set_collection(txn, &collection).await?;
+        }
+
         let compilation = if should_compile {
             compiler.compile(&mut *txn).await?
         } else {
@@ -168,20 +193,39 @@ impl Compiler {
 
     pub async fn find_by_id(
         txn: &mut Transaction<'_>,
-        device: &Device,
+        organization: &Organization,
         id: CompilerId,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
-            "SELECT compilers.id, target_id
+            "SELECT compilers.id, compilers.target_id
              FROM compilers
-             INNER JOIN devices ON devices.compiler_id = compilers.id
-             WHERE compilers.id = $1 AND devices.id = $2",
+             INNER JOIN collections ON collections.compiler_id = compilers.id
+             INNER JOIN collection_belongs_to_organization bt ON bt.collection_id = collections.id
+             INNER JOIN organizations ON organizations.id = bt.organization_id
+             WHERE compilers.id = $1 AND organizations.id = $2",
         )
         .bind(id)
-        .bind(device.id())
+        .bind(organization.id())
         .fetch_one(&mut *txn)
         .await?;
         Ok(comp)
+    }
+
+    pub async fn list_for_target(
+        txn: &mut Transaction<'_>,
+        organization: &Organization,
+        target: &Target,
+    ) -> Result<Vec<Self>> {
+        let comps = sqlx::query_as(
+            "SELECT compilers.id, compilers.target_id
+             FROM compilers
+             WHERE compilers.target_id = $1 AND compilers.organization_id = $2",
+        )
+        .bind(target.id())
+        .bind(organization.id())
+        .fetch_all(&mut *txn)
+        .await?;
+        Ok(comps)
     }
 
     pub async fn find_by_compilation(
@@ -189,7 +233,7 @@ impl Compiler {
         compilation: &Compilation,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
-            "SELECT compilers.id, target_id
+            "SELECT compilers.id, compilers.target_id
              FROM compilers
              INNER JOIN compilations ON compilations.compiler_id = compilers.id
              WHERE compilers.id = $1 AND compilations.id = $2",
@@ -456,6 +500,10 @@ auto setup(EventLoop &loop) noexcept -> void {{
 
     pub async fn device_configs(&self, txn: &mut Transaction<'_>) -> Result<Vec<DeviceConfig>> {
         DeviceConfig::find_by_compiler(txn, self).await
+    }
+
+    pub async fn collection(&self, txn: &mut Transaction<'_>) -> Result<Option<Collection>> {
+        Collection::find_by_compiler(txn, self).await
     }
 
     pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {

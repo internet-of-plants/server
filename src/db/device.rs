@@ -1,6 +1,6 @@
 use crate::{
-    utils, AuthToken, Collection, CollectionId, Compiler, CompilerId, CompilerView, DateTime,
-    Error, Event, EventView, Firmware, FirmwareId, FirmwareView, Login, Organization, Result,
+    utils, AuthToken, Collection, CollectionId, DateTime,
+    Error, Event, EventView, Firmware, FirmwareId, FirmwareView, Login, Organization, Result,CompilerView,
     Transaction, User, UserId,
 };
 use derive_more::FromStr;
@@ -34,12 +34,11 @@ impl DeviceView {
     pub async fn new(txn: &mut Transaction<'_>, device: Device) -> Result<Self> {
         let firmware = device.current_firmware(txn).await?;
         let firmware = FirmwareView::new(firmware);
-
-        let compiler = if let Some(id) = device.compiler_id {
-            let compiler = Compiler::find_by_id(txn, &device, id).await?;
-            Some(CompilerView::new(txn, compiler).await?)
-        } else {
-            None
+        let collection = device.collection(txn).await?;
+        let compiler = collection.compiler(txn).await?;
+        let compiler = match compiler {
+            Some(c) => Some(CompilerView::new(txn, c).await?),
+            None => None,
         };
 
         let last_event = device.last_event(txn).await?;
@@ -53,8 +52,8 @@ impl DeviceView {
             name: device.name,
             description: device.description,
             firmware,
-            compiler,
             mac: device.mac,
+            compiler,
             last_event,
             created_at: device.created_at,
             updated_at: device.updated_at,
@@ -75,7 +74,6 @@ pub struct Device {
     id: DeviceId,
     collection_id: CollectionId,
     firmware_id: FirmwareId,
-    compiler_id: Option<CompilerId>,
     name: String,
     description: Option<String>,
     mac: String,
@@ -115,32 +113,27 @@ impl Device {
             if device.firmware_id != firmware.id() {
                 device.set_firmware(txn, &firmware).await?;
             }
-            if let Some(compiler) = compiler {
-                if device.compiler_id.is_none() {
-                    device.set_compiler(txn, Some(&compiler)).await?;
-                }
-            }
+            let mut collection = device.collection(txn).await?;
+            collection.set_compiler(txn, compiler.as_ref()).await?;
             return Ok(device);
         }
 
         // TODO: if firmware exists put new device in existing collection that has the devices with the same firmware instead of the default
-        let collection = Collection::new(txn, new_device.mac.clone(), organization).await?;
-
         let name = format!("device-{}", utils::random_string(5));
+        let collection = Collection::new(txn, name.clone(), organization).await?;
+
         let (id, now) =
-            sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id, compiler_id) VALUES ($1, '1', $2, $3, $4, $5) RETURNING id, created_at")
+            sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id) VALUES ($1, '1', $2, $3, $4) RETURNING id, created_at")
                 .bind(&new_device.mac)
                 .bind(collection.id())
                 .bind(&name)
                 .bind(firmware.id())
-                .bind(compiler.as_ref().map(|c| c.id()))
                 .fetch_one(&mut *txn)
                 .await?;
         Ok(Self {
             id,
             collection_id: collection.id(),
             firmware_id: firmware.id(),
-            compiler_id: compiler.map(|c| c.id()),
             name,
             description: None,
             mac: new_device.mac,
@@ -155,7 +148,7 @@ impl Device {
         mac: &str,
     ) -> Result<Option<Self>> {
         let device: Option<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.compiler_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
@@ -168,13 +161,17 @@ impl Device {
         Ok(device)
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    
     pub async fn find_by_id(
         txn: &mut Transaction<'_>,
         device_id: DeviceId,
         user: &User,
     ) -> Result<Self> {
         let device: Self = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.compiler_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
@@ -192,7 +189,7 @@ impl Device {
         collection: &Collection,
     ) -> Result<Vec<Self>> {
         let devices: Vec<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.compiler_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              WHERE dev.collection_id = $1",
@@ -209,7 +206,7 @@ impl Device {
         mac: String,
     ) -> Result<Self> {
         let device: Option<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.compiler_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN authentications ON authentications.device_id = dev.id AND authentications.mac = dev.mac
              WHERE authentications.token = $1 AND authentications.mac = $2",
@@ -272,6 +269,30 @@ impl Device {
         self.id
     }
 
+    pub async fn set_collection(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        collection: &Collection,
+    ) -> Result<()> {
+        let old_collection = self.collection(txn).await?;
+
+        let (updated_at,): (DateTime,) = sqlx::query_as(
+            "UPDATE devices SET collection_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
+        )
+        .bind(&collection.id())
+        .bind(self.id)
+        .fetch_one(&mut *txn)
+        .await?;
+
+        if Device::from_collection(txn, &old_collection).await?.is_empty() {
+            old_collection.delete(txn).await?;
+        }
+
+        self.updated_at = updated_at;
+        self.collection_id = collection.id();
+        Ok(())
+    }
+
     pub async fn set_name(&mut self, txn: &mut Transaction<'_>, name: String) -> Result<()> {
         let (updated_at,): (DateTime,) = sqlx::query_as(
             "UPDATE devices SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
@@ -300,29 +321,6 @@ impl Device {
         Ok(())
     }
 
-    pub async fn set_compiler(
-        &mut self,
-        txn: &mut Transaction<'_>,
-        compiler: Option<&Compiler>,
-    ) -> Result<()> {
-        let (updated_at,): (DateTime,) = sqlx::query_as("UPDATE devices SET compiler_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at")
-            .bind(compiler.map(|c| c.id()))
-            .bind(self.id)
-            .fetch_one(txn)
-            .await?;
-        self.updated_at = updated_at;
-        self.compiler_id = compiler.map(|c| c.id());
-        Ok(())
-    }
-
-    pub async fn compiler(&self, txn: &mut Transaction<'_>) -> Result<Option<Compiler>> {
-        if let Some(compiler_id) = self.compiler_id {
-            Ok(Some(Compiler::find_by_id(txn, self, compiler_id).await?))
-        } else {
-            Ok(None)
-        }
-    }
-
     pub async fn current_firmware(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
         Firmware::find_by_device(txn, self).await
     }
@@ -333,15 +331,6 @@ impl Device {
 
     pub fn firmware_id(&self) -> FirmwareId {
         self.firmware_id
-    }
-
-    pub async fn update(&self, txn: &mut Transaction<'_>) -> Result<Option<Firmware>> {
-        if let Some(compiler) = self.compiler(txn).await? {
-            let compilation = compiler.latest_compilation(txn).await?;
-            Ok(Some(compilation.firmware(txn).await?))
-        } else {
-            Ok(None)
-        }
     }
 
     pub fn collection_id(&self) -> CollectionId {

@@ -17,8 +17,9 @@ pub async fn set_alias(
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
     let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let collection = device.collection(&mut txn).await?;
 
-    if let Some(mut compiler) = device.compiler(&mut txn).await? {
+    if let Some(mut compiler) = collection.compiler(&mut txn).await? {
         let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;
         compiler.set_alias(&mut txn, &sensor, request.alias).await?;
     } else {
@@ -45,8 +46,9 @@ pub async fn set_color(
     let mut txn = pool.begin().await?;
 
     let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let collection = device.collection(&mut txn).await?;
 
-    if let Some(mut compiler) = device.compiler(&mut txn).await? {
+    if let Some(mut compiler) = collection.compiler(&mut txn).await? {
         let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;
         compiler.set_color(&mut txn, &sensor, request.color).await?;
     } else {

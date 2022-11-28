@@ -1,6 +1,6 @@
 use crate::{extractor::User, Collection, CollectionId, CollectionView, Pool, Result};
 use axum::extract::{Extension, Json, Query};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -18,4 +18,24 @@ pub async fn find(
     let collection = CollectionView::new(&mut txn, collection).await?;
     txn.commit().await?;
     Ok(Json(collection))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SetNameRequest {
+    pub collection_id: CollectionId,
+    pub name: String,
+}
+
+pub async fn set_name(
+    Extension(pool): Extension<&'static Pool>,
+    User(user): User,
+    Json(request): Json<SetNameRequest>,
+) -> Result<Json<()>> {
+    let mut txn = pool.begin().await?;
+    let mut collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
+    collection.set_name(&mut txn, request.name).await?;
+
+    txn.commit().await?;
+    Ok(Json(()))
 }

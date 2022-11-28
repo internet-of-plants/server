@@ -108,11 +108,9 @@ impl Firmware {
         let firmware = sqlx::query_as(
             "SELECT firmwares.id, compilation_id, binary_hash
                  FROM firmwares
-                 INNER JOIN devices ON devices.firmware_id = firmwares.id
-                 WHERE firmwares.id = $1 AND devices.id = $2",
+                 WHERE firmwares.id = $1",
         )
         .bind(device.firmware_id())
-        .bind(device.id())
         .fetch_one(txn)
         .await?;
         Ok(firmware)

@@ -34,7 +34,16 @@ pub async fn set_name(
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
     let mut device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
+    let old_name = device.name().to_owned();
     device.set_name(&mut txn, request.name).await?;
+
+    let mut collection = device.collection(&mut txn).await?;
+    if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
+        if collection.name() == old_name {
+            collection.set_name(&mut txn, device.name().to_owned()).await?;
+        }
+    }
+
     txn.commit().await?;
     Ok(Json(()))
 }

@@ -27,23 +27,6 @@ CREATE TABLE IF NOT EXISTS user_belongs_to_organization (
   FOREIGN KEY (organization_id) REFERENCES  organizations (id)
 );
 
-CREATE TABLE IF NOT EXISTS collections (
-  id          BIGSERIAL    PRIMARY KEY NOT NULL,
-  name        TEXT                     NOT NULL,
-  description TEXT,
-  created_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS collection_belongs_to_organization (
-  collection_id   BIGINT                    NOT NULL,
-  organization_id BIGINT                    NOT NULL,
-  created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
-  UNIQUE (collection_id, organization_id),
-  FOREIGN KEY (collection_id)   REFERENCES  collections   (id),
-  FOREIGN KEY (organization_id) REFERENCES  organizations (id)
-);
-
 CREATE TABLE IF NOT EXISTS target_prototypes (
   id                      BIGSERIAL   PRIMARY KEY NOT NULL,
   arch                    TEXT                    NOT NULL UNIQUE,
@@ -77,6 +60,25 @@ CREATE TABLE IF NOT EXISTS compilers (
   FOREIGN KEY (target_id) REFERENCES targets (id)
 );
 
+CREATE TABLE IF NOT EXISTS collections (
+  id          BIGSERIAL    PRIMARY KEY NOT NULL,
+  name        TEXT                     NOT NULL,
+  compiler_id BIGINT,
+  description TEXT,
+  created_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (compiler_id) REFERENCES compilers (id)
+);
+
+CREATE TABLE IF NOT EXISTS collection_belongs_to_organization (
+  collection_id   BIGINT                    NOT NULL,
+  organization_id BIGINT                    NOT NULL,
+  created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
+  UNIQUE (collection_id, organization_id),
+  FOREIGN KEY (collection_id)   REFERENCES  collections   (id),
+  FOREIGN KEY (organization_id) REFERENCES  organizations (id)
+);
+
 -- TODO: add versioning to compilations (and automatically compile when dependencies update)
 -- or certificates
 CREATE TABLE IF NOT EXISTS compilations (
@@ -107,13 +109,11 @@ CREATE TABLE IF NOT EXISTS devices (
   description      TEXT,
   collection_id    BIGINT                NOT NULL,
   firmware_id      BIGINT                NOT NULL,
-  compiler_id      BIGINT,
   mac              CHAR(17)              NOT NULL,
   number_of_plants INTEGER               NOT NULL,
   created_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE(mac, collection_id),
-  FOREIGN KEY (compiler_id) REFERENCES compilers (id),
   FOREIGN KEY (collection_id) REFERENCES collections (id),
   FOREIGN KEY (firmware_id) REFERENCES firmwares (id)
 );

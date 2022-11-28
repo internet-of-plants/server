@@ -4,6 +4,7 @@ use axum::Json;
 use derive_more::{Display, From};
 use log::{error, warn};
 use serde_json::json;
+use crate::CompilerId;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -38,6 +39,8 @@ pub enum Error {
     CorruptedBinary,
     MissingBinary,
     NothingFound,
+    #[display(fmt = "no collection for compiler: _0")]
+    NoCollectionForCompiler(CompilerId),
     #[display(fmt = "invalid timezone _1: _0")]
     InvalidTimezone(std::num::ParseIntError, String),
     ParseInt(std::num::ParseIntError),
@@ -141,6 +144,10 @@ impl IntoResponse for Error {
                 warn!("Measurement Missing");
                 (StatusCode::BAD_REQUEST, "Measurement Missing")
             }
+            Self::NoCollectionForCompiler(id) => {
+                warn!("No Collection For Compiler: {id:?}");
+                (StatusCode::BAD_REQUEST, "No Collection For Compiler")
+            }
             Self::MissingMeasurement(m) => {
                 warn!("Measurement Missing: {m}");
                 (StatusCode::BAD_REQUEST, "Measurement Missing")
@@ -174,7 +181,6 @@ impl IntoResponse for Error {
                 (StatusCode::BAD_REQUEST, "Asked For Too Many")
             }
             Self::InvalidTimezone(err, tz) => {
-
                 warn!("Invalid Timezone {tz}: {err}");
                 (StatusCode::BAD_REQUEST, "Invalid Timezone")
             }

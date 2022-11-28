@@ -160,12 +160,15 @@ pub async fn router(url: &str) -> Router {
         .route("/v1/sensor/alias", post(controllers::sensor::set_alias))
         .route("/v1/sensor/color", post(controllers::sensor::set_color))
         .route("/v1/compiler", post(controllers::compiler::new))
+        .route("/v1/compiler/set", post(controllers::compiler::set))
+        .route("/v1/compilers", get(controllers::compiler::list))
         .route(
             "/v1/organizations",
             get(controllers::organization::from_user),
         )
         .route("/v1/organization", get(controllers::organization::find))
         .route("/v1/collection", get(controllers::collection::find))
+        .route("/v1/collection/name", post(controllers::collection::set_name))
         .route("/v1/device", get(controllers::device::find))
         .route("/v1/device/events", get(controllers::event::list))
         .route("/v1/device/logs", get(controllers::device_log::list))

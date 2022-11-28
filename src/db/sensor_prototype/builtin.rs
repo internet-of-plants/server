@@ -164,7 +164,10 @@ async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         "Water Pump".to_owned(),
         vec!["https://github.com/internet-of-plants/water-pump".to_owned()],
         vec!["water_pump.hpp".to_owned()],
-        vec!["static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));".to_owned()],
+        vec![
+            "static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));"
+                .to_owned(),
+        ],
         vec![concat!(
             "waterPump{{index}}.begin();\n",
             "for (const auto &[moment, seconds]: config::waterPumpActions{{index}}) {\n",
