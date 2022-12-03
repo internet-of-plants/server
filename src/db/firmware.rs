@@ -17,6 +17,10 @@ impl FirmwareView {
             hash: firmware.hash().to_owned(),
         }
     }
+
+    pub fn id(&self) -> FirmwareId {
+        self.id
+    }
 }
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]

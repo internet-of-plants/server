@@ -4,7 +4,7 @@ use crate::extractor::{
 };
 use crate::{
     logger::*, DateTime, DeviceId, DeviceStat, Error, Event, EventView, Firmware, Pool, Result,
-    SensorMeasurementType, Transaction,Collection
+    SensorMeasurementType, Transaction,Collection,
 };
 use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
@@ -50,18 +50,33 @@ pub async fn new(
     if let Some(firmware) =
         Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await?
     {
-        device.set_firmware(&mut txn, &firmware).await?;
         if collection.compiler(&mut txn).await?.is_none() {
             if let Some(compilation) = firmware.compilation(&mut txn).await? {
                 let compiler = compilation.compiler(&mut txn).await?;
-                if let Some(col)= Collection::find_by_compiler(&mut txn, &compiler).await? {
+                if let Some(col) = Collection::find_by_compiler(&mut txn, &compiler).await? {
                     device.set_collection(&mut txn, &col).await?;
                     collection = col;
                 } else {
                     collection.set_compiler(&mut txn, Some(&compiler)).await?;
                 }
+            } else if let Some(dev) = crate::Device::find_by_firmware(&mut txn, &firmware, &organization).await? {
+                let col = dev.collection(&mut txn).await?;
+                if col.compiler(&mut txn).await?.is_none() {
+                    let mut all_same = true;
+                    for dev in col.devices(&mut txn).await? {
+                        if dev.firmware.id() != firmware.id() {
+                            all_same = false;
+                            break;
+                        }
+                    }
+
+                    if all_same {
+                        device.set_collection(&mut txn, &col).await?;
+                    }
+                }
             }
         }
+        device.set_firmware(&mut txn, &firmware).await?;
     }
 
     let result = if !event.is_null() {

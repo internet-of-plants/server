@@ -218,6 +218,24 @@ impl Device {
         device.ok_or(Error::Unauthorized)
     }
 
+    pub async fn find_by_firmware(
+        txn: &mut Transaction<'_>,
+        firmware: &Firmware,
+        organization: &Organization,
+    ) -> Result<Option<Self>> {
+        let device: Option<Self> = sqlx::query_as(
+            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+             FROM devices as dev
+             INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
+             WHERE cbt.organization_id = $1 AND dev.firmware_id = $2"
+        )
+        .bind(&organization.id())
+        .bind(&firmware.id())
+        .fetch_optional(&mut *txn)
+        .await?;
+        Ok(device)
+    }
+
     pub async fn login(
         txn: &mut Transaction<'_>,
         client: Login,
@@ -269,6 +287,18 @@ impl Device {
         self.id
     }
 
+    pub async fn update_collection(txn: &mut Transaction<'_>, id: DeviceId, collection: &Collection) -> Result<DateTime> {
+        let (updated_at,): (DateTime,) = sqlx::query_as(
+            "UPDATE devices SET collection_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
+        )
+        .bind(&collection.id())
+        .bind(id)
+        .fetch_one(&mut *txn)
+        .await?;
+
+        Ok(updated_at)
+    }
+
     pub async fn set_collection(
         &mut self,
         txn: &mut Transaction<'_>,
@@ -276,18 +306,12 @@ impl Device {
     ) -> Result<()> {
         let old_collection = self.collection(txn).await?;
 
-        let (updated_at,): (DateTime,) = sqlx::query_as(
-            "UPDATE devices SET collection_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
-        )
-        .bind(&collection.id())
-        .bind(self.id)
-        .fetch_one(&mut *txn)
-        .await?;
+        let updated_at = Self::update_collection(txn, self.id, collection).await?;
 
-        if Device::from_collection(txn, &old_collection).await?.is_empty() {
+        if old_collection.devices(txn).await?.len() == 0 {
             old_collection.delete(txn).await?;
         }
-
+        
         self.updated_at = updated_at;
         self.collection_id = collection.id();
         Ok(())

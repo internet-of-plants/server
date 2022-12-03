@@ -1,7 +1,7 @@
 use crate::{
-    Collection, Compilation, DeviceConfig, DeviceConfigView, DeviceId,
+    Collection, Compilation, DeviceConfig, DeviceConfigView, CollectionId,
     DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization, Result,
-    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,Device
+    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,Device,DeviceId,
 };
 use derive_more::FromStr;
 use handlebars::Handlebars;
@@ -14,7 +14,8 @@ use serde_json::json;
 pub struct NewCompiler {
     // TODO: remove pub fields from all structs
     // TODO: make getter proc_macro
-    pub device_id: DeviceId,
+    pub collection_id: CollectionId,
+    pub device_id: Option<DeviceId>,
     pub target_id: TargetId,
     pub device_configs: Vec<NewDeviceConfig>,
     pub sensors: Vec<NewSensor>,
@@ -87,10 +88,10 @@ impl Compiler {
         target: &Target,
         mut sensors_and_alias: Vec<(Sensor, String)>,
         mut device_configs: Vec<DeviceConfig>,
-        device: &mut Device,
+        collection: &mut Collection,
+        device: &mut Option<Device>,
     ) -> Result<(Self, Compilation)> {
-        let mut collection = device.collection(txn).await?;
-        let organization = collection.organization(txn).await?;
+        let organization = dbg!(collection.organization(txn).await)?;
 
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());
@@ -173,14 +174,28 @@ impl Compiler {
         };
 
         if let Some(col) = compiler.collection(txn).await? {
-            collection = col;
-            device.set_collection(txn, &collection).await?;
-        } else if Device::from_collection(txn, &collection).await?.len() == 1 {
-            collection.set_compiler(txn, Some(&compiler)).await?;
+            match device {
+                Some(device) => device.set_collection(txn, &col).await?,
+                None => {
+                    for mut device in Device::from_collection(txn, collection).await? {
+                        device.set_collection(txn, &col).await?;
+                    }
+                }
+            }
+            *collection = col;
+            if let Some(device) = device {
+                device.set_collection(txn, &collection).await?;
+            }
+        } else if let Some(device) = device {
+            if Device::from_collection(txn, &collection).await?.len() == 1 {
+                collection.set_compiler(txn, Some(&compiler)).await?;
+            } else {
+                let mut col = Collection::new(txn, device.name().to_owned(), &organization).await?;
+                col.set_compiler(txn, Some(&compiler)).await?;
+                device.set_collection(txn, collection).await?;
+            }
         } else {
-            collection = Collection::new(txn, device.name().to_owned(), &organization).await?;
             collection.set_compiler(txn, Some(&compiler)).await?;
-            device.set_collection(txn, &collection).await?;
         }
 
         let compilation = if should_compile {

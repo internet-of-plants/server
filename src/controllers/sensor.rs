@@ -1,11 +1,11 @@
-use crate::{extractor::User, Device, DeviceId, Error, Pool, Result, Sensor, SensorId};
+use crate::{extractor::User, Collection, CollectionId, Error, Pool, Result, Sensor, SensorId};
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetAliasRequest {
-    pub device_id: DeviceId,
+    pub collection_id: CollectionId,
     pub sensor_id: SensorId,
     pub alias: String,
 }
@@ -16,8 +16,8 @@ pub async fn set_alias(
     Json(request): Json<SetAliasRequest>,
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
-    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let collection = device.collection(&mut txn).await?;
+
+    let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
 
     if let Some(mut compiler) = collection.compiler(&mut txn).await? {
         let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;
@@ -33,7 +33,7 @@ pub async fn set_alias(
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetColorRequest {
-    pub device_id: DeviceId,
+    pub collection_id: CollectionId,
     pub sensor_id: SensorId,
     pub color: String,
 }
@@ -45,8 +45,7 @@ pub async fn set_color(
 ) -> Result<Json<()>> {
     let mut txn = pool.begin().await?;
 
-    let device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let collection = device.collection(&mut txn).await?;
+    let collection = Collection::find_by_id(&mut txn, request.collection_id, &user).await?;
 
     if let Some(mut compiler) = collection.compiler(&mut txn).await? {
         let sensor = Sensor::find_by_id(&mut txn, &compiler, request.sensor_id).await?;

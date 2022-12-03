@@ -1,7 +1,7 @@
 use crate::{
     extractor::User, CompilationView, Compiler, CompilerView, Device, DeviceConfig,
     NewCompiler, Organization, OrganizationId, Pool, Result, Sensor, Target, TargetId,Collection,
-    DeviceId,CompilerId
+    CollectionId,CompilerId,DeviceId
 };
 use axum::extract::{Extension, Json, Query};
 use serde::Deserialize;
@@ -13,8 +13,11 @@ pub async fn new(
 ) -> Result<Json<CompilationView>> {
     let mut txn = pool.begin().await?;
 
-    let mut device = Device::find_by_id(&mut txn, new_compiler.device_id, &user).await?;
-    let collection = device.collection(&mut txn).await?;
+    let mut device = match new_compiler.device_id {
+        Some(device_id) => Some(Device::find_by_id(&mut txn, device_id, &user).await?),
+        None => None,
+    };
+    let mut collection = Collection::find_by_id(&mut txn, new_compiler.collection_id, &user).await?;
     let organization = collection.organization(&mut txn).await?;
 
     let mut sensors_and_alias = Vec::with_capacity(new_compiler.sensors.len());
@@ -35,6 +38,7 @@ pub async fn new(
         &target,
         sensors_and_alias,
         device_configs,
+        &mut collection,
         &mut device,
     )
     .await?;
@@ -46,9 +50,20 @@ pub async fn new(
 }
 
 #[derive(Deserialize)]
+#[serde(untagged, rename_all = "camelCase")]
+enum Id {
+    CollectionId {
+        collection_id: CollectionId,
+    },
+    DeviceId {
+        device_id: DeviceId,
+    },
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetRequest {
-    device_id: DeviceId,
+    id: Id,
     compiler_id: CompilerId,
 }
 
@@ -59,19 +74,27 @@ pub async fn set(
 ) -> Result<Json<CompilationView>> {
     let mut txn = pool.begin().await?;
 
-    let mut device = Device::find_by_id(&mut txn, request.device_id, &user).await?;
-    let mut collection = device.collection(&mut txn).await?;
+    let mut collection = match &request.id {
+        Id::CollectionId { collection_id } => Collection::find_by_id(&mut txn, *collection_id, &user).await?,
+        Id::DeviceId { device_id } => {
+            let device = Device::find_by_id(&mut txn, *device_id, &user).await?;
+            device.collection(&mut txn).await?
+        }
+    };
     let organization = collection.organization(&mut txn).await?;
     let compiler = Compiler::find_by_id(&mut txn, &organization, request.compiler_id).await?;
 
     if let Some(col) = compiler.collection(&mut txn).await? {
-        collection = col;
-        device.set_collection(&mut txn, &collection).await?;
+        for device in collection.devices(&mut txn).await? {
+            Device::update_collection(&mut txn, device.id, &col).await?;
+        }
+        collection.delete(&mut txn).await?;
     } else if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
         // Technically unreachable as the compiler set here should have a collection, supporting as this might change in the future
         collection.set_compiler(&mut txn, Some(&compiler)).await?;
-    } else {
+    } else if let Id::DeviceId { device_id } = request.id {
         // Technically unreachable as the compiler set here should have a collection, supporting as this might change in the future
+        let mut device = Device::find_by_id(&mut txn, device_id, &user).await?;
         collection = Collection::new(&mut txn, device.name().to_owned(), &organization).await?;
         collection.set_compiler(&mut txn, Some(&compiler)).await?;
         device.set_collection(&mut txn, &collection).await?;
@@ -103,8 +126,10 @@ pub async fn list(
     let mut views = Vec::with_capacity(compilers.len());
     for compiler in compilers {
         // Compilers without collections aren't helpful
-        if compiler.collection(&mut txn).await?.is_some() {
-            views.push(CompilerView::new(&mut txn, compiler).await?);
+        if let Some(collection) = compiler.collection(&mut txn).await? {
+            if Device::from_collection(&mut txn, &collection).await?.len() > 0 {
+                views.push(CompilerView::new(&mut txn, compiler).await?);
+            }
         }
     }
 

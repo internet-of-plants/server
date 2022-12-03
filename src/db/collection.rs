@@ -1,5 +1,5 @@
 use crate::{
-    Compiler, CompilerId, DateTime, Device, DeviceView, Error, Organization, Result, Transaction,Firmware,
+    Compiler, CompilerId, DateTime, Device, DeviceView, Error, Organization, Result, Transaction,Firmware,CompilerView,
     User,
 };
 use derive_more::FromStr;
@@ -21,6 +21,7 @@ pub struct CollectionView {
     pub id: CollectionId,
     pub name: String,
     pub description: Option<String>,
+    pub compiler: Option<CompilerView>,
     pub devices: Vec<DeviceView>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -29,10 +30,16 @@ pub struct CollectionView {
 impl CollectionView {
     pub async fn new(txn: &mut Transaction<'_>, collection: Collection) -> Result<Self> {
         let devices = collection.devices(txn).await?;
+        let compiler = collection.compiler(txn).await?;
+        let compiler = match compiler {
+            Some(c) => Some(CompilerView::new(txn, c).await?),
+            None => None,
+        };
         Ok(Self {
             id: collection.id,
             name: collection.name,
             description: collection.description,
+            compiler,
             devices,
             created_at: collection.created_at,
             updated_at: collection.updated_at,
