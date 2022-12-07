@@ -46,6 +46,17 @@ pub async fn new(
     let mut txn = pool.begin().await?;
 
     let mut collection = device.collection(&mut txn).await?;
+    
+    // Don't even process request if there is an update
+    if let Some(firmware) = collection.update(&mut txn).await? {
+        if firmware.hash() != stat.version {
+            return Ok(HeaderMap::from_iter([(
+                HeaderName::from_static("latest_version"),
+                HeaderValue::from_str(firmware.hash())?,
+            )]));
+        }
+    }
+
     let organization = collection.organization(&mut txn).await?;
     if let Some(firmware) =
         Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await?
@@ -79,23 +90,10 @@ pub async fn new(
         device.set_firmware(&mut txn, &firmware).await?;
     }
 
-    let result = if !event.is_null() {
-        handle_measurements(&mut txn, &collection, &device, stat.clone(), event).await.map(Some)
-    } else {
-        Ok(None)
-    };
-    
-    if let Some(firmware) = collection.update(&mut txn).await? {
-        if firmware.hash() != stat.version {
-            return Ok(HeaderMap::from_iter([(
-                HeaderName::from_static("latest_version"),
-                HeaderValue::from_str(firmware.hash())?,
-            )]));
-        }
+    if !event.is_null() {
+        handle_measurements(&mut txn, &collection, &device, stat.clone(), event).await?;
     }
 
-    // Let's not fail until 
-    result?;
 
     txn.commit().await?;
     Ok(HeaderMap::new())

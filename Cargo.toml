@@ -20,11 +20,13 @@ tracing = "0.1"
 axum = { version = "0.5", features = ["headers", "multipart"] }
 axum-server = { version = "0.4", features = ["tls-rustls"] }
 headers-core = "0.2"
-futures = { version = "0.3", default-features = false, features = ["alloc"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process"] }
 hyper = { version = "0.14", features = ["stream", "server", "http1", "tcp", "client"] }
 tower-http = { version = "0.2", features = ["cors"] }
 tower = "0.4"
+
+git2 = "0.15"
 
 md5 = "0.7"
 
@@ -36,7 +38,7 @@ sqlx = { version = "0.6", default-features = false, features = ["runtime-tokio-n
 pretty_env_logger = "0.4"
 log = "0.4"
 
-serde = {version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 rand = "0.8"

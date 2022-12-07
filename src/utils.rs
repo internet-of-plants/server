@@ -1,49 +1,55 @@
-use std::path::PathBuf;
+use std::{path::Path, path::PathBuf, fmt::Write};
 
-use crate::{logger::*, Result};
+use crate::{logger::*, Result, Pool};
 use rand::{distributions::Alphanumeric, Rng};
-use sqlx::Connection;
+use tokio::fs;
 
 #[derive(sqlx::FromRow, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Migration {
     pub id: i16,
-    pub code: String,
+    pub code_hash: String,
 }
 
-pub async fn run_migrations(url: &str) {
-    use std::path::Path;
-    use tokio::fs;
+fn hash(msg: &str) -> Result<String> {
+    let md5 = md5::compute(msg);
+    let md5 = &*md5;
+    let mut hash = String::with_capacity(md5.len() * 2);
+    for byte in md5 {
+        write!(hash, "{:02X}", byte)?;
+    }
+    Ok(hash)
+}
 
-    let mut connection = sqlx::PgConnection::connect(url)
-        .await
-        .expect("unable to connect to pg");
+pub async fn run_migrations(pool: &'static Pool) {
+    let mut txn = pool.begin().await.expect("unable to start transaction");
 
     let migrations_creation_query = "CREATE TABLE IF NOT EXISTS migrations (
   id         SMALLINT    NOT NULL UNIQUE,
-  code       TEXT        NOT NULL UNIQUE,
+  code_hash  TEXT        NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )";
     info!("Creating migrations table if needed");
     debug!("{}", migrations_creation_query);
     sqlx::query(migrations_creation_query)
-        .execute(&mut connection)
+        .execute(&mut txn)
         .await
-        .unwrap_or_else(|_| panic!("Failed to execute query: {}", migrations_creation_query));
+        .unwrap_or_else(| err| panic!("Failed to execute query: {} ({})", migrations_creation_query, err));
+    txn.commit().await.expect("unable to commit transaction");
 
-    let mut transaction = sqlx::Connection::begin(&mut connection)
-        .await
-        .expect("unable to connect to pg");
+    let mut txn = pool.begin().await.expect("unable to start transaction");
 
     sqlx::query("SELECT pg_advisory_xact_lock(9128312731)")
-        .execute(&mut transaction)
+        .execute(&mut txn)
         .await
         .expect("unable to get migration lock");
 
-    let vec: Vec<Migration> = sqlx::query_as("SELECT id, code FROM migrations")
-        .fetch_all(&mut transaction)
+    let vec: Vec<Migration> = sqlx::query_as("SELECT id, code_hash FROM migrations")
+        .fetch_all(&mut txn)
         .await
         .expect("unable to find migrations table");
     let latest = vec.iter().max().map_or(0, |m| m.id);
+
+    txn.commit().await.expect("unable to commit transaction");
 
     let mut files = Vec::new();
     let mut reader = fs::read_dir("migrations")
@@ -74,16 +80,17 @@ pub async fn run_migrations(url: &str) {
             let code = fs::read_to_string(path)
                 .await
                 .expect("unable to read migration file");
+            let code_hash = hash(&code).expect("unable to hash code");
             let obj = vec.get((number - 1) as usize);
             if obj.is_some()
                 && obj
                     != Some(&Migration {
                         id: number,
-                        code: code.clone(),
+                        code_hash: code_hash.clone(),
                     })
             {
                 error!("Migration found: {:#?}", vec.get((number - 1) as usize));
-                error!("Migration expected: {:#?}", Migration { id: number, code });
+                error!("Migration expected: {:#?}", Migration { id: number, code_hash });
                 panic!("Migration {} changed", number);
             }
         }
@@ -93,45 +100,47 @@ pub async fn run_migrations(url: &str) {
 
     for file in files {
         info!("Running migration {}.sql", file);
+        let mut txn = pool.begin().await.expect("unable to start transaction");
+
         let path = Path::new("migrations").join(format!("{}.sql", file));
         let code = fs::read_to_string(path)
             .await
             .expect("unable to open migration file");
+        let code_hash = hash(&code).expect("unable to hash code");
+
         for string in code.split(';') {
             if string.trim().is_empty() {
                 continue;
             }
             debug!("{}", string);
             sqlx::query(&format!("{};", string))
-                .execute(&mut transaction)
+                .execute(&mut txn)
                 .await
                 .unwrap_or_else(|_| panic!("Failed to execute query: {}", string));
         }
 
-        sqlx::query("INSERT INTO migrations (id, code) VALUES ($1, $2)")
+        sqlx::query("INSERT INTO migrations (id, code_hash) VALUES ($1, $2)")
             .bind(file as i16)
-            .bind(&code)
-            .execute(&mut transaction)
+            .bind(&code_hash)
+            .execute(&mut txn)
             .await
             .expect("unable to insert new migration");
         info!(
             "Has migrations: {:?}",
             sqlx::query_as::<_, (i16,)>("SELECT id FROM migrations ORDER BY id ASC")
-                .fetch_all(&mut transaction)
+                .fetch_all(&mut txn)
                 .await
         );
+        txn.commit().await.expect("unable to commit transaction");
     }
 
     if has_files {
-        crate::db::sensor_prototype::builtin::create_builtin(&mut transaction)
+        let mut txn = pool.begin().await.expect("unable to start transaction");
+        crate::db::sensor_prototype::builtin::create_builtin(&mut txn)
             .await
             .expect("failed to create builtins");
+        txn.commit().await.expect("unable to commit transaction");
     }
-
-    transaction
-        .commit()
-        .await
-        .expect("transaction commit failed");
 }
 
 pub fn random_string(size: usize) -> String {

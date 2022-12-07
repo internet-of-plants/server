@@ -91,7 +91,7 @@ impl Compiler {
         collection: &mut Collection,
         device: &mut Option<Device>,
     ) -> Result<(Self, Compilation)> {
-        let organization = dbg!(collection.organization(txn).await)?;
+        let organization = collection.organization(txn).await?;
 
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());

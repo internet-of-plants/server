@@ -1,4 +1,4 @@
-use crate::{logger::*, Firmware, Result, Transaction};
+use crate::{logger::*, Firmware, Result, Transaction, Error, SensorId};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
@@ -134,12 +134,24 @@ impl Compilation {
         Ok(comp)
     }
 
+    pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+        let comps = sqlx::query_as(
+            "SELECT DISTINCT ON (compilations.compiler_id) compilations.compiler_id, compilations.id, platformio_ini, main_cpp, pin_hpp
+             FROM compilations
+             INNER JOIN collections ON collections.compiler_id = compilations.compiler_id
+             ORDER BY compilations.compiler_id, compilations.created_at DESC",
+        )
+        .fetch_all(&mut *txn)
+        .await?;
+        Ok(comps)
+    }
+
     pub fn id(&self) -> CompilationId {
         self.id
     }
 
     pub async fn firmware(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
-        Firmware::find_by_compilation(txn, self).await
+        Firmware::latest_by_compilation(txn, self).await
     }
 
     pub async fn compiler(&self, txn: &mut Transaction<'_>) -> Result<Compiler> {
@@ -148,6 +160,51 @@ impl Compilation {
 
     pub fn compiler_id(&self) -> CompilerId {
         self.compiler_id
+    }
+
+    pub async fn is_outdated(&self, txn: &mut Transaction<'_>) -> Result<bool> {
+        // TODO: take certs into account
+        // TODO: take iop, iop-hal and its dependencies (arduino, etc)
+
+        let compiler = self.compiler(&mut *txn).await?;
+
+        let dependencies = sqlx::query_as::<_, (SensorId, String)>(
+            "SELECT sensor_id, commit_hash
+             FROM dependency_belongs_to_compilation
+             WHERE compilation_id = $1")
+                .bind(&self.id)
+                .fetch_all(&mut *txn)
+.await?;
+
+        // Is there any RCE danger in cloning a git repo?
+        for sensor in compiler.sensors(txn).await? {
+            let sid = sensor.id;
+
+            for dependency_url in sensor.prototype.dependencies {
+                let commit_hash = tokio::task::spawn_blocking(move || {
+                    let dir = tempfile::tempdir()?;
+                    let repo = git2::Repository::clone(&dependency_url, dir.path())?;
+
+                    // TODO: add branch to the sensor prototype metadata
+                    let object = repo.revparse_single("main")?;
+                    let commit = object.peel_to_commit()?;
+                    let commit_hash = commit.id().to_string();
+                    Ok::<_, Error>(commit_hash)
+                }).await??;
+
+                if !dependencies.iter().any(|(sensor_id, expected_commit_hash)| *sensor_id == sid && &commit_hash == expected_commit_hash) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    pub async fn compile_if_outdated(&self, txn: &mut Transaction<'_>) -> Result<()> {
+        if self.is_outdated(txn).await? {
+            self.compile(txn).await?;
+        }
+        Ok(())
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
@@ -162,6 +219,30 @@ impl Compilation {
             env_name.push(board);
         }
         let env_name = env_name.join("-");
+
+        for sensor in compiler.sensors(txn).await? {
+            for dependency_url in sensor.prototype.dependencies {
+                // Is there any RCE danger in cloning a git repo?
+                let commit_hash = tokio::task::spawn_blocking(move || {
+                    let dir = tempfile::tempdir()?;
+                    let repo = git2::Repository::clone(&dependency_url, dir.path())?;
+
+                    // TODO: add branch to the sensor prototype metadata
+                    let object = repo.revparse_single("main")?;
+                    let commit = object.peel_to_commit()?;
+                    let commit_hash = commit.id().to_string();
+                    Ok::<_, Error>(commit_hash)
+                }).await??;
+
+                sqlx::query("INSERT INTO dependency_belongs_to_compilation (sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3)
+                             ON CONFLICT (sensor_id, compilation_id) DO UPDATE set commit_hash = $2")
+                    .bind(&sensor.id)
+                    .bind(&commit_hash)
+                    .bind(&self.id())
+                    .execute(&mut *txn)
+                    .await?;
+            }
+        }
 
         let firmware = {
             let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;

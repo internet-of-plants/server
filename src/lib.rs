@@ -92,10 +92,14 @@ pub async fn test_router() -> Router {
         .init();
     }
     let url = "postgres://postgres:postgres@127.0.0.1:5432/iop_test";
-    router(url).await
+    let pool = Pool::connect(url)
+        .await
+        .expect("Unable to connect to database");
+    let pool: &'static Pool = Box::leak(pool.into());
+    router(pool).await
 }
 
-pub async fn router(url: &str) -> Router {
+pub async fn router(pool: &'static Pool) -> Router {
     info!(
         "RUST_LOG is {}",
         std::env::var("RUST_LOG").ok().unwrap_or_default()
@@ -142,12 +146,7 @@ pub async fn router(url: &str) -> Router {
         ])
         .allow_origin(Origin::list(allowed_origin));
 
-    utils::run_migrations(url).await;
-
-    let pool = Pool::connect(url)
-        .await
-        .expect("Unable to connect to database");
-    let pool: &'static Pool = Box::leak(pool.into());
+    utils::run_migrations(pool).await;
 
     Router::new()
         .route("/v1/user/login", post(controllers::user::login))

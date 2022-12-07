@@ -372,3 +372,13 @@ CREATE TABLE IF NOT EXISTS sensor_belongs_to_compiler (
   FOREIGN KEY (compiler_id) REFERENCES compilers (id),
   FOREIGN KEY (sensor_id) REFERENCES sensors (id)
 );
+
+CREATE TABLE IF NOT EXISTS dependency_belongs_to_compilation (
+  sensor_id       BIGINT,
+  commit_hash     TEXT                      NOT NULL,
+  compilation_id  BIGINT                    NOT NULL,
+  created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
+  UNIQUE (sensor_id, compilation_id),
+  FOREIGN KEY (sensor_id)      REFERENCES sensors     (id),
+  FOREIGN KEY (compilation_id) REFERENCES compilations (id)
+);

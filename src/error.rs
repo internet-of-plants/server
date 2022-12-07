@@ -49,6 +49,7 @@ pub enum Error {
     InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
     Http(axum::http::Error),
     Multipart(axum::extract::multipart::MultipartError),
+    Git2(git2::Error),
 }
 
 impl std::error::Error for Error {}
@@ -105,6 +106,10 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::ParseInt(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Git2(error) => {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }

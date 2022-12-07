@@ -147,12 +147,12 @@ impl Firmware {
         Ok(firmware)
     }
 
-    pub async fn find_by_compilation(
+    pub async fn latest_by_compilation(
         txn: &mut Transaction<'_>,
         compilation: &Compilation,
     ) -> Result<Self> {
         let firmware = sqlx::query_as(
-            "SELECT id, compilation_id, binary_hash FROM firmwares WHERE compilation_id = $1",
+            "SELECT id, compilation_id, binary_hash FROM firmwares WHERE compilation_id = $1 ORDER BY created_at DESC",
         )
         .bind(compilation.id())
         .fetch_one(txn)

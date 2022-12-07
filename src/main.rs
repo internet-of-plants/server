@@ -1,4 +1,5 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration, panic::AssertUnwindSafe};
+use futures::future::{Future, FutureExt};
 
 #[cfg(not(debug_assertions))]
 use std::path::PathBuf;
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 #[cfg(not(debug_assertions))]
 use axum_server::tls_rustls::RustlsConfig;
 
-use server::router;
+use server::{router, logger::*, Compilation, Result, Pool};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
@@ -37,7 +38,14 @@ async fn main() {
         .init();
 
     let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
-    let router = router(url).await;
+    let pool = Pool::connect(url)
+        .await
+        .expect("Unable to connect to database");
+    let pool: &'static Pool = Box::leak(pool.into());
+
+    tokio::task::spawn(update_compilations(pool));
+
+    let router = router(pool).await;
 
     #[cfg(debug_assertions)]
     let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
@@ -65,5 +73,50 @@ async fn main() {
             .serve(router.into_make_service())
             .await
             .expect("unable to bind https server");
+    }
+}
+
+async fn update_compilations(pool: &'static Pool) {
+    loop {
+        wrap_panic("update compilations".to_owned(), update_compilations_tick(pool)).await;
+        tokio::time::sleep(Duration::from_secs(7200)).await;
+    }
+}
+
+async fn update_compilations_tick(pool: &'static Pool) -> Result<()> {
+    let mut txn = pool.begin().await?;
+    let all_compilations = Compilation::all_active(&mut txn).await?;
+    txn.commit().await?;
+
+    for compilation in all_compilations {
+        wrap_panic(format!("update compilation ({:?})", compilation.id()), update_compilations_each(pool, &compilation)).await;
+    }
+    Ok(())
+}
+
+async fn update_compilations_each(pool: &'static Pool, compilation: &Compilation) -> Result<()> {
+    let mut txn = pool.begin().await?;
+    compilation.compile_if_outdated(&mut txn).await?;
+    txn.commit().await?;
+    Ok(())
+}
+
+async fn wrap_panic<F: Future<Output = Result<()>>>(label: String, future: F) {
+    match AssertUnwindSafe(future).catch_unwind().await {
+        Ok(Ok(())) => {},
+        Ok(Err(err)) => error!("{label}: {err}"),
+        Err(any) => {
+            // Note: Technically panics can be of any form, but most should be &str or String
+            match any.downcast::<String>() {
+                Ok(msg) => error!("Panic at {label}: {msg}"),
+                Err(any) => match any.downcast::<&str>() {
+                    Ok(msg) => error!("Panic at {label}: {msg}"),
+                    Err(any) => {
+                        let type_id = any.type_id();
+                        error!("{label}: Unable to downcast panic message {type_id:?}",);
+                    }
+                },
+            }
+        }
     }
 }
