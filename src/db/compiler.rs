@@ -436,7 +436,7 @@ constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;
 auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Json> {{
   IOP_TRACE();
 
-  loop.logger().infoln(IOP_STR(\"Handle Measurements\"));
+  loop.logger().infoln(IOP_STR(\"Collect Measurements\"));
   auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{
     {measurements}
   }});
@@ -461,12 +461,17 @@ auto setup(EventLoop &loop) noexcept -> void {{
 }}
 }}",
         );
+
+        let target_prototype = target.prototype(&mut *txn).await?;
+        let certificate = target_prototype.latest_certificate(&mut *txn).await?;
+
         Compilation::new(
             &mut *txn,
             self,
             dbg!(platformio_ini),
             dbg!(main_cpp),
             dbg!(pin_hpp),
+            dbg!(certificate.id)
         )
         .await
     }
@@ -523,5 +528,17 @@ auto setup(EventLoop &loop) noexcept -> void {{
 
     pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {
         Organization::find_by_compiler(txn, self).await
+    }
+    
+    pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+        let comps = sqlx::query_as(
+            "SELECT DISTINCT ON (compilers.id) compilers.id, compilers.target_id
+             FROM compilers
+             INNER JOIN collections ON collections.compiler_id = compilers.id
+             INNER JOIN device_belongs_to_collection bt ON bt.collection_id = collections.id
+             ORDER BY compilers.id, compilers.created_at")
+        .fetch_all(&mut *txn)
+        .await?;
+        Ok(comps)
     }
 }

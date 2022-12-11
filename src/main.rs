@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[cfg(not(debug_assertions))]
 use axum_server::tls_rustls::RustlsConfig;
 
-use server::{router, logger::*, Compilation, Result, Pool};
+use server::{router, logger::*, Compilation, Result, Pool, Certificate, TargetPrototype};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[tokio::main]
@@ -44,6 +44,9 @@ async fn main() {
     let pool: &'static Pool = Box::leak(pool.into());
 
     tokio::task::spawn(update_compilations(pool));
+    tokio::task::spawn(update_certificates(pool));
+    tokio::task::spawn(recompile(pool));
+
 
     let router = router(pool).await;
 
@@ -76,6 +79,31 @@ async fn main() {
     }
 }
 
+async fn update_certificates(pool: &'static Pool) {
+    loop {
+        wrap_panic("update certificates".to_owned(), update_certificates_tick(pool)).await;
+        tokio::time::sleep(Duration::from_secs(3600 * 24)).await;
+    }
+}
+
+async fn update_certificates_tick(pool: &'static Pool) -> Result<()> {
+    let mut txn = pool.begin().await?;
+    let all_target_prototypes = TargetPrototype::list(&mut txn).await?;
+    txn.commit().await?;
+
+    for target_prototype in all_target_prototypes {
+        wrap_panic(format!("update certificate for target prototype {:?}", target_prototype.id()), update_certificates_each(pool, &target_prototype)).await;
+    }
+    Ok(())
+}
+
+async fn update_certificates_each(pool: &'static Pool, target_prototype: &TargetPrototype) -> Result<()> {
+    let mut txn = pool.begin().await?;
+    target_prototype.update_certificates(&mut txn).await?;
+    txn.commit().await?;
+    Ok(())
+}
+
 async fn update_compilations(pool: &'static Pool) {
     loop {
         wrap_panic("update compilations".to_owned(), update_compilations_tick(pool)).await;
@@ -98,6 +126,35 @@ async fn update_compilations_each(pool: &'static Pool, compilation: &Compilation
     let mut txn = pool.begin().await?;
     compilation.compile_if_outdated(&mut txn).await?;
     txn.commit().await?;
+    Ok(())
+}
+
+async fn recompile(pool: &'static Pool) {
+    loop {
+        wrap_panic("recompile".to_owned(), recompile_tick(pool)).await;
+        tokio::time::sleep(Duration::from_secs(7200)).await;
+    }
+}
+
+async fn recompile_tick(pool: &'static Pool) -> Result<()> {
+    let mut txn = pool.begin().await?;
+    let all_compilations = Compilation::all_active(&mut txn).await?;
+    let latest_certificates = TargetPrototype::latest_certificates(&mut txn).await?;
+    txn.commit().await?;
+
+    for compilation in all_compilations {
+        wrap_panic(format!("update compilation ({:?})", compilation.id()), recompile_each(pool, compilation, &latest_certificates)).await;
+    }
+    Ok(())
+}
+
+async fn recompile_each(pool: &'static Pool, compilation: Compilation, latest_certificates: &[Certificate]) -> Result<()> {
+    if latest_certificates.iter().any(|c| c.id == compilation.certificate_id()) {
+        let mut txn = pool.begin().await?;
+        let compiler = compilation.compiler(&mut txn).await?;
+        compiler.compile(&mut txn).await?;
+        txn.commit().await?;
+    }
     Ok(())
 }
 

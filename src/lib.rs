@@ -41,7 +41,7 @@ pub use crate::db::{
     },
     sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
     target::{Target, TargetId, TargetView},
-    target_prototype::{TargetPrototype, TargetPrototypeId},
+    target_prototype::{TargetPrototype, TargetPrototypeId, Certificate, CertificateId},
     user::{Login, NewUser, User, UserId, Username},
 };
 pub use error::{Error, Result};

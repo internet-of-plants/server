@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS user_belongs_to_organization (
 
 CREATE TABLE IF NOT EXISTS target_prototypes (
   id                      BIGSERIAL   PRIMARY KEY NOT NULL,
+  certs_url               TEXT                    NOT NULL,
   arch                    TEXT                    NOT NULL UNIQUE,
   build_flags             TEXT                    NOT NULL,
   build_unflags           TEXT,
@@ -38,6 +39,14 @@ CREATE TABLE IF NOT EXISTS target_prototypes (
   extra_platformio_params TEXT,
   ldf_mode                TEXT,
   created_at              TIMESTAMPTZ             NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS dependency_belongs_to_target_prototype (
+  target_prototype_id BIGINT                    NOT NULL,
+  url                 TEXT                      NOT NULL,
+  created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
+  UNIQUE (target_prototype_id, url),
+  FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id)
 );
 
 CREATE TABLE IF NOT EXISTS targets (
@@ -79,16 +88,25 @@ CREATE TABLE IF NOT EXISTS collection_belongs_to_organization (
   FOREIGN KEY (organization_id) REFERENCES  organizations (id)
 );
 
--- TODO: add versioning to compilations (and automatically compile when dependencies update)
--- or certificates
+CREATE TABLE IF NOT EXISTS certificates (
+  id                  BIGSERIAL PRIMARY KEY NOT NULL,
+  target_prototype_id BIGINT                NOT NULL,
+  hash                TEXT                  NOT NULL,
+  created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
+  UNIQUE (target_prototype_id, hash),
+  FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id)
+);
+
 CREATE TABLE IF NOT EXISTS compilations (
   id             BIGSERIAL PRIMARY KEY NOT NULL,
   compiler_id    BIGINT                NOT NULL,
   platformio_ini TEXT                  NOT NULL,
   main_cpp       TEXT                  NOT NULL,
   pin_hpp        TEXT                  NOT NULL,
+  certificate_id BIGINT                NOT NULL,
   created_at     TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (compiler_id) REFERENCES compilers (id)
+  FOREIGN KEY (compiler_id) REFERENCES compilers (id),
+  FOREIGN KEY (certificate_id) REFERENCES certificates (id)
 );
 
 CREATE TABLE IF NOT EXISTS firmwares (
@@ -374,11 +392,13 @@ CREATE TABLE IF NOT EXISTS sensor_belongs_to_compiler (
 );
 
 CREATE TABLE IF NOT EXISTS dependency_belongs_to_compilation (
+  url             TEXT                      NOT NULL,
   sensor_id       BIGINT,
   commit_hash     TEXT                      NOT NULL,
   compilation_id  BIGINT                    NOT NULL,
   created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
   UNIQUE (sensor_id, compilation_id),
+  UNIQUE (url, compilation_id),
   FOREIGN KEY (sensor_id)      REFERENCES sensors     (id),
   FOREIGN KEY (compilation_id) REFERENCES compilations (id)
 );

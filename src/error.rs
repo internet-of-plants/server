@@ -14,6 +14,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     Sqlx(sqlx::error::Error),
     Bcrypt(bcrypt::BcryptError),
+    Reqwest(reqwest::Error),
     Join(tokio::task::JoinError),
     Json(serde_json::Error),
     IO(std::io::Error),
@@ -66,6 +67,10 @@ impl IntoResponse for Error {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::Hyper(error) => {
+                error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::Reqwest(error) => {
                 error!("{:?} {}", error, error);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }

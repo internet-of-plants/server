@@ -232,14 +232,15 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
 async fn esp8266_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     TargetPrototype::new(
         txn,
+        "https://ccadb-public.secure.force.com/mozilla/IncludedCACertificateReportPEMCSV".to_owned(),
         "esp8266".to_owned(),
         "-D IOP_ESP8266\n    -D IOP_SSL".to_owned(),
-        "espressif8266".to_owned(),
+        "https://github.com/platformio/platform-espressif8266".to_owned(),
         Some("arduino".to_owned()),
-        Some("mcspr/toolchain-xtensa @ ~5.100300.211127
-    framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino.git#d5444c4aa38bff01269cfbd98a13a1454d0c62df".to_owned()),
+        Some("framework-arduinoespressif8266 @ https://github.com/internet-of-plants/Arduino".to_owned()),
         Some("monitor_filters = esp8266_exception_decoder\nboard_build.f_cpu = 160000000L\nmonitor_speed = 115200".to_owned()),
-        Some("deep".to_owned())
+        Some("deep".to_owned()),
+        vec!["https://github.com/internet-of-plants/Arduino".to_owned(), "https://github.com/platformio/platform-espressif8266".to_owned()]
     ).await
 }
 
@@ -296,16 +297,18 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
 async fn esp32_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     let mut prototype = TargetPrototype::new(
         txn,
+        "https://hg.mozilla.org/releases/mozilla-release/raw-file/default/security/nss/lib/ckfw/builtins/certdata.txt".to_owned(),
         "esp32".to_owned(),
         "-D IOP_ESP32\n    -D IOP_SSL".to_owned(),
-        "https://github.com/platformio/platform-espressif32.git#378419806ce465505a36437157d32c17144e45d2".to_owned(),
+        "https://github.com/internet-of-plants/platform-espressif32".to_owned(),
         Some("arduino".to_owned()),
         Some("toolchain-xtensa-esp32 @ 8.4.0+2021r1
     espressif/toolchain-riscv32-esp @ 8.4.0+2021r1
-    framework-arduinoespressif32 @ https://github.com/internet-of-plants/arduino-esp32.git#release_2011
+    framework-arduinoespressif32 @ https://github.com/internet-of-plants/arduino-esp32
     platformio/tool-esptoolpy @ https://github.com/tasmota/esptool/releases/download/v3.2/esptool-v3.2.zip".to_owned()),
     Some("board_build.mcu = esp32\nboard_build.f_cpu = 240000000L\nmonitor_speed = 115200".to_owned()),
-        Some("deep".to_owned())
+        Some("deep".to_owned()),
+        vec!["https://github.com/internet-of-plants/arduino-esp32".to_owned(), "https://github.com/internet-of-plants/platform-espressif32".to_owned()]
     ).await?;
     prototype
         .set_build_unflags(txn, Some("-std=gnu++11".to_owned()))
@@ -353,6 +356,7 @@ async fn esp32dev_esp32_target(
 async fn linux_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
     TargetPrototype::new(
         txn,
+        "https://hg.mozilla.org/releases/mozilla-release/raw-file/default/security/nss/lib/ckfw/builtins/certdata.txt".to_owned(),
         "linux".to_owned(),
         "-Wextra
     -Wpedantic
@@ -369,7 +373,7 @@ async fn linux_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetProto
         None,
         None,
         None,
-        None,
+        None,Vec::new(),
     )
     .await
 }
@@ -425,11 +429,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
     target
         .set_build_flags(
             txn,
-            Some(
-                "
-    -D IOP_LINUX"
-                    .to_owned(),
-            ),
+            Some("-D IOP_LINUX".to_owned()),
         )
         .await?;
     Ok(target)
@@ -487,11 +487,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
     target
         .set_build_flags(
             txn,
-            Some(
-                "
-    -D IOP_LINUX_MOCK"
-                    .to_owned(),
-            ),
+            Some("-D IOP_LINUX_MOCK".to_owned()),
         )
         .await?;
     Ok(target)

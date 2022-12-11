@@ -58,3 +58,5 @@ mime = "0.3"
 handlebars = "4"
 
 random_color = "0.6.1"
+
+reqwest = "0.11"

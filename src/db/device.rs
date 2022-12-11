@@ -118,7 +118,6 @@ impl Device {
             return Ok(device);
         }
 
-        // TODO: if firmware exists put new device in existing collection that has the devices with the same firmware instead of the default
         let name = format!("device-{}", utils::random_string(5));
         let collection = Collection::new(txn, name.clone(), organization).await?;
 

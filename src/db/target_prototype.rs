@@ -1,6 +1,26 @@
 use crate::{Result, Transaction};
+use std::fmt::Write;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
+#[sqlx(transparent)]
+pub struct CertificateId(pub i64);
+
+#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Certificate {
+    pub id: CertificateId,
+    pub target_prototype_id: TargetPrototypeId,
+    pub hash: String,
+}
+
+#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Dependency {
+    pub url: String,
+    pub branch: String,
+}
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
 #[sqlx(transparent)]
@@ -16,6 +36,7 @@ impl TargetPrototypeId {
 #[serde(rename_all = "camelCase")]
 pub struct TargetPrototype {
     pub id: TargetPrototypeId,
+    pub certs_url: String,
     pub arch: String,
     pub build_flags: String,
     pub build_unflags: Option<String>,
@@ -30,6 +51,7 @@ impl TargetPrototype {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         txn: &mut Transaction<'_>,
+        certs_url: String,
         arch: String,
         build_flags: String,
         platform: String,
@@ -37,10 +59,12 @@ impl TargetPrototype {
         platform_packages: Option<String>,
         extra_platformio_params: Option<String>,
         ldf_mode: Option<String>,
+        dependencies: Vec<String>,
     ) -> Result<Self> {
         let (id,): (TargetPrototypeId,) = sqlx::query_as(
-            "INSERT INTO target_prototypes (arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+            "INSERT INTO target_prototypes (certs_url, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
         )
+            .bind(&certs_url)
             .bind(&arch)
             .bind(&build_flags)
             .bind(&platform)
@@ -50,8 +74,20 @@ impl TargetPrototype {
             .bind(&ldf_mode)
             .fetch_one(&mut *txn)
             .await?;
+
+        for dependency in dependencies {
+            sqlx::query(
+                "INSERT INTO dependency_belongs_to_target_prototypes (target_prototype_id, url) VALUES ($1, $2)",
+            )
+                .bind(&id)
+                .bind(&dependency)
+                .execute(&mut *txn)
+                .await?;
+        }
+
         Ok(Self {
             id,
+            certs_url,
             arch,
             build_flags,
             build_unflags: None,
@@ -65,10 +101,18 @@ impl TargetPrototype {
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetPrototypeId) -> Result<Self> {
         Ok(sqlx::query_as(
-            "SELECT id, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE id = $1"
+            "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE id = $1"
         )
             .bind(&id)
             .fetch_one(&mut *txn)
+            .await?)
+    }
+    
+    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+        Ok(sqlx::query_as(
+            "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes"
+        )
+            .fetch_all(&mut *txn)
             .await?)
     }
 
@@ -88,5 +132,71 @@ impl TargetPrototype {
 
     pub fn id(&self) -> TargetPrototypeId {
         self.id
+    }
+    
+    pub async fn dependencies(&self, txn: &mut Transaction<'_>) -> Result<Vec<Dependency>> {
+        let mut deps = vec![
+            Dependency {
+                url: "https://github.com/bblanchon/ArduinoJson".to_owned(),
+                branch: "6.x".to_owned()
+            },
+            Dependency {
+                url: "https://github.com/internet-of-plants/iop-hal".to_owned(),
+                branch: "main".to_owned()
+            },
+            Dependency {
+                url: "https://github.com/internet-of-plants/iop".to_owned(),
+                branch: "main".to_owned()
+            },
+        ];
+
+        let dependencies: Vec<(String,)> = sqlx::query_as(
+            "SELECT url FROM dependency_belongs_to_target_prototypes WHERE target_prototype_id = $1",
+        )
+            .bind(&self.id)
+            .fetch_all(&mut *txn)
+            .await?;
+        for (dependency,) in dependencies {
+            deps.push(Dependency {
+                url: dependency,
+                branch: "main".to_owned(),
+            });
+        }
+
+        Ok(deps)
+    }
+
+    pub async fn update_certificates(&self, txn: &mut Transaction<'_>) -> Result<()> {
+        let content = reqwest::get(&self.certs_url).await?.text().await?;
+        let md5 = md5::compute(content);
+        let md5 = &*md5;
+        let mut hash = String::with_capacity(md5.len() * 2);
+        for byte in md5 {
+            write!(hash, "{:02X}", byte)?;
+        }
+        sqlx::query("INSERT INTO certificates (target_prototype_id, hash) VALUES ($1, $2)
+                          ON CONFLICT (target_prototype_id, hash) DO NOTHING set commit_hash = $2")
+            .bind(&self.id)
+            .bind(&hash)
+            .execute(txn)
+            .await?;
+        Ok(())
+    }
+    
+    pub async fn latest_certificates(txn: &mut Transaction<'_>) -> Result<Vec<Certificate>> {
+        let certificates = sqlx::query_as("SELECT DISTINCT(target_prototype_id), id, hash
+                                                             FROM certificates
+                                                             ORDER BY target_prototype_id, created_at DESC")
+            .fetch_all(txn)
+            .await?;
+        Ok(certificates)
+    }
+    
+    pub async fn latest_certificate(&self, txn: &mut Transaction<'_>) -> Result<Certificate> {
+        let certificate = sqlx::query_as("SELECT DISTINCT(target_prototype_id), id, hash FROM certificates WHERE target_prototype_id = $1")
+            .bind(&self.id)
+            .fetch_one(txn)
+            .await?;
+        Ok(certificate)
     }
 }
