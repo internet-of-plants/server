@@ -110,7 +110,7 @@ impl Compilation {
         compiler: &Compiler,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
-            "SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp
+            "SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp, certificate_id
             FROM compilations
             WHERE compiler_id = $1
             ORDER BY created_at DESC",
@@ -127,7 +127,7 @@ impl Compilation {
         id: CompilationId,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
-            "SELECT compilations.id, compiler_id, platformio_ini, main_cpp, pin_hpp
+            "SELECT compilations.id, compiler_id, platformio_ini, main_cpp, pin_hpp, certificate_id
              FROM compilations
              INNER JOIN firmwares ON firmwares.compilation_id = compilations.id
              WHERE compilations.id = $1 AND firmwares.id = $2",
@@ -141,7 +141,7 @@ impl Compilation {
 
     pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         let comps = sqlx::query_as(
-            "SELECT DISTINCT ON (compilations.compiler_id) compilations.compiler_id, compilations.id, platformio_ini, main_cpp, pin_hpp
+            "SELECT DISTINCT ON (compilations.compiler_id) compilations.compiler_id, compilations.id, platformio_ini, main_cpp, pin_hpp, certificate_id
              FROM compilations
              INNER JOIN collections ON collections.compiler_id = compilations.compiler_id
              INNER JOIN devices ON devices.collection_id = collections.id

@@ -15,7 +15,7 @@ if [ -z "$DOMAIN" ]; then
 fi
 
 cd $SCRIPTPATH/..
-  cargo build --release
+  RUSTFLAGS=-g cargo build --release
   if [ $? -ne 0 ]; then
     cd -
     echo "Build failed, bailing out"

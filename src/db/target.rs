@@ -224,6 +224,7 @@ impl Target {
             .map_or(String::new(), |f| format!("lib_ldf_mode = {f}\n"));
         let mut build_flags = prototype.build_flags.clone();
         if let Some(flags) = &self.build_flags {
+            build_flags.push_str("\n    ");
             build_flags.push_str(flags);
         }
         let extra_platformio_params = &prototype.extra_platformio_params;
@@ -241,7 +242,7 @@ impl Target {
         let env_name = env_name.join("-");
 
         let debug = if cfg!(debug_assertions) {
-            "-D IOP_DEBUG"
+            "    -D IOP_DEBUG\n"
         } else {
             ""
         };
@@ -259,7 +260,7 @@ build_flags =
     -Wall
     {build_flags}
     -D IOP_LOG_LEVEL=iop::LogLevel::INFO
-    {debug}
+{debug}\
 platform = {platform}
 build_type = {build_type}
 {framework}\

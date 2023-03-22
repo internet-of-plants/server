@@ -49,10 +49,6 @@ async fn main() {
 
     let router = router(pool).await;
 
-    #[cfg(debug_assertions)]
-    let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
-
-    #[cfg(not(debug_assertions))]
     let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
 
     tracing::info!("Listening on {}", addr);
