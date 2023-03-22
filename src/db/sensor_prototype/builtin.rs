@@ -5,22 +5,22 @@ use crate::{
 };
 
 pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
-    let esp8266_target_prototype = esp8266_target_prototype(&mut *txn).await?;
-    nodemcuv2_esp8266_target(&mut *txn, &esp8266_target_prototype).await?;
+    let esp8266_target_prototype = esp8266_target_prototype(txn).await?;
+    nodemcuv2_esp8266_target(txn, &esp8266_target_prototype).await?;
 
-    let esp32_target_prototype = esp32_target_prototype(&mut *txn).await?;
-    esp32dev_esp32_target(&mut *txn, &esp32_target_prototype).await?;
+    let esp32_target_prototype = esp32_target_prototype(txn).await?;
+    esp32dev_esp32_target(txn, &esp32_target_prototype).await?;
 
-    let linux_target_prototype = linux_target_prototype(&mut *txn).await?;
-    native_linux_target(&mut *txn, &linux_target_prototype).await?;
-    native_linux_local_debugging_target(&mut *txn, &linux_target_prototype).await?;
+    let linux_target_prototype = linux_target_prototype(txn).await?;
+    native_linux_target(txn, &linux_target_prototype).await?;
+    native_linux_local_debugging_target(txn, &linux_target_prototype).await?;
 
-    dht(&mut *txn).await?;
-    soil_resistivity(&mut *txn).await?;
-    factory_reset_button(&mut *txn).await?;
-    light_relay(&mut *txn).await?;
-    dallas_temperature(&mut *txn).await?;
-    water_pump(&mut *txn).await?;
+    dht(txn).await?;
+    soil_resistivity(txn).await?;
+    factory_reset_button(txn).await?;
+    light_relay(txn).await?;
+    dallas_temperature(txn).await?;
+    water_pump(txn).await?;
 
     Ok(())
 }
@@ -190,7 +190,7 @@ async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
                 "std::pair<relay::Moment, iop::time::seconds>".to_owned(),
                 SensorWidgetKind::Map(
                     Box::new(SensorWidgetKind::Moment),
-                    Box::new(SensorWidgetKind::U32),
+                    Box::new(SensorWidgetKind::Seconds),
                 ),
             ),
         ],
@@ -427,10 +427,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
     )
     .await?;
     target
-        .set_build_flags(
-            txn,
-            Some("-D IOP_LINUX".to_owned()),
-        )
+        .set_build_flags(txn, Some("-D IOP_LINUX".to_owned()))
         .await?;
     Ok(target)
 }
@@ -485,10 +482,7 @@ enum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };
     .await?;
     target.set_name(txn, Some("mock".to_owned())).await?;
     target
-        .set_build_flags(
-            txn,
-            Some("-D IOP_LINUX_MOCK".to_owned()),
-        )
+        .set_build_flags(txn, Some("-D IOP_LINUX_MOCK".to_owned()))
         .await?;
     Ok(target)
 }

@@ -1,6 +1,6 @@
 use crate::{
-    Compiler, CompilerId, DateTime, Device, DeviceView, Error, Organization, Result, Transaction,Firmware,CompilerView,
-    User,
+    Compiler, CompilerId, CompilerView, DateTime, Device, DeviceView, Error, Firmware,
+    Organization, Result, Transaction, User,
 };
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -170,19 +170,22 @@ impl Collection {
              WHERE devices.id = $1",
         )
         .bind(device.id())
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(collection)
     }
 
-    pub async fn find_by_compiler(txn: &mut Transaction<'_>, compiler: &Compiler) -> Result<Option<Self>> {
+    pub async fn find_by_compiler(
+        txn: &mut Transaction<'_>,
+        compiler: &Compiler,
+    ) -> Result<Option<Self>> {
         let collection = sqlx::query_as(
             "SELECT col.id, col.name, col.description, col.compiler_id,  col.created_at, col.updated_at
             FROM collections as col
             WHERE col.compiler_id = $1",
         )
         .bind(compiler.id())
-        .fetch_optional(&mut *txn)
+        .fetch_optional(txn)
         .await?;
         Ok(collection)
     }
@@ -217,7 +220,9 @@ impl Collection {
     pub async fn compiler(&self, txn: &mut Transaction<'_>) -> Result<Option<Compiler>> {
         if let Some(compiler_id) = self.compiler_id {
             let organization = self.organization(txn).await?;
-            Ok(Some(Compiler::find_by_id(txn, &organization, compiler_id).await?))
+            Ok(Some(
+                Compiler::find_by_id(txn, &organization, compiler_id).await?,
+            ))
         } else {
             Ok(None)
         }
@@ -231,7 +236,7 @@ impl Collection {
             Ok(None)
         }
     }
-    
+
     pub async fn set_name(&mut self, txn: &mut Transaction<'_>, name: String) -> Result<()> {
         let (updated_at,): (DateTime,) = sqlx::query_as(
             "UPDATE collections SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",

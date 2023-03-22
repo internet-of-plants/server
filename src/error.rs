@@ -1,59 +1,95 @@
+use crate::CompilerId;
+use backtrace::Backtrace;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use derive_more::{Display, From};
 use log::{error, warn};
 use serde_json::json;
-use crate::CompilerId;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 // TODO: improve error code returned, send error message in debug builds
 
-#[derive(From, Display, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error(transparent)]
     Sqlx(sqlx::error::Error),
-    Bcrypt(bcrypt::BcryptError),
-    Reqwest(reqwest::Error),
-    Join(tokio::task::JoinError),
-    Json(serde_json::Error),
-    IO(std::io::Error),
-    Fmt(std::fmt::Error),
-    Utf8(std::str::Utf8Error),
-    Handlebars(handlebars::RenderError),
+    #[error(transparent)]
+    Bcrypt(#[from] bcrypt::BcryptError),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error(transparent)]
+    Join(#[from] tokio::task::JoinError),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
+    Fmt(#[from] std::fmt::Error),
+    #[error(transparent)]
+    Utf8(#[from] std::str::Utf8Error),
+    #[error(transparent)]
+    Handlebars(#[from] handlebars::RenderError),
+    #[error("event must be object")]
     EventMustBeObject,
+    #[error("measurement missing")]
     MeasurementMissing,
-    #[display(fmt = "value:{} range:{}", "_0", "_1")]
+    #[error("value: {0} range: {1}")]
     MeasurementOutOfRange(String, String),
-    #[display(fmt = "type:{:?} expected:{}", "_0", "_1")]
+    #[error("type: {0:?} expected: {1}")]
     InvalidMeasurementType(serde_json::Value, String),
+    #[error("missing measurement {0}")]
     MissingMeasurement(String),
+    #[error("duplicated config")]
     DuplicatedConfig,
+    #[error("duplicated key")]
     DuplicatedKey,
+    #[error("unauthorized")]
     Unauthorized,
+    #[error("bad data")]
     BadData,
+    #[error("insecure password")]
     InsecurePassword,
+    #[error("invalid name")]
     InvalidName,
+    #[error("no binary available")]
     NoBinaryAvailable,
+    #[error("no update available")]
     NoUpdateAvailable,
+    #[error("asked for too many")]
     AskedForTooMany,
+    #[error("corrupted binary")]
     CorruptedBinary,
+    #[error("missing binary")]
     MissingBinary,
+    #[error("nothing found")]
     NothingFound,
-    #[display(fmt = "no collection for compiler: _0")]
+    #[error("no collection for compiler: {0}")]
     NoCollectionForCompiler(CompilerId),
-    #[display(fmt = "invalid timezone _1: _0")]
-    InvalidTimezone(std::num::ParseIntError, String),
-    ParseInt(std::num::ParseIntError),
+    #[error("missing header {0}")]
     MissingHeader(&'static str),
-    Hyper(hyper::Error),
-    InvalidHeaderValue(axum::http::header::InvalidHeaderValue),
-    Http(axum::http::Error),
-    Multipart(axum::extract::multipart::MultipartError),
-    Git2(git2::Error),
+    #[error("invalid timezone {1}: {0}")]
+    InvalidTimezone(std::num::ParseIntError, String),
+    #[error(transparent)]
+    ParseInt(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    Hyper(#[from] hyper::Error),
+    #[error(transparent)]
+    InvalidHeaderValue(#[from] axum::http::header::InvalidHeaderValue),
+    #[error(transparent)]
+    Http(#[from] axum::http::Error),
+    #[error(transparent)]
+    Multipart(#[from] axum::extract::multipart::MultipartError),
+    #[error(transparent)]
+    Git2(#[from] git2::Error),
 }
 
-impl std::error::Error for Error {}
+impl From<sqlx::error::Error> for Error {
+    fn from(err: sqlx::error::Error) -> Self {
+        error!("{err}\n{:?}", Backtrace::new());
+        Self::Sqlx(err)
+    }
+}
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {

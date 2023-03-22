@@ -107,7 +107,7 @@ impl DeviceConfigRequest {
             .bind(&human_name)
             .bind(target.id())
             .bind(&secret_algo)
-            .fetch_one(&mut *txn)
+            .fetch_one(txn)
             .await?;
         Ok(Self {
             id,
@@ -123,7 +123,7 @@ impl DeviceConfigRequest {
             "SELECT id, type_id, name, human_name, target_id, secret_algo FROM device_config_requests WHERE id = $1",
         )
         .bind(id)
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(request)
     }
@@ -133,7 +133,7 @@ impl DeviceConfigRequest {
             "SELECT id, type_id, name, human_name, target_id, secret_algo FROM device_config_requests WHERE target_id = $1",
         )
             .bind(target.id())
-            .fetch_all(&mut *txn)
+            .fetch_all(txn)
             .await?;
         Ok(requests)
     }

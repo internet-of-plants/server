@@ -22,10 +22,10 @@ pub struct DeviceConfigView {
 
 impl DeviceConfigView {
     pub async fn new(txn: &mut Transaction<'_>, config: DeviceConfig) -> Result<Self> {
-        let request = config.request(&mut *txn).await?;
+        let request = config.request(txn).await?;
         Ok(Self {
             request_id: config.request_id,
-            type_name: request.ty(&mut *txn).await?.name,
+            type_name: request.ty(txn).await?.name,
             name: request.name,
             value: config.value,
         })
@@ -101,7 +101,7 @@ impl DeviceConfig {
     }
 
     pub async fn request(&self, txn: &mut Transaction<'_>) -> Result<DeviceConfigRequest> {
-        DeviceConfigRequest::find_by_id(&mut *txn, self.request_id).await
+        DeviceConfigRequest::find_by_id(txn, self.request_id).await
     }
 
     pub fn id(&self) -> DeviceConfigId {

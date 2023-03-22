@@ -23,11 +23,10 @@ pub struct TargetView {
 
 impl TargetView {
     pub async fn new(txn: &mut Transaction<'_>, target: Target) -> Result<Self> {
-        let prototype = target.prototype(&mut *txn).await?;
+        let prototype = target.prototype(txn).await?;
         let mut configuration_requests = Vec::new();
-        for config_request in target.configuration_requests(&mut *txn).await? {
-            configuration_requests
-                .push(DeviceConfigRequestView::new(&mut *txn, config_request).await?);
+        for config_request in target.configuration_requests(txn).await? {
+            configuration_requests.push(DeviceConfigRequestView::new(txn, config_request).await?);
         }
         Ok(Self {
             id: target.id(),
@@ -103,7 +102,7 @@ impl Target {
         };
         for config_request in new_config_requests {
             DeviceConfigRequest::new(
-                &mut *txn,
+                txn,
                 config_request.name,
                 config_request.human_name,
                 config_request.type_name,
@@ -121,7 +120,7 @@ impl Target {
             "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags
             FROM targets",
         )
-        .fetch_all(&mut *txn)
+        .fetch_all(txn)
         .await?)
     }
 
@@ -130,7 +129,7 @@ impl Target {
             "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
         )
         .bind(&id)
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(target)
     }
@@ -154,7 +153,7 @@ impl Target {
     pub async fn pins(&self, txn: &mut Transaction<'_>) -> Result<Vec<String>> {
         let pins = sqlx::query_as("SELECT name FROM pins WHERE target_id = $1")
             .bind(self.id)
-            .fetch_all(&mut *txn)
+            .fetch_all(txn)
             .await?
             .into_iter()
             .map(|(name,)| name)
@@ -170,7 +169,7 @@ impl Target {
         sqlx::query("UPDATE targets SET name = $1 WHERE id = $2")
             .bind(&name)
             .bind(&self.id)
-            .execute(&mut *txn)
+            .execute(txn)
             .await?;
         self.name = name;
         Ok(())
@@ -184,7 +183,7 @@ impl Target {
         sqlx::query("UPDATE targets SET build_flags = $1 WHERE id = $2")
             .bind(&build_flags)
             .bind(&self.id)
-            .execute(&mut *txn)
+            .execute(txn)
             .await?;
         self.build_flags = build_flags;
         Ok(())
@@ -206,7 +205,7 @@ impl Target {
         txn: &mut Transaction<'_>,
         lib_deps: &[Dependency],
     ) -> Result<String> {
-        let prototype = self.prototype(&mut *txn).await?;
+        let prototype = self.prototype(txn).await?;
         let arch = &prototype.arch;
         let build_type = "debug".to_owned();
         //match prototype.kind {

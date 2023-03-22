@@ -1,7 +1,6 @@
 use crate::{
-    utils, AuthToken, Collection, CollectionId, DateTime,
-    Error, Event, EventView, Firmware, FirmwareId, FirmwareView, Login, Organization, Result,CompilerView,
-    Transaction, User, UserId,
+    utils, AuthToken, Collection, CollectionId, CompilerView, DateTime, Error, Event, EventView,
+    Firmware, FirmwareId, FirmwareView, Login, Organization, Result, Transaction, User, UserId,
 };
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
@@ -110,16 +109,39 @@ impl Device {
         };
 
         if let Some(mut device) = device {
+            let mut collection = device.collection(txn).await?;
+
+            if collection.compiler(txn).await?.is_none() {
+                if let Some(compiler) = compiler {
+                    if let Some(col) = Collection::find_by_compiler(txn, &compiler).await? {
+                        device.set_collection(txn, &col).await?;
+                    } else {
+                        collection.set_compiler(txn, Some(&compiler)).await?;
+                    }
+                } else {
+                    // Assume all devices with the same firmware are of the same collection, a race might make this not true, but let's pick one
+                    for dev in
+                        crate::Device::list_by_firmware(txn, &firmware, &organization).await?
+                    {
+                        let col = dev.collection(txn).await?;
+                        device.set_collection(txn, &col).await?;
+                        break;
+                    }
+                }
+            }
+
             if device.firmware_id != firmware.id() {
                 device.set_firmware(txn, &firmware).await?;
             }
-            let mut collection = device.collection(txn).await?;
-            collection.set_compiler(txn, compiler.as_ref()).await?;
             return Ok(device);
         }
 
         let name = format!("device-{}", utils::random_string(5));
-        let collection = Collection::new(txn, name.clone(), organization).await?;
+        let mut collection = Collection::new(txn, name.clone(), organization).await?;
+
+        if device.is_none() {
+            collection.set_compiler(txn, compiler.as_ref()).await?;
+        }
 
         let (id, now) =
             sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id) VALUES ($1, '1', $2, $3, $4) RETURNING id, created_at")
@@ -163,7 +185,7 @@ impl Device {
     pub fn name(&self) -> &str {
         &self.name
     }
-    
+
     pub async fn find_by_id(
         txn: &mut Transaction<'_>,
         device_id: DeviceId,
@@ -207,7 +229,7 @@ impl Device {
         let device: Option<Self> = sqlx::query_as(
             "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
-             INNER JOIN authentications ON authentications.device_id = dev.id AND authentications.mac = dev.mac
+             INNER JOIN authentications ON authentications.device_id = dev.id AND authentications.mac = dev.mac AND authentications.expired = false
              WHERE authentications.token = $1 AND authentications.mac = $2",
         )
         .bind(&token)
@@ -217,12 +239,12 @@ impl Device {
         device.ok_or(Error::Unauthorized)
     }
 
-    pub async fn find_by_firmware(
+    pub async fn list_by_firmware(
         txn: &mut Transaction<'_>,
         firmware: &Firmware,
         organization: &Organization,
-    ) -> Result<Option<Self>> {
-        let device: Option<Self> = sqlx::query_as(
+    ) -> Result<Vec<Self>> {
+        let device = sqlx::query_as(
             "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
@@ -230,7 +252,7 @@ impl Device {
         )
         .bind(&organization.id())
         .bind(&firmware.id())
-        .fetch_optional(&mut *txn)
+        .fetch_all(&mut *txn)
         .await?;
         Ok(device)
     }
@@ -269,6 +291,13 @@ impl Device {
                 let token = AuthToken::random();
 
                 sqlx::query(
+                    "UPDATE authentications SET expired = true WHERE mac = $1",
+                )
+                .bind(&device.mac)
+                .execute(&mut *txn)
+                .await?;
+
+                sqlx::query(
                     "INSERT INTO authentications (mac, device_id, token) VALUES ($1, $2, $3)",
                 )
                 .bind(&device.mac)
@@ -286,7 +315,11 @@ impl Device {
         self.id
     }
 
-    pub async fn update_collection(txn: &mut Transaction<'_>, id: DeviceId, collection: &Collection) -> Result<DateTime> {
+    pub async fn update_collection(
+        txn: &mut Transaction<'_>,
+        id: DeviceId,
+        collection: &Collection,
+    ) -> Result<DateTime> {
         let (updated_at,): (DateTime,) = sqlx::query_as(
             "UPDATE devices SET collection_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
         )
@@ -310,7 +343,7 @@ impl Device {
         if old_collection.devices(txn).await?.len() == 0 {
             old_collection.delete(txn).await?;
         }
-        
+
         self.updated_at = updated_at;
         self.collection_id = collection.id();
         Ok(())

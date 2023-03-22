@@ -41,7 +41,7 @@ pub use crate::db::{
     },
     sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
     target::{Target, TargetId, TargetView},
-    target_prototype::{TargetPrototype, TargetPrototypeId, Certificate, CertificateId},
+    target_prototype::{Certificate, CertificateId, TargetPrototype, TargetPrototypeId},
     user::{Login, NewUser, User, UserId, Username},
 };
 pub use error::{Error, Result};
@@ -167,7 +167,10 @@ pub async fn router(pool: &'static Pool) -> Router {
         )
         .route("/v1/organization", get(controllers::organization::find))
         .route("/v1/collection", get(controllers::collection::find))
-        .route("/v1/collection/name", post(controllers::collection::set_name))
+        .route(
+            "/v1/collection/name",
+            post(controllers::collection::set_name),
+        )
         .route("/v1/device", get(controllers::device::find))
         .route("/v1/device/events", get(controllers::event::list))
         .route("/v1/device/logs", get(controllers::device_log::list))

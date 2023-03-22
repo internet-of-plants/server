@@ -1,7 +1,7 @@
 use crate::{
-    extractor::User, CompilationView, Compiler, CompilerView, Device, DeviceConfig,
-    NewCompiler, Organization, OrganizationId, Pool, Result, Sensor, Target, TargetId,Collection,
-    CollectionId,CompilerId,DeviceId
+    extractor::User, Collection, CollectionId, CompilationView, Compiler, CompilerId, CompilerView,
+    Device, DeviceConfig, DeviceId, NewCompiler, Organization, OrganizationId, Pool, Result,
+    Sensor, Target, TargetId,
 };
 use axum::extract::{Extension, Json, Query};
 use serde::Deserialize;
@@ -17,7 +17,8 @@ pub async fn new(
         Some(device_id) => Some(Device::find_by_id(&mut txn, device_id, &user).await?),
         None => None,
     };
-    let mut collection = Collection::find_by_id(&mut txn, new_compiler.collection_id, &user).await?;
+    let mut collection =
+        Collection::find_by_id(&mut txn, new_compiler.collection_id, &user).await?;
     let organization = collection.organization(&mut txn).await?;
 
     let mut sensors_and_alias = Vec::with_capacity(new_compiler.sensors.len());
@@ -52,12 +53,8 @@ pub async fn new(
 #[derive(Deserialize)]
 #[serde(untagged, rename_all = "camelCase")]
 enum Id {
-    CollectionId {
-        collection_id: CollectionId,
-    },
-    DeviceId {
-        device_id: DeviceId,
-    },
+    CollectionId { collection_id: CollectionId },
+    DeviceId { device_id: DeviceId },
 }
 
 #[derive(Deserialize)]
@@ -75,7 +72,9 @@ pub async fn set(
     let mut txn = pool.begin().await?;
 
     let mut collection = match &request.id {
-        Id::CollectionId { collection_id } => Collection::find_by_id(&mut txn, *collection_id, &user).await?,
+        Id::CollectionId { collection_id } => {
+            Collection::find_by_id(&mut txn, *collection_id, &user).await?
+        }
         Id::DeviceId { device_id } => {
             let device = Device::find_by_id(&mut txn, *device_id, &user).await?;
             device.collection(&mut txn).await?
@@ -89,15 +88,18 @@ pub async fn set(
             Device::update_collection(&mut txn, device.id, &col).await?;
         }
         collection.delete(&mut txn).await?;
-    } else if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
-        // Technically unreachable as the compiler set here should have a collection, supporting as this might change in the future
-        collection.set_compiler(&mut txn, Some(&compiler)).await?;
     } else if let Id::DeviceId { device_id } = request.id {
-        // Technically unreachable as the compiler set here should have a collection, supporting as this might change in the future
-        let mut device = Device::find_by_id(&mut txn, device_id, &user).await?;
-        collection = Collection::new(&mut txn, device.name().to_owned(), &organization).await?;
+        if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
+            collection.set_compiler(&mut txn, Some(&compiler)).await?;
+        } else {
+            let mut device = Device::find_by_id(&mut txn, device_id, &user).await?;
+            collection = Collection::new(&mut txn, device.name().to_owned(), &organization).await?;
+            collection.set_compiler(&mut txn, Some(&compiler)).await?;
+            device.set_collection(&mut txn, &collection).await?;
+        }
+    } else if let Id::CollectionId { collection_id } = request.id {
+        let mut collection = Collection::find_by_id(&mut txn, collection_id, &user).await?;
         collection.set_compiler(&mut txn, Some(&compiler)).await?;
-        device.set_collection(&mut txn, &collection).await?;
     }
     let compilation = CompilationView::new(compiler.latest_compilation(&mut txn).await?);
 

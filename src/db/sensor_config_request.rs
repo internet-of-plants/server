@@ -103,7 +103,7 @@ impl SensorConfigRequest {
             .bind(&name)
             .bind(&human_name)
             .bind(sensor_prototype.id())
-            .fetch_one(&mut *txn)
+            .fetch_one(txn)
             .await?;
         Ok(Self {
             id,
@@ -118,7 +118,7 @@ impl SensorConfigRequest {
             "SELECT id, type_id, name, human_name, sensor_prototype_id FROM sensor_config_requests WHERE id = $1",
         )
         .bind(id)
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(request)
     }

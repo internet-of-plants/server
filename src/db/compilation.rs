@@ -1,4 +1,6 @@
-use crate::{logger::*, Firmware, Result, Transaction, Error, SensorId, CertificateId, Compiler, CompilerId};
+use crate::{
+    logger::*, CertificateId, Compiler, CompilerId, Error, Firmware, Result, SensorId, Transaction,
+};
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
@@ -108,8 +110,7 @@ impl Compilation {
         compiler: &Compiler,
     ) -> Result<Self> {
         let comp = sqlx::query_as(
-            "
-            SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp
+            "SELECT id, compiler_id, platformio_ini, main_cpp, pin_hpp
             FROM compilations
             WHERE compiler_id = $1
             ORDER BY created_at DESC",
@@ -143,7 +144,7 @@ impl Compilation {
             "SELECT DISTINCT ON (compilations.compiler_id) compilations.compiler_id, compilations.id, platformio_ini, main_cpp, pin_hpp
              FROM compilations
              INNER JOIN collections ON collections.compiler_id = compilations.compiler_id
-             INNER JOIN device_belongs_to_collection bt ON bt.collection_id = collections.id
+             INNER JOIN devices ON devices.collection_id = collections.id
              ORDER BY compilations.compiler_id, compilations.created_at DESC",
         )
         .fetch_all(&mut *txn)
@@ -179,10 +180,11 @@ impl Compilation {
         let dependencies = sqlx::query_as::<_, (String, Option<SensorId>, String)>(
             "SELECT url, sensor_id, commit_hash
              FROM dependency_belongs_to_compilation
-             WHERE compilation_id = $1")
-                .bind(&self.id)
-                .fetch_all(&mut *txn)
-.await?;
+             WHERE compilation_id = $1",
+        )
+        .bind(&self.id)
+        .fetch_all(&mut *txn)
+        .await?;
 
         // Is there any RCE danger in cloning a git repo?
         for sensor in compiler.sensors(txn).await? {
@@ -199,9 +201,17 @@ impl Compilation {
                     let commit = object.peel_to_commit()?;
                     let commit_hash = commit.id().to_string();
                     Ok::<_, Error>(commit_hash)
-                }).await??;
+                })
+                .await??;
 
-                if !dependencies.iter().any(|(url, sensor_id, expected_commit_hash)| url == &dependency_url && *sensor_id == Some(sid) && &commit_hash == expected_commit_hash) {
+                if !dependencies
+                    .iter()
+                    .any(|(url, sensor_id, expected_commit_hash)| {
+                        url == &dependency_url
+                            && *sensor_id == Some(sid)
+                            && &commit_hash == expected_commit_hash
+                    })
+                {
                     return Ok(true);
                 }
             }
@@ -218,9 +228,15 @@ impl Compilation {
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
-            }).await??;
+            })
+            .await??;
 
-            if !dependencies.iter().any(move|(dep_url, sensor_id, expected_commit_hash)| dep_url == &url && sensor_id.is_none() && &commit_hash == expected_commit_hash) {
+            if !dependencies
+                .iter()
+                .any(move |(dep_url, sensor_id, expected_commit_hash)| {
+                    dep_url == &url && sensor_id.is_none() && &commit_hash == expected_commit_hash
+                })
+            {
                 return Ok(true);
             }
         }
@@ -261,11 +277,11 @@ impl Compilation {
                     let commit = object.peel_to_commit()?;
                     let commit_hash = commit.id().to_string();
                     Ok::<_, Error>(commit_hash)
-                }).await??;
+                })
+                .await??;
 
                 sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3, $4)
-                             ON CONFLICT (url, compilation_id) DO UPDATE set commit_hash = $2
-                             ON CONFLICT (sensor_ir, compilation_id) DO UPDATE set commit_hash = $2")
+                             ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2")
                     .bind(&dependency_url)
                     .bind(&sensor.id)
                     .bind(&commit_hash)
@@ -274,7 +290,7 @@ impl Compilation {
                     .await?;
             }
         }
-        
+
         for dependency in prototype.dependencies(txn).await? {
             let dep = dependency.clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
@@ -286,10 +302,12 @@ impl Compilation {
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
-            }).await??;
+            })
+            .await??;
 
-            sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, commit_hash, compilation_id) VALUES ($1, $2, $3)
-                        ON CONFLICT (url, compilation_id) DO UPDATE set commit_hash = $2")
+            sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, commit_hash, compilation_id)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2")
                 .bind(&dependency.url)
                 .bind(&commit_hash)
                 .bind(&self.id())

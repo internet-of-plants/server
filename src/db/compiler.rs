@@ -1,9 +1,9 @@
 use crate::{
-    Collection, Compilation, DeviceConfig, DeviceConfigView, CollectionId,
+    Collection, CollectionId, Compilation, Device, DeviceConfig, DeviceConfigView, DeviceId,
     DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization, Result,
-    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,Device,DeviceId,
+    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
 };
-use derive_more::FromStr;
+use derive_more::{Display, FromStr};
 use handlebars::Handlebars;
 use random_color::RandomColor;
 use serde::{Deserialize, Serialize};
@@ -66,7 +66,7 @@ impl CompilerView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
+#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Display)]
 #[sqlx(transparent)]
 pub struct CompilerId(i64);
 
@@ -183,9 +183,6 @@ impl Compiler {
                 }
             }
             *collection = col;
-            if let Some(device) = device {
-                device.set_collection(txn, &collection).await?;
-            }
         } else if let Some(device) = device {
             if Device::from_collection(txn, &collection).await?.len() == 1 {
                 collection.set_compiler(txn, Some(&compiler)).await?;
@@ -199,9 +196,9 @@ impl Compiler {
         }
 
         let compilation = if should_compile {
-            compiler.compile(&mut *txn).await?
+            compiler.compile(txn).await?
         } else {
-            compiler.latest_compilation(&mut *txn).await?
+            compiler.latest_compilation(txn).await?
         };
         Ok((compiler, compilation))
     }
@@ -221,7 +218,7 @@ impl Compiler {
         )
         .bind(id)
         .bind(organization.id())
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(comp)
     }
@@ -238,7 +235,7 @@ impl Compiler {
         )
         .bind(target.id())
         .bind(organization.id())
-        .fetch_all(&mut *txn)
+        .fetch_all(txn)
         .await?;
         Ok(comps)
     }
@@ -255,7 +252,7 @@ impl Compiler {
         )
         .bind(compilation.compiler_id())
         .bind(compilation.id())
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(comp)
     }
@@ -273,7 +270,7 @@ impl Compiler {
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {
-        let sensors = self.sensors(&mut *txn).await?;
+        let sensors = self.sensors(txn).await?;
 
         let device_configs_raw = self.device_configs(txn).await?;
         let mut device_configs = Vec::with_capacity(device_configs_raw.len());
@@ -358,14 +355,14 @@ impl Compiler {
             );
 
             for c in &sensor.configurations {
-                let req = SensorConfigRequest::find_by_id(&mut *txn, c.request_id).await?;
+                let req = SensorConfigRequest::find_by_id(txn, c.request_id).await?;
                 let reg = Handlebars::new();
                 let name = reg.render_template(&req.name, &json!({ "index": index }))?;
                 configs.push((
                     req.name.clone(),
                     format!(
                         "static const {} {} = {};",
-                        req.ty(&mut *txn).await?.name,
+                        req.ty(txn).await?.name,
                         name,
                         c.value,
                     ),
@@ -404,9 +401,9 @@ impl Compiler {
 
         definitions.sort_unstable();
 
-        let target = self.target(&mut *txn).await?;
+        let target = self.target(txn).await?;
         let pin_hpp = target.pin_hpp().to_owned();
-        let platformio_ini = target.compile_platformio_ini(&mut *txn, &lib_deps).await?;
+        let platformio_ini = target.compile_platformio_ini(txn, &lib_deps).await?;
 
         let includes = includes.join("\n");
         let definitions = definitions.join("\n");
@@ -462,16 +459,16 @@ auto setup(EventLoop &loop) noexcept -> void {{
 }}",
         );
 
-        let target_prototype = target.prototype(&mut *txn).await?;
-        let certificate = target_prototype.latest_certificate(&mut *txn).await?;
+        let target_prototype = target.prototype(txn).await?;
+        let certificate = target_prototype.latest_certificate(txn).await?;
 
         Compilation::new(
-            &mut *txn,
+            txn,
             self,
             dbg!(platformio_ini),
             dbg!(main_cpp),
             dbg!(pin_hpp),
-            dbg!(certificate.id)
+            dbg!(certificate.id),
         )
         .await
     }
@@ -494,7 +491,7 @@ auto setup(EventLoop &loop) noexcept -> void {{
         .bind(alias)
         .bind(sensor.id())
         .bind(self.id())
-        .execute(&mut *txn)
+        .execute(txn)
         .await?;
         Ok(())
     }
@@ -513,7 +510,7 @@ auto setup(EventLoop &loop) noexcept -> void {{
         .bind(color)
         .bind(sensor.id())
         .bind(self.id())
-        .execute(&mut *txn)
+        .execute(txn)
         .await?;
         Ok(())
     }
@@ -529,15 +526,16 @@ auto setup(EventLoop &loop) noexcept -> void {{
     pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {
         Organization::find_by_compiler(txn, self).await
     }
-    
+
     pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         let comps = sqlx::query_as(
             "SELECT DISTINCT ON (compilers.id) compilers.id, compilers.target_id
              FROM compilers
              INNER JOIN collections ON collections.compiler_id = compilers.id
-             INNER JOIN device_belongs_to_collection bt ON bt.collection_id = collections.id
-             ORDER BY compilers.id, compilers.created_at")
-        .fetch_all(&mut *txn)
+             INNER JOIN devices ON devices.collection_id = collections.id
+             ORDER BY compilers.id, compilers.created_at DESC",
+        )
+        .fetch_all(txn)
         .await?;
         Ok(comps)
     }

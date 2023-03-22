@@ -40,6 +40,7 @@ impl SensorConfigTypeId {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", content = "data")]
 pub enum SensorWidgetKind {
+    Seconds,
     U8,
     U16,
     U32,
@@ -56,6 +57,7 @@ pub enum SensorWidgetKind {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", content = "data")]
 pub enum SensorWidgetKindView {
+    Seconds,
     U8,
     U16,
     U32,
@@ -70,6 +72,7 @@ pub enum SensorWidgetKindView {
 
 #[derive(sqlx::Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SensorWidgetKindRaw {
+    Seconds,
     U8,
     U16,
     U32,
@@ -86,6 +89,7 @@ pub enum SensorWidgetKindRaw {
 impl From<&SensorWidgetKind> for SensorWidgetKindRaw {
     fn from(kind: &SensorWidgetKind) -> Self {
         match kind {
+            SensorWidgetKind::Seconds => SensorWidgetKindRaw::Seconds,
             SensorWidgetKind::U8 => SensorWidgetKindRaw::U8,
             SensorWidgetKind::U16 => SensorWidgetKindRaw::U16,
             SensorWidgetKind::U32 => SensorWidgetKindRaw::U32,
@@ -120,6 +124,7 @@ impl SensorWidgetKindView {
         parent: Option<(SensorConfigTypeMapId, ParentMetadata)>,
     ) -> Result<SensorWidgetKindView> {
         let kind = match raw {
+            SensorWidgetKindRaw::Seconds => SensorWidgetKindView::Seconds,
             SensorWidgetKindRaw::U8 => SensorWidgetKindView::U8,
             SensorWidgetKindRaw::U16 => SensorWidgetKindView::U16,
             SensorWidgetKindRaw::U32 => SensorWidgetKindView::U32,

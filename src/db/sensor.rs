@@ -39,12 +39,12 @@ impl SensorView {
         compiler: &Compiler,
     ) -> Result<Vec<Self>> {
         let sensors_metadata: Vec<(SensorId, SensorPrototypeId, String, String)> = sqlx::query_as(
-            "SELECT DISTINCT(sensors.id), sensors.prototype_id, bt.alias, bt.color
+            "SELECT DISTINCT ON (sensors.id) sensors.id, sensors.prototype_id, bt.alias, bt.color
              FROM sensors
              INNER JOIN sensor_prototypes ON sensor_prototypes.id = sensors.prototype_id
              INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
              WHERE bt.compiler_id = $1
-             ORDER BY sensors.id ASC",
+             ORDER BY sensors.id",
         )
         .bind(compiler.id())
         .fetch_all(&mut *txn)
@@ -207,7 +207,7 @@ impl Sensor {
         )
         .bind(sensor_id)
         .bind(compiler.id())
-        .fetch_one(&mut *txn)
+        .fetch_one(txn)
         .await?;
         Ok(sensor)
     }

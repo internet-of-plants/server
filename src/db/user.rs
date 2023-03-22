@@ -47,7 +47,7 @@ impl User {
             return Err(Error::InsecurePassword);
         }
 
-        let organization = Organization::new(&mut *txn, user.organization_name).await?;
+        let organization = Organization::new(txn, user.organization_name).await?;
 
         let hash = utils::hash_password(&user.password)?;
         let (id, now) = sqlx::query_as::<_, (UserId, DateTime)>(
@@ -67,8 +67,7 @@ impl User {
             created_at: now,
             updated_at: now,
         };
-        user.associate_to_organization(&mut *txn, &organization)
-            .await?;
+        user.associate_to_organization(txn, &organization).await?;
 
         Ok(user)
     }
@@ -78,10 +77,10 @@ impl User {
             "SELECT users.id, users.email, users.username, users.created_at, users.updated_at
              FROM users
              INNER JOIN authentications ON authentications.user_id = users.id
-             WHERE authentications.token = $1",
+             WHERE authentications.token = $1 AND authentications.expired = false",
         )
         .bind(&token)
-        .fetch_optional(&mut *txn)
+        .fetch_optional(txn)
         .await?;
         user.ok_or(Error::Unauthorized)
     }
@@ -115,7 +114,7 @@ impl User {
                 sqlx::query("INSERT INTO authentications (user_id, token) VALUES ($1, $2)")
                     .bind(user.id())
                     .bind(&token)
-                    .execute(&mut *txn)
+                    .execute(txn)
                     .await?;
                 Ok(token)
             }
@@ -134,7 +133,7 @@ impl User {
              WHERE bt.organization_id = $1",
         )
         .bind(organization.id())
-        .fetch_all(&mut *txn)
+        .fetch_all(txn)
         .await?
         .into_iter()
         .map(|(username,)| username)

@@ -3,8 +3,8 @@ use crate::extractor::{
     TimeRunning, User, Vcc, Version,
 };
 use crate::{
-    logger::*, DateTime, DeviceId, DeviceStat, Error, Event, EventView, Firmware, Pool, Result,
-    SensorMeasurementType, Transaction,Collection,
+    logger::*, Collection, DateTime, DeviceId, DeviceStat, Error, Event, EventView, Firmware, Pool,
+    Result, SensorMeasurementType, Transaction,
 };
 use axum::extract::{Extension, Json, Query, TypedHeader};
 use axum::http::header::{HeaderMap, HeaderName, HeaderValue};
@@ -46,7 +46,7 @@ pub async fn new(
     let mut txn = pool.begin().await?;
 
     let mut collection = device.collection(&mut txn).await?;
-    
+
     // Don't even process request if there is an update
     if let Some(firmware) = collection.update(&mut txn).await? {
         if firmware.hash() != stat.version {
@@ -70,20 +70,14 @@ pub async fn new(
                 } else {
                     collection.set_compiler(&mut txn, Some(&compiler)).await?;
                 }
-            } else if let Some(dev) = crate::Device::find_by_firmware(&mut txn, &firmware, &organization).await? {
-                let col = dev.collection(&mut txn).await?;
-                if col.compiler(&mut txn).await?.is_none() {
-                    let mut all_same = true;
-                    for dev in col.devices(&mut txn).await? {
-                        if dev.firmware.id() != firmware.id() {
-                            all_same = false;
-                            break;
-                        }
-                    }
-
-                    if all_same {
-                        device.set_collection(&mut txn, &col).await?;
-                    }
+            } else {
+                // Assume all devices with the same firmware are of the same collection, a race might make this not true, but let's pick one
+                for dev in
+                    crate::Device::list_by_firmware(&mut txn, &firmware, &organization).await?
+                {
+                    let col = dev.collection(&mut txn).await?;
+                    device.set_collection(&mut txn, &col).await?;
+                    break;
                 }
             }
         }
@@ -93,7 +87,6 @@ pub async fn new(
     if !event.is_null() {
         handle_measurements(&mut txn, &collection, &device, stat.clone(), event).await?;
     }
-
 
     txn.commit().await?;
     Ok(HeaderMap::new())
@@ -121,7 +114,13 @@ pub async fn list(
     Ok(Json(events))
 }
 
-async fn handle_measurements(txn: &mut Transaction<'_>, collection: &Collection, device: &crate::Device, stat: DeviceStat, event: serde_json::Value) -> Result<Event> {
+async fn handle_measurements(
+    txn: &mut Transaction<'_>,
+    collection: &Collection,
+    device: &crate::Device,
+    stat: DeviceStat,
+    event: serde_json::Value,
+) -> Result<Event> {
     let obj = event.as_object().ok_or(Error::EventMustBeObject)?;
     // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
     if let Some(compiler) = collection.compiler(txn).await? {

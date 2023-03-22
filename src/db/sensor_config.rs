@@ -56,10 +56,10 @@ pub struct SensorConfigView {
 
 impl SensorConfigView {
     pub async fn new(txn: &mut Transaction<'_>, config: SensorConfig) -> Result<Self> {
-        let request = config.request(&mut *txn).await?;
+        let request = config.request(txn).await?;
         Ok(Self {
             request_id: config.request_id,
-            type_name: request.ty(&mut *txn).await?.name,
+            type_name: request.ty(txn).await?.name,
             name: request.name,
             value: config.value,
         })

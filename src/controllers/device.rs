@@ -40,7 +40,9 @@ pub async fn set_name(
     let mut collection = device.collection(&mut txn).await?;
     if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
         if collection.name() == old_name {
-            collection.set_name(&mut txn, device.name().to_owned()).await?;
+            collection
+                .set_name(&mut txn, device.name().to_owned())
+                .await?;
         }
     }
 

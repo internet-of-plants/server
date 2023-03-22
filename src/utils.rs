@@ -1,6 +1,6 @@
-use std::{path::Path, path::PathBuf, fmt::Write};
+use std::{fmt::Write, path::Path, path::PathBuf};
 
-use crate::{logger::*, Result, Pool};
+use crate::{logger::*, Pool, Result};
 use rand::{distributions::Alphanumeric, Rng};
 use tokio::fs;
 
@@ -33,7 +33,12 @@ pub async fn run_migrations(pool: &'static Pool) {
     sqlx::query(migrations_creation_query)
         .execute(&mut txn)
         .await
-        .unwrap_or_else(| err| panic!("Failed to execute query: {} ({})", migrations_creation_query, err));
+        .unwrap_or_else(|err| {
+            panic!(
+                "Failed to execute query: {} ({})",
+                migrations_creation_query, err
+            )
+        });
     txn.commit().await.expect("unable to commit transaction");
 
     let mut txn = pool.begin().await.expect("unable to start transaction");
@@ -90,7 +95,13 @@ pub async fn run_migrations(pool: &'static Pool) {
                     })
             {
                 error!("Migration found: {:#?}", vec.get((number - 1) as usize));
-                error!("Migration expected: {:#?}", Migration { id: number, code_hash });
+                error!(
+                    "Migration expected: {:#?}",
+                    Migration {
+                        id: number,
+                        code_hash
+                    }
+                );
                 panic!("Migration {} changed", number);
             }
         }

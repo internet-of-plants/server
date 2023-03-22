@@ -195,7 +195,7 @@ CREATE TABLE IF NOT EXISTS sensors (
 );
 
 CREATE TYPE SensorWidgetKindRaw AS ENUM (
-  'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection', 'Moment', 'Map'
+  'Seconds', 'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection', 'Moment', 'Map'
 );
 
 CREATE TABLE IF NOT EXISTS sensor_config_types (
@@ -397,7 +397,6 @@ CREATE TABLE IF NOT EXISTS dependency_belongs_to_compilation (
   commit_hash     TEXT                      NOT NULL,
   compilation_id  BIGINT                    NOT NULL,
   created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
-  UNIQUE (sensor_id, compilation_id),
   UNIQUE (url, compilation_id),
   FOREIGN KEY (sensor_id)      REFERENCES sensors     (id),
   FOREIGN KEY (compilation_id) REFERENCES compilations (id)
