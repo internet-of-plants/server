@@ -33,8 +33,8 @@ pub async fn new(
 ) -> Result<StatusCode> {
     let mut txn = pool.begin().await?;
 
-    if error.msg.trim() != error.msg {
-        error.msg = error.msg.trim().to_owned();
+    if error.msg().trim() != error.msg() {
+        error.msg = error.msg().trim().to_owned();
     }
     DevicePanic::new(&mut txn, &device, error).await?;
 

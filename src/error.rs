@@ -1,14 +1,12 @@
 use crate::CompilerId;
-use backtrace::Backtrace;
-use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
+use axum::{http::StatusCode, Json};
+use backtrace::Backtrace;
 use log::{error, warn};
 use serde_json::json;
+use std::collections::HashSet;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-// TODO: improve error code returned, send error message in debug builds
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -70,6 +68,8 @@ pub enum Error {
     MissingHeader(&'static str),
     #[error("invalid timezone {1}: {0}")]
     InvalidTimezone(std::num::ParseIntError, String),
+    #[error("new sensor referenced by {0} doesnt exist in {1:?}")]
+    NewSensorReferencedDoesntExist(usize, HashSet<usize>),
     #[error(transparent)]
     ParseInt(#[from] std::num::ParseIntError),
     #[error(transparent)]
@@ -152,6 +152,10 @@ impl IntoResponse for Error {
             }
             Self::Git2(error) => {
                 error!("{:?} {}", error, error);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::NewSensorReferencedDoesntExist(pk, list) => {
+                error!("Unable to find sensor {} in {:?}", pk, list);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::Unauthorized => {

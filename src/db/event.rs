@@ -1,19 +1,27 @@
 use crate::{logger::*, DateTime, Device, Firmware, Result, SensorMeasurementView, Transaction};
 use derive_more::FromStr;
+use derive_get::Getters;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceStat {
     pub version: String,
+    #[copy]
     pub time_running: u64,
+    #[copy]
     pub vcc: u16,
+    #[copy]
     pub free_dram: u64,
+    #[copy]
     pub free_iram: Option<u64>,
+    #[copy]
     pub free_stack: u32,
+    #[copy]
     pub biggest_dram_block: u64,
+    #[copy]
     pub biggest_iram_block: Option<u64>,
 }
 
@@ -21,41 +29,40 @@ pub struct DeviceStat {
 #[sqlx(transparent)]
 pub struct EventId(i64);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventView {
-    pub measurements: serde_json::Value,
-    pub stat: DeviceStat,
-    pub metadatas: Vec<SensorMeasurementView>,
-    pub created_at: DateTime,
+    measurements: serde_json::Value,
+    stat: DeviceStat,
+    metadatas: Vec<SensorMeasurementView>,
+    #[copy]
+    created_at: DateTime,
 }
 
 impl EventView {
     pub fn new(event: Event) -> Result<Self> {
         Ok(Self {
-            measurements: event.measurements,
-            metadatas: serde_json::from_value(event.metadatas)?,
-            created_at: event.created_at,
-            stat: serde_json::from_value(event.stat)?,
+            measurements: event.measurements().clone(),
+            metadatas: serde_json::from_value(event.metadatas().clone())?,
+            created_at: event.created_at(),
+            stat: serde_json::from_value(event.stat().clone())?,
         })
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
-    pub id: EventId,
-    pub measurements: serde_json::Value,
-    pub stat: serde_json::Value,
-    pub metadatas: serde_json::Value,
-    pub firmware_hash: String,
-    pub created_at: DateTime,
+    #[copy]
+    id: EventId,
+    measurements: serde_json::Value,
+    stat: serde_json::Value,
+    metadatas: serde_json::Value,
+    firmware_hash: String,
+    #[copy]
+    created_at: DateTime,
 }
 
 impl Event {
-    pub fn id(&self) -> &EventId {
-        &self.id
-    }
-
     pub async fn new(
         txn: &mut Transaction<'_>,
         device: &Device,
@@ -76,18 +83,18 @@ impl Event {
             let sensors = compiler.sensors(txn).await?;
             let mut measurements = Vec::new();
             for (index, sensor) in sensors.into_iter().enumerate() {
-                let prototype = &sensor.prototype;
+                let prototype = sensor.prototype();
                 measurements.extend(
                     prototype
-                        .measurements
-                        .iter()
+                        .measurements()
+                        .into_iter()
                         .map(|m| {
                             let reg = Handlebars::new();
-                            let name = reg.render_template(&m.name, &json!({ "index": index }))?;
+                            let name = reg.render_template(m.name(), &json!({ "index": index }))?;
                             Ok(SensorMeasurementView::new(
                                 m.clone(),
                                 name,
-                                sensor.color.clone(),
+                                sensor.color().clone(),
                             ))
                         })
                         .collect::<Result<Vec<_>>>()?,

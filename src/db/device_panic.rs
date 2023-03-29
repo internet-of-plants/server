@@ -1,12 +1,14 @@
 use crate::{logger::*, DateTime, Device, Error, Result, Transaction};
 use derive_more::FromStr;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NewDevicePanic {
-    pub file: String,
-    pub line: i32,
-    pub func: String,
+    file: String,
+    #[copy]
+    line: i32,
+    func: String,
     pub msg: String,
 }
 
@@ -16,14 +18,17 @@ pub struct DevicePanicId(i64);
 
 pub type DevicePanicView = DevicePanic;
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DevicePanic {
+    #[copy]
     id: DevicePanicId,
     file: String,
+    #[copy]
     line: i32,
     func: String,
     msg: String,
+    #[copy]
     created_at: DateTime,
 }
 
@@ -98,9 +103,5 @@ impl DevicePanic {
             .execute(txn)
             .await?;
         Ok(())
-    }
-
-    pub fn msg(&self) -> &str {
-        &self.msg
     }
 }

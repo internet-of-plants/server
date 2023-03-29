@@ -43,11 +43,11 @@ async fn main() {
         .expect("Unable to connect to database");
     let pool: &'static Pool = Box::leak(pool.into());
 
+    let router = router(pool).await;
+
     tokio::task::spawn(update_compilations(pool));
     tokio::task::spawn(update_certificates(pool));
     tokio::task::spawn(recompile(pool));
-
-    let router = router(pool).await;
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 4001));
 
@@ -176,7 +176,7 @@ async fn recompile_each(
 ) -> Result<()> {
     if latest_certificates
         .iter()
-        .any(|c| c.id == compilation.certificate_id())
+        .any(|c| c.id() == compilation.certificate_id())
     {
         let mut txn = pool.begin().await?;
         let compiler = compilation.compiler(&mut txn).await?;

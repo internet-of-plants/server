@@ -16,8 +16,8 @@ pub async fn new(
     let token = User::login(
         &mut txn,
         Login {
-            email: user.email,
-            password: user.password,
+            email: user.email().to_owned(),
+            password: user.password().to_owned(),
         },
     )
     .await?;
@@ -31,11 +31,11 @@ pub async fn login(
     mac: Option<TypedHeader<MacAddress>>,
     file_hash: Option<TypedHeader<Version>>,
 ) -> Result<impl IntoResponse> {
-    info!("Login: {:?}, {:?}, {:?}", user.email, mac, file_hash);
+    info!("Login: {:?}, {:?}, {:?}", user.email(), mac, file_hash);
     let mut txn = pool.begin().await?;
     let token = if let (Some(mac), Some(file_hash)) = (mac, file_hash) {
         let (mac, file_hash) = (mac.0 .0, file_hash.0 .0);
-        Device::login(&mut txn, user, NewDevice { mac, file_hash }).await?
+        Device::login(&mut txn, user, NewDevice::new(mac, file_hash)).await?
     } else {
         User::login(&mut txn, user).await?
     };

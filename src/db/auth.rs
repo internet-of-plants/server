@@ -1,4 +1,5 @@
 use crate::{utils, Device, User};
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, sqlx::Type, Clone, Debug, PartialEq, Eq)]
@@ -17,8 +18,8 @@ impl AuthToken {
     }
 }
 
-#[derive(sqlx::FromRow, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(sqlx::FromRow, Getters, Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Auth {
-    pub user: User,
-    pub device: Option<Device>,
+    user: User,
+    device: Option<Device>,
 }

@@ -2,23 +2,25 @@ use crate::{
     Dependency, DeviceConfigRequest, DeviceConfigRequestView, NewDeviceConfigRequest, Result,
     TargetPrototype, TargetPrototypeId, Transaction,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetView {
-    pub id: TargetId,
-    pub arch: String,
-    pub name: Option<String>,
-    pub build_flags: String,
-    pub platform: String,
-    pub framework: Option<String>,
-    pub platform_packages: Option<String>,
-    pub extra_platformio_params: Option<String>,
-    pub ldf_mode: Option<String>,
-    pub board: Option<String>,
-    pub configuration_requests: Vec<DeviceConfigRequestView>,
+    #[copy]
+    id: TargetId,
+    arch: String,
+    name: Option<String>,
+    build_flags: String,
+    platform: String,
+    framework: Option<String>,
+    platform_packages: Option<String>,
+    extra_platformio_params: Option<String>,
+    ldf_mode: Option<String>,
+    board: Option<String>,
+    configuration_requests: Vec<DeviceConfigRequestView>,
 }
 
 impl TargetView {
@@ -30,21 +32,17 @@ impl TargetView {
         }
         Ok(Self {
             id: target.id(),
-            arch: prototype.arch,
-            build_flags: prototype.build_flags,
-            platform: prototype.platform,
-            framework: prototype.framework,
-            platform_packages: prototype.platform_packages,
-            extra_platformio_params: prototype.extra_platformio_params,
-            ldf_mode: prototype.ldf_mode,
-            board: target.board().map(ToOwned::to_owned),
-            name: target.name,
+            arch: prototype.arch().clone(),
+            build_flags: prototype.build_flags().clone(),
+            platform: prototype.platform().clone(),
+            framework: prototype.framework().clone(),
+            platform_packages: prototype.platform_packages().clone(),
+            extra_platformio_params: prototype.extra_platformio_params().clone(),
+            ldf_mode: prototype.ldf_mode().clone(),
+            board: target.board().clone(),
+            name: target.name().to_owned(),
             configuration_requests,
         })
-    }
-
-    pub fn id(&self) -> TargetId {
-        self.id
     }
 }
 
@@ -58,11 +56,13 @@ impl TargetId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Target {
+    #[copy]
     id: TargetId,
     pub name: Option<String>,
     board: Option<String>,
+    #[copy]
     target_prototype_id: TargetPrototypeId,
     pin_hpp: String,
     build_flags: Option<String>,
@@ -134,22 +134,6 @@ impl Target {
         Ok(target)
     }
 
-    pub fn id(&self) -> TargetId {
-        self.id
-    }
-
-    pub fn pin_hpp(&self) -> &str {
-        &self.pin_hpp
-    }
-
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    pub fn board(&self) -> Option<&str> {
-        self.board.as_deref()
-    }
-
     pub async fn pins(&self, txn: &mut Transaction<'_>) -> Result<Vec<String>> {
         let pins = sqlx::query_as("SELECT name FROM pins WHERE target_id = $1")
             .bind(self.id)
@@ -206,29 +190,29 @@ impl Target {
         lib_deps: &[Dependency],
     ) -> Result<String> {
         let prototype = self.prototype(txn).await?;
-        let arch = &prototype.arch;
+        let arch = prototype.arch();
         let build_type = "debug".to_owned();
         //match prototype.kind {
         //    CompilationType::Debug => "debug",
         //    CompilationType::Release => "release",
         //};
         let framework = prototype
-            .framework
+            .framework()
             .as_ref()
             .map_or(String::new(), |f| format!("framework = {f}\n"));
-        let platform = &prototype.platform;
-        let board = &self.board;
+        let platform = prototype.platform();
+        let board = self.board();
         let ldf_mode = prototype
-            .ldf_mode
+            .ldf_mode()
             .as_ref()
             .map_or(String::new(), |f| format!("lib_ldf_mode = {f}\n"));
-        let mut build_flags = prototype.build_flags.clone();
-        if let Some(flags) = &self.build_flags {
+        let mut build_flags = prototype.build_flags().clone();
+        if let Some(flags) = self.build_flags() {
             build_flags.push_str("\n    ");
             build_flags.push_str(flags);
         }
-        let extra_platformio_params = &prototype.extra_platformio_params;
-        let platform_packages = &prototype.platform_packages;
+        let extra_platformio_params = prototype.extra_platformio_params();
+        let platform_packages = prototype.platform_packages();
         let mut lib_deps = lib_deps.to_owned();
         lib_deps.sort_unstable();
         let lib_deps = lib_deps.join("\n    ");

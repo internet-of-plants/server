@@ -2,17 +2,20 @@ use crate::{
     DeviceConfigType, DeviceConfigTypeId, DeviceConfigTypeView, DeviceWidgetKind, Result,
     SecretAlgo, Target, Transaction,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceConfigRequestView {
-    pub id: DeviceConfigRequestId,
-    pub name: String,
-    pub human_name: String,
-    pub secret_algo: Option<SecretAlgo>,
-    pub ty: DeviceConfigTypeView,
+    #[copy]
+    id: DeviceConfigRequestId,
+    name: String,
+    human_name: String,
+    #[copy]
+    secret_algo: Option<SecretAlgo>,
+    ty: DeviceConfigTypeView,
 }
 
 impl DeviceConfigRequestView {
@@ -51,12 +54,14 @@ impl DeviceConfigRequestId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NewDeviceConfigRequest {
     pub name: String,
     pub human_name: String,
     pub type_name: String,
+    #[copy]
     pub secret_algo: Option<SecretAlgo>,
+    #[copy]
     pub widget: DeviceWidgetKind,
 }
 
@@ -78,13 +83,16 @@ impl NewDeviceConfigRequest {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DeviceConfigRequest {
-    pub id: DeviceConfigRequestId,
-    pub name: String,
-    pub human_name: String,
-    pub secret_algo: Option<SecretAlgo>,
-    pub type_id: DeviceConfigTypeId,
+    #[copy]
+    id: DeviceConfigRequestId,
+    name: String,
+    human_name: String,
+    #[copy]
+    secret_algo: Option<SecretAlgo>,
+    #[copy]
+    type_id: DeviceConfigTypeId,
 }
 
 impl DeviceConfigRequest {
@@ -136,18 +144,6 @@ impl DeviceConfigRequest {
             .fetch_all(txn)
             .await?;
         Ok(requests)
-    }
-
-    pub fn id(&self) -> DeviceConfigRequestId {
-        self.id
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn human_name(&self) -> &str {
-        &self.human_name
     }
 
     pub async fn ty(&self, txn: &mut Transaction<'_>) -> Result<DeviceConfigType> {

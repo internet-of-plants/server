@@ -8,29 +8,34 @@ use handlebars::Handlebars;
 use random_color::RandomColor;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use derive_get::Getters;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Getters, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NewCompiler {
-    // TODO: remove pub fields from all structs
-    // TODO: make getter proc_macro
-    pub collection_id: CollectionId,
-    pub device_id: Option<DeviceId>,
-    pub target_id: TargetId,
-    pub device_configs: Vec<NewDeviceConfig>,
-    pub sensors: Vec<NewSensor>,
+    #[copy]
+    collection_id: CollectionId,
+    #[copy]
+    device_id: Option<DeviceId>,
+    #[copy]
+    target_id: TargetId,
+    device_configs: Vec<NewDeviceConfig>,
+    sensors: Vec<NewSensor>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilerView {
-    pub id: CompilerId,
-    pub sensors: Vec<SensorView>,
-    pub device_configs: Vec<DeviceConfigView>,
-    pub collection_name: String,
-    pub devices_count: usize,
-    pub target: TargetView,
-    pub latest_firmware: FirmwareView,
+    #[copy]
+    id: CompilerId,
+    sensors: Vec<SensorView>,
+    device_configs: Vec<DeviceConfigView>,
+    collection_name: String,
+    #[copy]
+    devices_count: usize,
+    target: TargetView,
+    latest_firmware: FirmwareView,
 }
 
 impl CompilerView {
@@ -66,7 +71,9 @@ impl CompilerView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Display)]
+#[derive(
+    Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Display,
+)]
 #[sqlx(transparent)]
 pub struct CompilerId(i64);
 
@@ -118,10 +125,10 @@ impl Compiler {
         .bind(
             &sensors_and_alias
                 .iter()
-                .map(|s| s.0.id.0)
+                .map(|s| s.0.id().0)
                 .collect::<Vec<_>>(),
         )
-        .bind(&device_configs.iter().map(|s| s.id.0).collect::<Vec<_>>())
+        .bind(&device_configs.iter().map(|s| s.id().0).collect::<Vec<_>>())
         .bind(&(sensors_and_alias.len() as i64))
         .bind(&(device_configs.len() as i64))
         .bind(target.id())
@@ -281,13 +288,13 @@ impl Compiler {
             // TODO: validate SSID and PSK sizes and Timezone
             match ty.widget() {
                 DeviceWidgetKind::SSID => device_configs.push(
-                    format!("constexpr static char SSID_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString SSID = reinterpret_cast<const __FlashStringHelper*>(SSID_ROM_RAW);", config.value.replace('"', "\\\""))
+                    format!("constexpr static char SSID_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString SSID = reinterpret_cast<const __FlashStringHelper*>(SSID_ROM_RAW);", config.value().replace('"', "\\\""))
                 ),
                 DeviceWidgetKind::PSK => device_configs.push(
-                    format!("constexpr static char PSK_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString PSK = reinterpret_cast<const __FlashStringHelper*>(PSK_ROM_RAW);", config.value.replace('"', "\\\""))
+                    format!("constexpr static char PSK_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString PSK = reinterpret_cast<const __FlashStringHelper*>(PSK_ROM_RAW);", config.value().replace('"', "\\\""))
                 ),
                 DeviceWidgetKind::Timezone => device_configs.push(
-                    format!("constexpr static int8_t timezone = {0};", config.value.parse::<i8>().map_err(|err| Error::InvalidTimezone(err, config.value.clone()))?)
+                    format!("constexpr static int8_t timezone = {0};", config.value().parse::<i8>().map_err(|err| Error::InvalidTimezone(err, config.value().clone()))?)
                 )
             }
         }
@@ -301,33 +308,48 @@ impl Compiler {
         let mut unauthenticated_actions = Vec::new();
         let mut configs = Vec::with_capacity(sensors.len());
         for (index, sensor) in sensors.iter().enumerate() {
-            let prototype = &sensor.prototype;
-            lib_deps.extend(prototype.dependencies.clone());
+            let prototype = sensor.prototype();
+            lib_deps.extend(prototype.dependencies().clone());
             includes.extend(
                 prototype
-                    .includes
-                    .iter()
+                    .includes()
+                    .into_iter()
                     .map(|name| format!("#include <{name}>")),
             );
-            definitions.push(
-                prototype
-                    .definitions
-                    .iter()
-                    .map(|definition| {
-                        let reg = Handlebars::new();
-                        reg.render_template(definition, &json!({ "index": index }))
-                    })
-                    .collect::<Result<Vec<String>, _>>()?
-                    .join("\n"),
-            );
+            let mut local_definitions = Vec::with_capacity(prototype.definitions().len());
+            for definition in prototype.definitions() {
+                let reg = Handlebars::new();
+                let mut map = HashMap::new();
+                map.insert("index".to_owned(), index.to_string());
+                'outer: for sensor_referenced in definition.sensors_referenced() {
+                    for other_sensor in &sensors {
+                        if other_sensor.name() == sensor_referenced.sensor_name() {
+                            for c in sensor.configurations() {
+                                let req =
+                                    SensorConfigRequest::find_by_id(txn, c.request_id()).await?;
+                                if req.name() == sensor_referenced.request_name() {
+                                    map.insert(
+                                        sensor_referenced.request_name().clone(),
+                                        c.value().clone(),
+                                    );
+                                    continue 'outer;
+                                }
+                            }
+                        }
+                    }
+                }
+                local_definitions
+                    .push(reg.render_template(definition.line(), &serde_json::to_value(&map)?)?);
+            }
+            definitions.push(local_definitions.join("\n"));
             measurements.push(
                 prototype
-                    .measurements
-                    .iter()
+                    .measurements()
+                    .into_iter()
                     .map(|m| {
                         let reg = Handlebars::new();
-                        let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                        let value = reg.render_template(&m.value, &json!({ "index": index }))?;
+                        let name = reg.render_template(m.name(), &json!({ "index": index }))?;
+                        let value = reg.render_template(m.value(), &json!({ "index": index }))?;
                         Ok(format!("doc[\"{}\"] = {}", name, value))
                     })
                     .collect::<Result<Vec<String>>>()?
@@ -335,8 +357,8 @@ impl Compiler {
             );
             setups.extend(
                 prototype
-                    .setups
-                    .iter()
+                    .setups()
+                    .into_iter()
                     .map(|setup| {
                         let reg = Handlebars::new();
                         reg.render_template(setup, &json!({ "index": index }))
@@ -345,7 +367,7 @@ impl Compiler {
             );
             unauthenticated_actions.extend(
                 prototype
-                    .unauthenticated_actions
+                    .unauthenticated_actions()
                     .iter()
                     .map(|unauthenticated_action| {
                         let reg = Handlebars::new();
@@ -354,19 +376,17 @@ impl Compiler {
                     .collect::<Result<Vec<String>, _>>()?,
             );
 
-            for c in &sensor.configurations {
-                let req = SensorConfigRequest::find_by_id(txn, c.request_id).await?;
+            for c in sensor.configurations() {
+                let req = SensorConfigRequest::find_by_id(txn, c.request_id()).await?;
                 let reg = Handlebars::new();
-                let name = reg.render_template(&req.name, &json!({ "index": index }))?;
-                configs.push((
-                    req.name.clone(),
-                    format!(
-                        "static const {} {} = {};",
-                        req.ty(txn).await?.name,
-                        name,
-                        c.value,
-                    ),
-                ));
+                let ty = req.ty(txn).await?;
+                if let Some(type_name) = ty.name() {
+                    let name = reg.render_template(req.name(), &json!({ "index": index }))?;
+                    configs.push((
+                        req.name().clone(),
+                        format!("static const {} {} = {};", type_name, name, c.value()),
+                    ));
+                }
             }
         }
         lib_deps.dedup();
@@ -468,7 +488,7 @@ auto setup(EventLoop &loop) noexcept -> void {{
             dbg!(platformio_ini),
             dbg!(main_cpp),
             dbg!(pin_hpp),
-            dbg!(certificate.id),
+            dbg!(certificate.id()),
         )
         .await
     }

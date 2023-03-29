@@ -1,10 +1,12 @@
 use crate::{extractor::User, Collection, CollectionId, CollectionView, Pool, Result};
 use axum::extract::{Extension, Json, Query};
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Getters, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FindRequest {
+    #[copy]
     collection_id: CollectionId,
 }
 
@@ -20,11 +22,12 @@ pub async fn find(
     Ok(Json(collection))
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Getters, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SetNameRequest {
-    pub collection_id: CollectionId,
-    pub name: String,
+    #[copy]
+    collection_id: CollectionId,
+    name: String,
 }
 
 pub async fn set_name(

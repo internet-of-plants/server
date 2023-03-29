@@ -1,13 +1,15 @@
 use std::{fmt::Write, path::Path, path::PathBuf};
 
 use crate::{logger::*, Pool, Result};
+use derive_get::Getters;
 use rand::{distributions::Alphanumeric, Rng};
 use tokio::fs;
 
-#[derive(sqlx::FromRow, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(sqlx::FromRow, Getters, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Migration {
-    pub id: i16,
-    pub code_hash: String,
+    #[copy]
+    id: i16,
+    code_hash: String,
 }
 
 fn hash(msg: &str) -> Result<String> {
@@ -60,6 +62,8 @@ pub async fn run_migrations(pool: &'static Pool) {
     let mut reader = fs::read_dir("migrations")
         .await
         .expect("Unable to find migrations folder");
+
+    // TODO: this is bugged, doesnt ensure file sorting mode
     while let Some(entry) = reader
         .next_entry()
         .await

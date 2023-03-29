@@ -1,8 +1,9 @@
 use crate::{utils, AuthToken, DateTime, Error, Organization, Result, Transaction};
 use derive_more::FromStr;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Login {
     pub email: String,
     pub password: String,
@@ -22,21 +23,24 @@ impl UserId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NewUser {
-    pub email: String,
-    pub password: String,
-    pub username: String,
-    pub organization_name: String,
+    email: String,
+    password: String,
+    username: String,
+    organization_name: String,
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {
+    #[copy]
     pub id: UserId,
     pub email: String,
     pub username: String,
+    #[copy]
     pub created_at: DateTime,
+    #[copy]
     pub updated_at: DateTime,
 }
 
@@ -162,10 +166,6 @@ impl User {
         .await?;
         self.updated_at = updated_at;
         Ok(())
-    }
-
-    pub fn id(&self) -> UserId {
-        self.id
     }
 
     pub async fn default_organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {

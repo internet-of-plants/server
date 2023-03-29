@@ -49,7 +49,7 @@ pub async fn new(
 
     // Don't even process request if there is an update
     if let Some(firmware) = collection.update(&mut txn).await? {
-        if firmware.hash() != stat.version {
+        if firmware.hash() != stat.version() {
             return Ok(HeaderMap::from_iter([(
                 HeaderName::from_static("latest_version"),
                 HeaderValue::from_str(firmware.hash())?,
@@ -59,7 +59,7 @@ pub async fn new(
 
     let organization = collection.organization(&mut txn).await?;
     if let Some(firmware) =
-        Firmware::try_find_by_hash(&mut txn, &organization, &stat.version).await?
+        Firmware::try_find_by_hash(&mut txn, &organization, stat.version()).await?
     {
         if collection.compiler(&mut txn).await?.is_none() {
             if let Some(compilation) = firmware.compilation(&mut txn).await? {
@@ -127,15 +127,16 @@ async fn handle_measurements(
         let sensors = compiler.sensors(txn).await?;
         let mut measurements = Vec::new();
         for (index, sensor) in sensors.into_iter().enumerate() {
-            let prototype = sensor.prototype;
+            let prototype = sensor.prototype();
             measurements.extend(
                 prototype
-                    .measurements
+                    .measurements()
                     .into_iter()
+                    .cloned()
                     .map(|m| {
                         let reg = Handlebars::new();
-                        let name = reg.render_template(&m.name, &json!({ "index": index }))?;
-                        Ok((m.ty, name))
+                        let name = reg.render_template(m.name(), &json!({ "index": index }))?;
+                        Ok((m.ty().clone(), name))
                     })
                     .collect::<Result<Vec<_>>>()?,
             );

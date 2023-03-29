@@ -1,6 +1,7 @@
 use crate::{
     Collection, CollectionView, Compiler, DateTime, Error, Result, Transaction, User, Username,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -14,16 +15,19 @@ impl OrganizationId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OrganizationView {
-    pub id: OrganizationId,
-    pub name: String,
-    pub description: Option<String>,
-    pub collections: Vec<CollectionView>,
-    pub members: Vec<Username>,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    #[copy]
+    id: OrganizationId,
+    name: String,
+    description: Option<String>,
+    collections: Vec<CollectionView>,
+    members: Vec<Username>,
+    #[copy]
+    created_at: DateTime,
+    #[copy]
+    updated_at: DateTime,
 }
 
 impl OrganizationView {
@@ -45,18 +49,17 @@ impl OrganizationView {
             updated_at: organization.updated_at,
         })
     }
-
-    pub fn id(&self) -> OrganizationId {
-        self.id
-    }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Organization {
+    #[copy]
     id: OrganizationId,
     name: String,
     description: Option<String>,
+    #[copy]
     created_at: DateTime,
+    #[copy]
     updated_at: DateTime,
 }
 
@@ -152,9 +155,5 @@ impl Organization {
         .fetch_one(&mut *txn)
         .await?;
         Ok(organization)
-    }
-
-    pub fn id(&self) -> OrganizationId {
-        self.id
     }
 }

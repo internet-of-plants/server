@@ -2,16 +2,18 @@ use crate::{
     Result, SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorPrototype,
     SensorWidgetKind, Target, Transaction,
 };
-use derive_more::FromStr;
+use derive_more::{FromStr, Display};
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorConfigRequestView {
-    pub id: SensorConfigRequestId,
-    pub name: String,
-    pub human_name: String,
-    pub ty: SensorConfigTypeView,
+    #[copy]
+    id: SensorConfigRequestId,
+    name: String,
+    human_name: String,
+    ty: SensorConfigTypeView,
 }
 
 impl SensorConfigRequestView {
@@ -38,6 +40,7 @@ impl SensorConfigRequestView {
     Copy,
     Debug,
     PartialEq,
+    Display,
     Eq,
     FromStr,
     Hash,
@@ -53,36 +56,37 @@ impl SensorConfigRequestId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NewSensorConfigRequest {
-    pub name: String,
-    pub human_name: String,
-    pub type_name: String,
-    pub widget: SensorWidgetKind,
+    name: String,
+    human_name: String,
+    type_name: Option<String>,
+    widget: SensorWidgetKind,
 }
 
 impl NewSensorConfigRequest {
     pub fn new(
         human_name: String,
         name: String,
-        type_name: String,
+        type_name: impl Into<Option<String>>,
         widget: SensorWidgetKind,
     ) -> Self {
         Self {
             name,
             human_name,
-            type_name,
+            type_name: type_name.into(),
             widget,
         }
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorConfigRequest {
-    pub id: SensorConfigRequestId,
-    pub name: String,
-    pub human_name: String,
-    pub type_id: SensorConfigTypeId,
+    #[copy]
+    id: SensorConfigRequestId,
+    name: String,
+    human_name: String,
+    type_id: SensorConfigTypeId,
 }
 
 impl SensorConfigRequest {
@@ -90,7 +94,7 @@ impl SensorConfigRequest {
         txn: &mut Transaction<'_>,
         name: String,
         human_name: String,
-        type_name: String,
+        type_name: Option<String>,
         widget: SensorWidgetKind,
         sensor_prototype: &SensorPrototype,
     ) -> Result<Self> {
@@ -123,19 +127,7 @@ impl SensorConfigRequest {
         Ok(request)
     }
 
-    pub fn id(&self) -> SensorConfigRequestId {
-        self.id
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn human_name(&self) -> &str {
-        &self.human_name
-    }
-
     pub async fn ty(&self, txn: &mut Transaction<'_>) -> Result<SensorConfigType> {
-        SensorConfigType::find_by_id(txn, self.type_id).await
+        Ok(SensorConfigType::find_by_id(txn, self.type_id).await?)
     }
 }

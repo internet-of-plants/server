@@ -2,23 +2,26 @@ pub mod builtin;
 
 use crate::{
     Definition, Dependency, Include, NewSensorConfigRequest, Result, SensorConfigRequest,
-    SensorConfigRequestView, SensorMeasurement, Setup, Target, Transaction, UnauthenticatedAction,
+    SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId, Setup, Target,
+    Transaction, UnauthenticatedAction,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorPrototypeView {
-    pub id: SensorPrototypeId,
-    pub name: String,
-    pub dependencies: Vec<Dependency>,
-    pub includes: Vec<Include>,
-    pub definitions: Vec<Definition>,
-    pub setups: Vec<Setup>,
-    pub unauthenticated_actions: Vec<UnauthenticatedAction>,
-    pub measurements: Vec<SensorMeasurement>,
-    pub configuration_requests: Vec<SensorConfigRequestView>,
+    #[copy]
+    id: SensorPrototypeId,
+    name: String,
+    dependencies: Vec<Dependency>,
+    includes: Vec<Include>,
+    definitions: Vec<Definition>,
+    setups: Vec<Setup>,
+    unauthenticated_actions: Vec<UnauthenticatedAction>,
+    measurements: Vec<SensorMeasurement>,
+    configuration_requests: Vec<SensorConfigRequestView>,
 }
 
 impl SensorPrototypeView {
@@ -57,33 +60,39 @@ impl SensorPrototypeId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Debug, Clone)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Debug, Clone)]
 pub struct SensorPrototype {
+    #[copy]
     id: SensorPrototypeId,
     name: String,
+    variable_name: Option<String>,
 }
 
 impl SensorPrototype {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         txn: &mut Transaction<'_>,
-        name: String,
+        name: impl Into<String>,
+        variable_name: impl Into<Option<&str>>,
         dependencies: Vec<Dependency>,
         includes: Vec<Include>,
-        definitions: Vec<Definition>,
+        definitions: Vec<impl Into<Definition>>,
         setups: Vec<Setup>,
         unauthenticated_actions: Vec<UnauthenticatedAction>,
         measurements: Vec<SensorMeasurement>,
         new_config_requests: Vec<NewSensorConfigRequest>,
     ) -> Result<Self> {
+        let (name, variable_name) = (name.into(), variable_name.into());
         let (sensor_prototype_id,) = sqlx::query_as::<_, (SensorPrototypeId,)>(
-            "INSERT INTO sensor_prototypes (name) VALUES ($1) RETURNING id",
+            "INSERT INTO sensor_prototypes (name, variable_name) VALUES ($1, $2) RETURNING id",
         )
         .bind(&name)
+        .bind(&variable_name)
         .fetch_one(&mut *txn)
         .await?;
         let sensor_prototype = Self {
             id: sensor_prototype_id,
+            variable_name: variable_name.map(ToOwned::to_owned),
             name,
         };
 
@@ -105,14 +114,25 @@ impl SensorPrototype {
             .execute(&mut *txn)
             .await?;
         }
-        for define in &definitions {
-            sqlx::query(
-                "INSERT INTO sensor_prototype_definitions (definition, sensor_prototype_id) VALUES ($1, $2)",
+        for define in definitions {
+            let define = define.into();
+            let (sensor_prototype_definition_id,) = sqlx::query_as::<_, (SensorPrototypeDefinitionId,)>(
+                "INSERT INTO sensor_prototype_definitions (line, sensor_prototype_id) VALUES ($1, $2) RETURNING id",
             )
-            .bind(define)
+            .bind(define.line())
             .bind(&sensor_prototype_id)
-            .execute(&mut *txn)
+            .fetch_one(&mut *txn)
             .await?;
+            for sensor_referenced in define.sensors_referenced() {
+                sqlx::query(
+                    "INSERT INTO sensor_prototype_definition_sensors_referenced (sensor_name, request_name, sensor_prototype_definition_id) VALUES ($1, $2, $3)",
+                )
+                .bind(sensor_referenced.sensor_name())
+                .bind(sensor_referenced.request_name())
+                .bind(&sensor_prototype_definition_id)
+                .execute(&mut *txn)
+                .await?;
+            }
         }
         for setup in &setups {
             sqlx::query(
@@ -136,22 +156,22 @@ impl SensorPrototype {
             sqlx::query(
                 "INSERT INTO sensor_prototype_measurements (name, value, ty, sensor_prototype_id, human_name, kind) VALUES ($1, $2, $3, $4, $5, $6)",
             )
-            .bind(&measurement.name)
-            .bind(&measurement.value)
-            .bind(&measurement.ty)
+            .bind(measurement.name())
+            .bind(measurement.value())
+            .bind(measurement.ty())
             .bind(&sensor_prototype_id)
-            .bind(&measurement.human_name)
-            .bind(&measurement.kind)
+            .bind(measurement.human_name())
+            .bind(measurement.kind())
             .execute(&mut *txn)
             .await?;
         }
         for config_request in new_config_requests {
             SensorConfigRequest::new(
                 &mut *txn,
-                config_request.name,
-                config_request.human_name,
-                config_request.type_name,
-                config_request.widget,
+                config_request.name().clone(),
+                config_request.human_name().clone(),
+                config_request.type_name().clone(),
+                config_request.widget().clone(),
                 &sensor_prototype,
             )
             .await?;
@@ -160,26 +180,18 @@ impl SensorPrototype {
     }
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
-        let prototype = sqlx::query_as("SELECT id, name FROM sensor_prototypes")
+        let prototype = sqlx::query_as("SELECT id, name, variable_name FROM sensor_prototypes")
             .fetch_all(txn)
             .await?;
         Ok(prototype)
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: SensorPrototypeId) -> Result<Self> {
-        let prototype = sqlx::query_as("SELECT id, name FROM sensor_prototypes WHERE id = $1")
+        let prototype = sqlx::query_as("SELECT id, name, variable_name FROM sensor_prototypes WHERE id = $1")
             .bind(id)
             .fetch_one(txn)
             .await?;
         Ok(prototype)
-    }
-
-    pub fn id(&self) -> SensorPrototypeId {
-        self.id
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     /// A sensor should depend on N libraries (lib_dependencies param in platformio.ini)
@@ -206,13 +218,17 @@ impl SensorPrototype {
 
     /// A sensor should declare N variables to hold its state
     pub async fn definitions(&self, txn: &mut Transaction<'_>) -> Result<Vec<Definition>> {
-        let list = sqlx::query_as(
-            "SELECT definition FROM sensor_prototype_definitions WHERE sensor_prototype_id = $1",
+        let defs: Vec<(SensorPrototypeDefinitionId, String)> = sqlx::query_as(
+            "SELECT id, line FROM sensor_prototype_definitions WHERE sensor_prototype_id = $1",
         )
         .bind(&self.id)
         .fetch_all(&mut *txn)
         .await?;
-        Ok(list.into_iter().map(|(text,)| text).collect())
+        let mut list = Vec::with_capacity(defs.len());
+        for (id, line) in defs {
+            list.push(Definition::new(line, sqlx::query_as("SELECT sensor_name, request_name FROM sensor_prototype_definition_sensors_referenced WHERE sensor_prototype_definition_id = $1").bind(&id).fetch_all(&mut *txn).await?));
+        }
+        Ok(list)
     }
 
     /// A sensor should have code to setup itself

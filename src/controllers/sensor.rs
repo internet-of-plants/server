@@ -1,13 +1,16 @@
 use crate::{extractor::User, Collection, CollectionId, Error, Pool, Result, Sensor, SensorId};
+use derive_get::Getters;
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetAliasRequest {
-    pub collection_id: CollectionId,
-    pub sensor_id: SensorId,
-    pub alias: String,
+    #[copy]
+    collection_id: CollectionId,
+    #[copy]
+    sensor_id: SensorId,
+    alias: String,
 }
 
 pub async fn set_alias(
@@ -30,12 +33,14 @@ pub async fn set_alias(
     Ok(Json(()))
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SetColorRequest {
-    pub collection_id: CollectionId,
-    pub sensor_id: SensorId,
-    pub color: String,
+    #[copy]
+    collection_id: CollectionId,
+    #[copy]
+    sensor_id: SensorId,
+    color: String,
 }
 
 pub async fn set_color(

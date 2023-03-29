@@ -1,3 +1,4 @@
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[derive(sqlx::Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -15,14 +16,14 @@ pub enum SensorMeasurementType {
     RawAnalogRead, // (0-1024)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorMeasurementView {
-    pub name: String,
-    pub human_name: String,
-    pub ty: SensorMeasurementType,
-    pub kind: SensorMeasurementKind,
-    pub color: String,
+    name: String,
+    human_name: String,
+    ty: SensorMeasurementType,
+    kind: SensorMeasurementKind,
+    color: String,
 }
 
 impl SensorMeasurementView {
@@ -37,7 +38,7 @@ impl SensorMeasurementView {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorMeasurement {
     pub human_name: String,
     pub name: String,

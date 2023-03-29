@@ -1,13 +1,14 @@
-use crate::{Result, Target, Transaction};
+use crate::{Result, SensorPrototypeId, Target, Transaction};
 use async_recursion::async_recursion;
 use derive_more::FromStr;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, iter::FromIterator};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorConfigTypeView {
-    pub name: String,
-    pub widget: SensorWidgetKindView,
+    name: Option<String>,
+    widget: SensorWidgetKindView,
 }
 
 impl SensorConfigTypeView {
@@ -17,7 +18,7 @@ impl SensorConfigTypeView {
         targets: &[&Target],
     ) -> Result<Self> {
         Ok(Self {
-            name: ty.name().to_owned(),
+            name: ty.name().clone(),
             widget: ty.widget(txn, targets).await?,
         })
     }
@@ -47,6 +48,7 @@ pub enum SensorWidgetKind {
     U64,
     F32,
     F64,
+    Sensor(String),
     String,
     Moment,
     Map(Box<SensorWidgetKind>, Box<SensorWidgetKind>),
@@ -65,6 +67,7 @@ pub enum SensorWidgetKindView {
     F32,
     F64,
     String,
+    Sensor(SensorPrototypeId),
     Moment,
     Map(Box<SensorWidgetKindView>, Box<SensorWidgetKindView>),
     Selection(Vec<String>),
@@ -80,6 +83,7 @@ pub enum SensorWidgetKindRaw {
     F32,
     F64,
     String,
+    Sensor,
     Moment,
     Map,
     PinSelection,
@@ -96,6 +100,7 @@ impl From<&SensorWidgetKind> for SensorWidgetKindRaw {
             SensorWidgetKind::U64 => SensorWidgetKindRaw::U64,
             SensorWidgetKind::F32 => SensorWidgetKindRaw::F32,
             SensorWidgetKind::F64 => SensorWidgetKindRaw::F64,
+            SensorWidgetKind::Sensor(_) => SensorWidgetKindRaw::Sensor,
             SensorWidgetKind::String => SensorWidgetKindRaw::String,
             SensorWidgetKind::Moment => SensorWidgetKindRaw::Moment,
             SensorWidgetKind::Map(_, _) => SensorWidgetKindRaw::Map,
@@ -172,22 +177,38 @@ impl SensorWidgetKindView {
                 .await?;
                 SensorWidgetKindView::Map(key.into(), value.into())
             }
+            SensorWidgetKindRaw::Sensor => {
+                let (sensor_prototype_id,) = sqlx::query_as::<_, (SensorPrototypeId,)>(
+                    "SELECT sensor_prototypes.id
+                     FROM sensor_config_type_selection_sensors
+                     INNER JOIN sensor_prototypes ON sensor_prototypes.name = sensor_prototype_name
+                     WHERE type_id = $1
+                           AND (parent_id = $2 OR (parent_id IS NULL AND $2 IS NULL))
+                           AND (parent_metadata = $3 OR (parent_metadata IS NULL AND $3 IS NULL))",
+                )
+                .bind(&id)
+                .bind(parent.as_ref().map(|p| p.0))
+                .bind(parent.as_ref().map(|p| p.1))
+                .fetch_one(txn)
+                .await?;
+                SensorWidgetKindView::Sensor(sensor_prototype_id)
+            }
             SensorWidgetKindRaw::Selection => {
                 let options = sqlx::query_as::<_, (String,)>(
                     "SELECT option
                      FROM sensor_config_type_selection_options
                      WHERE type_id = $1
-                           AND (parent_map_id = $2 OR (parent_map_id IS NULL AND $2 IS NULL))
-                           AND (parent_map_metadata = $3 OR (parent_map_metadata IS NULL AND $3 IS NULL))",
+                           AND (parent_id = $2 OR (parent_id IS NULL AND $2 IS NULL))
+                           AND (parent_metadata = $3 OR (parent_metadata IS NULL AND $3 IS NULL))",
                 )
-                    .bind(&id)
-                    .bind(parent.as_ref().map(|p| p.0))
-                    .bind(parent.as_ref().map(|p| p.1))
-                    .fetch_all(txn)
-                    .await?
-                    .into_iter()
-                    .map(|(opt,)| opt)
-                    .collect();
+                .bind(&id)
+                .bind(parent.as_ref().map(|p| p.0))
+                .bind(parent.as_ref().map(|p| p.1))
+                .fetch_all(txn)
+                .await?
+                .into_iter()
+                .map(|(opt,)| opt)
+                .collect();
                 SensorWidgetKindView::Selection(options)
             }
             SensorWidgetKindRaw::PinSelection => {
@@ -209,10 +230,12 @@ impl SensorWidgetKindView {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorConfigType {
+    #[copy]
     id: SensorConfigTypeId,
-    pub name: String,
+    name: Option<String>,
+    #[skip]
     widget: SensorWidgetKindRaw,
 }
 
@@ -227,7 +250,7 @@ impl SensorConfigType {
 
     pub async fn new(
         txn: &mut Transaction<'_>,
-        name: String,
+        name: Option<String>,
         widget: SensorWidgetKind,
     ) -> Result<Self> {
         let widget_kind_raw = SensorWidgetKindRaw::from(&widget);
@@ -263,7 +286,7 @@ impl SensorConfigType {
                 SensorWidgetKind::Selection(options) => {
                     for option in options {
                         sqlx::query(
-                            "INSERT INTO sensor_config_type_selection_options (type_id, parent_map_id, parent_map_metadata, option) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+                            "INSERT INTO sensor_config_type_selection_options (type_id, parent_id, parent_metadata, option) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
                         )
                             .bind(&id)
                             .bind(parent.as_ref().map(|p| p.0))
@@ -272,6 +295,17 @@ impl SensorConfigType {
                             .execute(&mut *txn)
                             .await?;
                     }
+                }
+                SensorWidgetKind::Sensor(sensor_prototype_name) => {
+                    sqlx::query(
+                        "INSERT INTO sensor_config_type_selection_sensors (type_id, parent_id, parent_metadata, sensor_prototype_name) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+                    )
+                        .bind(&id)
+                        .bind(parent.as_ref().map(|p| p.0))
+                        .bind(parent.as_ref().map(|p| p.1))
+                        .bind(&sensor_prototype_name)
+                        .execute(&mut *txn)
+                        .await?;
                 }
                 _ => {}
             }
@@ -282,14 +316,6 @@ impl SensorConfigType {
             name,
             widget: widget_kind_raw,
         })
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn id(&self) -> SensorConfigTypeId {
-        self.id
     }
 
     pub async fn widget(

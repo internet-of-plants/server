@@ -1,25 +1,28 @@
 use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction};
 use derive_more::FromStr;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Getters, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Element {
-    pub key: Val,
-    pub value: Val,
+    key: Val,
+    value: Val,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Val {
     String(String),
+    Number(usize),
     Map(Vec<Element>),
 }
 
 impl fmt::Display for Val {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Val::Number(number) => write!(f, "{}", number)?,
             Val::String(string) => write!(f, "{}", string.replace("\"", "\\\""))?,
             Val::Map(vec) => {
                 write!(f, "{{")?;
@@ -38,20 +41,22 @@ impl fmt::Display for Val {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Getters, Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewSensorConfig {
-    pub request_id: SensorConfigRequestId,
+    #[copy]
+    request_id: SensorConfigRequestId,
     pub value: Val, // encoded the way it will be used by C++, or a map that becomes a array of std::pair<Key, Value>
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorConfigView {
-    pub request_id: SensorConfigRequestId,
+    #[copy]
+    request_id: SensorConfigRequestId,
     name: String,
-    type_name: String,
-    pub value: String,
+    type_name: Option<String>,
+    value: String,
 }
 
 impl SensorConfigView {
@@ -59,8 +64,8 @@ impl SensorConfigView {
         let request = config.request(txn).await?;
         Ok(Self {
             request_id: config.request_id,
-            type_name: request.ty(txn).await?.name,
-            name: request.name,
+            type_name: request.ty(txn).await?.name().clone(),
+            name: request.name().to_owned(),
             value: config.value,
         })
     }
@@ -76,12 +81,15 @@ impl SensorConfigId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorConfig {
-    pub id: SensorConfigId,
-    pub sensor_id: SensorId,
-    pub request_id: SensorConfigRequestId,
-    pub value: String,
+    #[copy]
+    id: SensorConfigId,
+    #[copy]
+    sensor_id: SensorId,
+    #[copy]
+    request_id: SensorConfigRequestId,
+    value: String,
 }
 
 impl SensorConfig {

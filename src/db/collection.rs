@@ -2,6 +2,7 @@ use crate::{
     Compiler, CompilerId, CompilerView, DateTime, Device, DeviceView, Error, Firmware,
     Organization, Result, Transaction, User,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -15,16 +16,19 @@ impl CollectionId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionView {
-    pub id: CollectionId,
-    pub name: String,
-    pub description: Option<String>,
-    pub compiler: Option<CompilerView>,
-    pub devices: Vec<DeviceView>,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    #[copy]
+    id: CollectionId,
+    name: String,
+    description: Option<String>,
+    compiler: Option<CompilerView>,
+    devices: Vec<DeviceView>,
+    #[copy]
+    created_at: DateTime,
+    #[copy]
+    updated_at: DateTime,
 }
 
 impl CollectionView {
@@ -45,19 +49,19 @@ impl CollectionView {
             updated_at: collection.updated_at,
         })
     }
-
-    pub fn id(&self) -> CollectionId {
-        self.id
-    }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Collection {
+    #[copy]
     id: CollectionId,
     name: String,
     description: Option<String>,
+    #[copy]
     compiler_id: Option<CompilerId>,
+    #[copy]
     created_at: DateTime,
+    #[copy]
     updated_at: DateTime,
 }
 
@@ -126,10 +130,6 @@ impl Collection {
         Ok(collections)
     }
 
-    pub fn id(&self) -> CollectionId {
-        self.id
-    }
-
     pub async fn associate_to_organization(
         &mut self,
         txn: &mut Transaction<'_>,
@@ -188,10 +188,6 @@ impl Collection {
         .fetch_optional(txn)
         .await?;
         Ok(collection)
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {

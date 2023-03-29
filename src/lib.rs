@@ -25,16 +25,16 @@ pub use crate::db::{
     organization::{Organization, OrganizationId, OrganizationView},
     secret::SecretAlgo,
     sensor::{
-        Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorView, Setup,
-        UnauthenticatedAction,
+        Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
+        SensorReference, SensorView, Setup, UnauthenticatedAction,
     },
-    sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView},
+    sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val},
     sensor_config_request::{
         NewSensorConfigRequest, SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView,
     },
     sensor_config_type::{
         SensorConfigType, SensorConfigTypeId, SensorConfigTypeMapId, SensorConfigTypeView,
-        SensorWidgetKind,
+        SensorWidgetKind, SensorWidgetKindRaw, SensorWidgetKindView,
     },
     sensor_measurement::{
         SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView,

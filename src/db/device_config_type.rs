@@ -1,18 +1,20 @@
 use crate::{Result, Transaction};
 use derive_more::FromStr;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DeviceConfigTypeView {
-    pub name: String,
-    pub widget: DeviceWidgetKind,
+    name: String,
+    #[copy]
+    widget: DeviceWidgetKind,
 }
 
 impl DeviceConfigTypeView {
     pub fn new(ty: DeviceConfigType) -> Self {
         Self {
             name: ty.name().to_owned(),
-            widget: *ty.widget(),
+            widget: ty.widget(),
         }
     }
 }
@@ -34,10 +36,12 @@ pub enum DeviceWidgetKind {
     Timezone,
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DeviceConfigType {
+    #[copy]
     id: DeviceConfigTypeId,
-    pub name: String,
+    name: String,
+    #[copy]
     widget: DeviceWidgetKind,
 }
 
@@ -68,17 +72,5 @@ impl DeviceConfigType {
             name,
             widget: widget_kind,
         })
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn id(&self) -> DeviceConfigTypeId {
-        self.id
-    }
-
-    pub fn widget(&self) -> &DeviceWidgetKind {
-        &self.widget
     }
 }

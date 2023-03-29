@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS certificates (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   target_prototype_id BIGINT                NOT NULL,
   hash                TEXT                  NOT NULL,
+  payload             BYTEA                 NOT NULL,
   created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE (target_prototype_id, hash),
   FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id)
@@ -183,9 +184,10 @@ CREATE TABLE IF NOT EXISTS authentications (
 );
 
 CREATE TABLE IF NOT EXISTS sensor_prototypes (
-  id         BIGSERIAL PRIMARY KEY NOT NULL,
-  name       TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id            BIGSERIAL PRIMARY KEY NOT NULL,
+  name          TEXT NOT NULL UNIQUE,
+  variable_name TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sensors (
@@ -195,12 +197,12 @@ CREATE TABLE IF NOT EXISTS sensors (
 );
 
 CREATE TYPE SensorWidgetKindRaw AS ENUM (
-  'Seconds', 'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection', 'Moment', 'Map'
+  'Seconds', 'U8', 'U16', 'U32', 'U64', 'F32', 'F64', 'String', 'PinSelection', 'Selection', 'Moment', 'Map', 'Sensor'
 );
 
 CREATE TABLE IF NOT EXISTS sensor_config_types (
   id         BIGSERIAL PRIMARY KEY NOT NULL,
-  name       TEXT NOT NULL,
+  name       TEXT,
   widget     SensorWidgetKindRaw NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -225,13 +227,25 @@ CREATE TABLE IF NOT EXISTS sensor_config_type_selection_maps (
 CREATE TABLE IF NOT EXISTS sensor_config_type_selection_options (
   id                  BIGSERIAL       PRIMARY KEY NOT NULL,
   type_id             BIGINT          NOT NULL,
-  parent_map_id       BIGINT,
-  parent_map_metadata ParentMetadata,
+  parent_id           BIGINT,
+  parent_metadata     ParentMetadata,
   option              TEXT            NOT NULL,
   created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, parent_map_id, parent_map_metadata, option),
+  UNIQUE(type_id, parent_id, parent_metadata, option),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
-  FOREIGN KEY (parent_map_id) REFERENCES sensor_config_type_selection_maps (id)
+  FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
+);
+
+CREATE TABLE IF NOT EXISTS sensor_config_type_selection_sensors (
+  id                    BIGSERIAL       PRIMARY KEY NOT NULL,
+  type_id               BIGINT          NOT NULL,
+  parent_id             BIGINT,
+  parent_metadata       ParentMetadata,
+  sensor_prototype_name TEXT            NOT NULL,
+  created_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+  UNIQUE(type_id, parent_id, parent_metadata, sensor_prototype_name),
+  FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
+  FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_config_requests (
@@ -241,7 +255,7 @@ CREATE TABLE IF NOT EXISTS sensor_config_requests (
   human_name          TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
   created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, name, sensor_prototype_id),
+  UNIQUE(name, sensor_prototype_id),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
@@ -330,10 +344,19 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_includes (
 
 CREATE TABLE IF NOT EXISTS sensor_prototype_definitions (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
-  definition          TEXT                  NOT NULL,
+  line                TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
-  UNIQUE(definition, sensor_prototype_id),
+  UNIQUE(line, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
+);
+
+CREATE TABLE IF NOT EXISTS sensor_prototype_definition_sensors_referenced (
+  id                             BIGSERIAL PRIMARY KEY NOT NULL,
+  sensor_name                    TEXT                  NOT NULL,
+  request_name                   TEXT                  NOT NULL,
+  sensor_prototype_definition_id BIGINT                NOT NULL,
+  UNIQUE(request_name, sensor_prototype_definition_id),
+  FOREIGN KEY (sensor_prototype_definition_id) REFERENCES sensor_prototype_definitions (id)
 );
 
 CREATE TABLE IF NOT EXISTS sensor_prototype_dependencies (

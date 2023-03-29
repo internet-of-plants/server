@@ -1,23 +1,26 @@
 use crate::{
     Compiler, DeviceConfigRequest, DeviceConfigRequestId, Organization, Result, Transaction,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Getters, Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NewDeviceConfig {
-    pub request_id: DeviceConfigRequestId,
-    pub value: String, // encoded the way it will be used by C++
+    #[copy]
+    request_id: DeviceConfigRequestId,
+    value: String, // encoded the way it will be used by C++
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceConfigView {
-    pub request_id: DeviceConfigRequestId,
+    #[copy]
+    request_id: DeviceConfigRequestId,
     name: String,
     type_name: String,
-    pub value: String,
+    value: String,
 }
 
 impl DeviceConfigView {
@@ -25,8 +28,8 @@ impl DeviceConfigView {
         let request = config.request(txn).await?;
         Ok(Self {
             request_id: config.request_id,
-            type_name: request.ty(txn).await?.name,
-            name: request.name,
+            type_name: request.ty(txn).await?.name().to_owned(),
+            name: request.name().to_owned(),
             value: config.value,
         })
     }
@@ -42,11 +45,13 @@ impl DeviceConfigId {
     }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct DeviceConfig {
-    pub id: DeviceConfigId,
-    pub request_id: DeviceConfigRequestId,
-    pub value: String,
+    #[copy]
+    id: DeviceConfigId,
+    #[copy]
+    request_id: DeviceConfigRequestId,
+    value: String,
 }
 
 impl DeviceConfig {
@@ -102,9 +107,5 @@ impl DeviceConfig {
 
     pub async fn request(&self, txn: &mut Transaction<'_>) -> Result<DeviceConfigRequest> {
         DeviceConfigRequest::find_by_id(txn, self.request_id).await
-    }
-
-    pub fn id(&self) -> DeviceConfigId {
-        self.id
     }
 }

@@ -1,17 +1,19 @@
 use crate::{
     logger::*, CertificateId, Compiler, CompilerId, Error, Firmware, Result, SensorId, Transaction,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilationView {
-    pub id: CompilationId,
-    pub platformio_ini: String,
-    pub main_cpp: String,
-    pub pin_hpp: String,
+    #[copy]
+    id: CompilationId,
+    platformio_ini: String,
+    main_cpp: String,
+    pin_hpp: String,
 }
 
 impl CompilationView {
@@ -35,14 +37,17 @@ impl CompilationId {
     }
 }
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Getters, Debug)]
 pub struct Compilation {
+    #[copy]
     id: CompilationId,
+    #[copy]
     compiler_id: CompilerId,
-    pub platformio_ini: String,
-    pub main_cpp: String,
-    pub pin_hpp: String,
-    pub certificate_id: CertificateId,
+    platformio_ini: String,
+    main_cpp: String,
+    pin_hpp: String,
+    #[copy]
+    certificate_id: CertificateId,
 }
 
 impl Compilation {
@@ -152,24 +157,12 @@ impl Compilation {
         Ok(comps)
     }
 
-    pub fn id(&self) -> CompilationId {
-        self.id
-    }
-
     pub async fn firmware(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
         Firmware::latest_by_compilation(txn, self).await
     }
 
     pub async fn compiler(&self, txn: &mut Transaction<'_>) -> Result<Compiler> {
         Compiler::find_by_compilation(txn, self).await
-    }
-
-    pub fn compiler_id(&self) -> CompilerId {
-        self.compiler_id
-    }
-
-    pub fn certificate_id(&self) -> CertificateId {
-        self.certificate_id
     }
 
     pub async fn is_outdated(&self, txn: &mut Transaction<'_>) -> Result<bool> {
@@ -188,9 +181,9 @@ impl Compilation {
 
         // Is there any RCE danger in cloning a git repo?
         for sensor in compiler.sensors(txn).await? {
-            let sid = sensor.id;
+            let sid = sensor.id();
 
-            for dependency_url in sensor.prototype.dependencies {
+            for dependency_url in sensor.prototype().dependencies() {
                 let url = dependency_url.clone();
                 let commit_hash = tokio::task::spawn_blocking(move || {
                     let dir = tempfile::tempdir()?;
@@ -207,7 +200,7 @@ impl Compilation {
                 if !dependencies
                     .iter()
                     .any(|(url, sensor_id, expected_commit_hash)| {
-                        url == &dependency_url
+                        &url == &dependency_url
                             && *sensor_id == Some(sid)
                             && &commit_hash == expected_commit_hash
                     })
@@ -218,13 +211,13 @@ impl Compilation {
         }
 
         for dependency in target_prototype.dependencies(txn).await? {
-            let url = dependency.url.clone();
+            let url = dependency.url().clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
                 let dir = tempfile::tempdir()?;
-                let repo = git2::Repository::clone(&dependency.url, dir.path())?;
+                let repo = git2::Repository::clone(dependency.url(), dir.path())?;
 
                 // TODO: add branch to the sensor prototype metadata
-                let object = repo.revparse_single(&dependency.branch)?;
+                let object = repo.revparse_single(dependency.branch())?;
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
@@ -256,7 +249,7 @@ impl Compilation {
         let compiler = self.compiler(txn).await?;
         let target = compiler.target(txn).await?;
         let prototype = target.prototype(txn).await?;
-        let arch = &prototype.arch;
+        let arch = prototype.arch();
         let board = target.board();
         let mut env_name = vec![arch.as_str()];
         if let Some(board) = board {
@@ -265,7 +258,7 @@ impl Compilation {
         let env_name = env_name.join("-");
 
         for sensor in compiler.sensors(txn).await? {
-            for dependency_url in sensor.prototype.dependencies {
+            for dependency_url in sensor.prototype().dependencies() {
                 let url = dependency_url.clone();
                 // Is there any RCE danger in cloning a git repo?
                 let commit_hash = tokio::task::spawn_blocking(move || {
@@ -283,7 +276,7 @@ impl Compilation {
                 sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3, $4)
                              ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2")
                     .bind(&dependency_url)
-                    .bind(&sensor.id)
+                    .bind(&sensor.id())
                     .bind(&commit_hash)
                     .bind(&self.id())
                     .execute(&mut *txn)
@@ -295,24 +288,26 @@ impl Compilation {
             let dep = dependency.clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
                 let dir = tempfile::tempdir()?;
-                let repo = git2::Repository::clone(&dep.url, dir.path())?;
+                let repo = git2::Repository::clone(dep.url(), dir.path())?;
 
                 // TODO: add branch to the sensor prototype metadata
-                let object = repo.revparse_single(&dep.branch)?;
+                let object = repo.revparse_single(dep.branch())?;
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
             })
             .await??;
 
-            sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, commit_hash, compilation_id)
+            sqlx::query(
+                "INSERT INTO dependency_belongs_to_compilation (url, commit_hash, compilation_id)
                         VALUES ($1, $2, $3)
-                        ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2")
-                .bind(&dependency.url)
-                .bind(&commit_hash)
-                .bind(&self.id())
-                .execute(&mut *txn)
-                .await?;
+                        ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2",
+            )
+            .bind(dependency.url())
+            .bind(&commit_hash)
+            .bind(&self.id())
+            .execute(&mut *txn)
+            .await?;
         }
 
         let firmware = {

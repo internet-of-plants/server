@@ -2,6 +2,7 @@ use crate::{
     utils, AuthToken, Collection, CollectionId, CompilerView, DateTime, Error, Event, EventView,
     Firmware, FirmwareId, FirmwareView, Login, Organization, Result, Transaction, User, UserId,
 };
+use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
@@ -15,18 +16,21 @@ impl DeviceId {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceView {
-    pub id: DeviceId,
-    pub name: String,
-    pub description: Option<String>,
-    pub mac: String,
-    pub firmware: FirmwareView,
-    pub compiler: Option<CompilerView>,
-    pub last_event: Option<EventView>,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
+    #[copy]
+    id: DeviceId,
+    name: String,
+    description: Option<String>,
+    mac: String,
+    firmware: FirmwareView,
+    compiler: Option<CompilerView>,
+    last_event: Option<EventView>,
+    #[copy]
+    created_at: DateTime,
+    #[copy]
+    updated_at: DateTime,
 }
 
 impl DeviceView {
@@ -58,32 +62,35 @@ impl DeviceView {
             updated_at: device.updated_at,
         })
     }
-
-    pub fn id(&self) -> DeviceId {
-        self.id
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
 }
 
-#[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Device {
+    #[copy]
     id: DeviceId,
+    #[copy]
     collection_id: CollectionId,
+    #[copy]
     firmware_id: FirmwareId,
     name: String,
     description: Option<String>,
     mac: String,
+    #[copy]
     created_at: DateTime,
+    #[copy]
     updated_at: DateTime,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NewDevice {
-    pub mac: String,
-    pub file_hash: String,
+    mac: String,
+    file_hash: String,
+}
+
+impl NewDevice {
+    pub fn new(mac: String, file_hash: String) -> Self {
+        Self { mac, file_hash }
+    }
 }
 
 impl Device {
@@ -182,10 +189,6 @@ impl Device {
         Ok(device)
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
     pub async fn find_by_id(
         txn: &mut Transaction<'_>,
         device_id: DeviceId,
@@ -267,13 +270,13 @@ impl Device {
             FROM users
             WHERE email = $1",
         )
-        .bind(&client.email)
+        .bind(client.email())
         .fetch_optional(&mut *txn)
         .await?;
         let is_auth = match &hash {
-            Some((_, _, _, _, _, hash)) => utils::verify_password(&client.password, hash)?,
+            Some((_, _, _, _, _, hash)) => utils::verify_password(client.password(), hash)?,
             // Avoids timing attacks to detect usernames
-            None => utils::hash_password(&client.password)? == "abc",
+            None => utils::hash_password(client.password())? == "abc",
         };
 
         match (hash, is_auth) {
@@ -290,12 +293,10 @@ impl Device {
                 let device = Device::put(txn, &organization, new_device).await?;
                 let token = AuthToken::random();
 
-                sqlx::query(
-                    "UPDATE authentications SET expired = true WHERE mac = $1",
-                )
-                .bind(&device.mac)
-                .execute(&mut *txn)
-                .await?;
+                sqlx::query("UPDATE authentications SET expired = true WHERE mac = $1")
+                    .bind(&device.mac)
+                    .execute(&mut *txn)
+                    .await?;
 
                 sqlx::query(
                     "INSERT INTO authentications (mac, device_id, token) VALUES ($1, $2, $3)",
@@ -309,10 +310,6 @@ impl Device {
             }
             _ => Err(Error::Unauthorized),
         }
-    }
-
-    pub fn id(&self) -> DeviceId {
-        self.id
     }
 
     pub async fn update_collection(
@@ -383,14 +380,6 @@ impl Device {
 
     pub async fn last_event(&self, txn: &mut Transaction<'_>) -> Result<Option<Event>> {
         Event::last_from_device(txn, self).await
-    }
-
-    pub fn firmware_id(&self) -> FirmwareId {
-        self.firmware_id
-    }
-
-    pub fn collection_id(&self) -> CollectionId {
-        self.collection_id
     }
 
     pub async fn collection(&self, txn: &mut Transaction<'_>) -> Result<Collection> {

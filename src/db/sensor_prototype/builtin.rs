@@ -1,7 +1,7 @@
 use crate::{
-    DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest, Result, SecretAlgo,
-    SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorPrototype,
-    SensorWidgetKind, Target, TargetPrototype, Transaction,
+    Definition, DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest, Result,
+    SecretAlgo, SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorPrototype,
+    SensorReference, SensorWidgetKind, Target, TargetPrototype, Transaction,
 };
 
 pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
@@ -19,6 +19,7 @@ pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
     soil_resistivity(txn).await?;
     factory_reset_button(txn).await?;
     light_relay(txn).await?;
+    cooler(txn).await?;
     dallas_temperature(txn).await?;
     water_pump(txn).await?;
 
@@ -29,6 +30,7 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
     SensorPrototype::new(
         txn,
         "DHT".to_owned(),
+        "airTempAndHumidity",
         vec!["https://github.com/internet-of-plants/dht".to_owned()],
         vec!["dht.hpp".to_owned()],
         vec![
@@ -72,6 +74,7 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
     SensorPrototype::new(
         txn,
         "Dallas Temperature".to_owned(),
+        "soilTemperature",
         vec!["https://github.com/internet-of-plants/dallas-temperature".to_owned()],
         vec!["dallas_temperature.hpp".to_owned()],
         vec![
@@ -102,9 +105,10 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
     SensorPrototype::new(
         txn,
         "Factory Reset Button".to_owned(),
+        None,
         vec!["https://github.com/internet-of-plants/factory-reset-button".to_owned()],
         vec!["factory_reset_button.hpp".to_owned()],
-        vec![],
+        Vec::<String>::new(),
         vec!["reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));".to_owned()],
         vec!["reset::resetIfNeeded(loop);".to_owned()],
         vec![],
@@ -118,10 +122,46 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
     .await
 }
 
+async fn cooler(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
+    SensorPrototype::new(
+        txn,
+        "Cooler",
+        Some("cooler"),
+        vec!["https://github.com/internet-of-plants/cooler".to_owned()],
+        vec!["cooler.hpp".to_owned()],
+        vec![Definition::new("static relay::Cooler cooler{{index}}(IOP_PIN_RAW(config::cooler{{index}}), std::ref({{dhtSensor}}), config::coolerMax{{index}});".to_owned(), vec![SensorReference::new("DHT".to_owned(), "dhtSensor".to_owned())])],
+        vec!["cooler{{index}}.begin();\n".to_owned()],
+        vec!["cooler{{index}}.actIfNeeded();".to_owned()],
+        vec![],
+        vec![
+            NewSensorConfigRequest::new(
+                "Port".to_owned(),
+                "cooler{{index}}".to_owned(),
+                "Pin".to_owned(),
+                SensorWidgetKind::PinSelection,
+            ),
+            NewSensorConfigRequest::new(
+                "Max Celsius".to_owned(),
+                "coolerMax{{index}}".to_owned(),
+                "float".to_owned(),
+                SensorWidgetKind::F32,
+            ),
+            NewSensorConfigRequest::new(
+                "DHT Sensor".to_owned(),
+                "dhtSensor".to_owned(),
+                None,
+                SensorWidgetKind::Sensor("DHT".to_owned()),
+            ),
+        ],
+    )
+    .await
+}
+
 async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
     SensorPrototype::new(
         txn,
         "Light Relay".to_owned(),
+        "light",
         vec!["https://github.com/internet-of-plants/light".to_owned()],
         vec!["light.hpp".to_owned()],
         vec!["static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));".to_owned()],
@@ -162,6 +202,7 @@ async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
     SensorPrototype::new(
         txn,
         "Water Pump".to_owned(),
+        "waterPump",
         vec!["https://github.com/internet-of-plants/water-pump".to_owned()],
         vec!["water_pump.hpp".to_owned()],
         vec![
@@ -202,6 +243,7 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
     SensorPrototype::new(
         txn,
         "Soil Resistivity".to_owned(),
+        "soilResistivity",
         vec!["https://github.com/internet-of-plants/soil-resistivity".to_owned()],
         vec!["soil_resistivity.hpp".to_owned()],
         vec![
