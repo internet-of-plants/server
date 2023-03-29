@@ -2,8 +2,8 @@ use crate::{
     DeviceConfigType, DeviceConfigTypeId, DeviceConfigTypeView, DeviceWidgetKind, Result,
     SecretAlgo, Target, Transaction,
 };
+use derive::id;
 use derive_get::Getters;
-use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -31,28 +31,8 @@ impl DeviceConfigRequestView {
     }
 }
 
-#[derive(
-    Serialize,
-    Deserialize,
-    sqlx::Type,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    FromStr,
-    Hash,
-    PartialOrd,
-    Ord,
-)]
-#[sqlx(transparent)]
-pub struct DeviceConfigRequestId(pub i64);
-
-impl DeviceConfigRequestId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct DeviceConfigRequestId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NewDeviceConfigRequest {

@@ -1,6 +1,6 @@
 use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction};
-use derive_more::FromStr;
 use derive_get::Getters;
+use derive::id;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -71,15 +71,8 @@ impl SensorConfigView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct SensorConfigId(i64);
-
-impl SensorConfigId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct SensorConfigId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SensorConfig {

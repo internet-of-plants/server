@@ -1,6 +1,6 @@
 use crate::{Result, SensorPrototypeId, Target, Transaction};
 use async_recursion::async_recursion;
-use derive_more::FromStr;
+use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, iter::FromIterator};
@@ -24,19 +24,11 @@ impl SensorConfigTypeView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct SensorConfigTypeMapId(i64);
+#[id]
+pub struct SensorConfigTypeMapId;
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct SensorConfigTypeId(i64);
-
-impl SensorConfigTypeId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct SensorConfigTypeId;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", content = "data")]

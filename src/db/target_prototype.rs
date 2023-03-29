@@ -1,12 +1,11 @@
 use crate::{Result, Transaction};
-use derive_more::FromStr;
 use derive_get::Getters;
+use derive::id;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct CertificateId(pub i64);
+#[id]
+pub struct CertificateId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -25,15 +24,8 @@ pub struct Dependency {
     branch: String,
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct TargetPrototypeId(pub i64);
-
-impl TargetPrototypeId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct TargetPrototypeId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

@@ -1,8 +1,8 @@
 use crate::{
     logger::*, CertificateId, Compiler, CompilerId, Error, Firmware, Result, SensorId, Transaction,
 };
+use derive::id;
 use derive_get::Getters;
-use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
@@ -27,15 +27,8 @@ impl CompilationView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct CompilationId(pub i64);
-
-impl CompilationId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct CompilationId;
 
 #[derive(sqlx::FromRow, Getters, Debug)]
 pub struct Compilation {

@@ -22,7 +22,7 @@ pub async fn new(
     )
     .await?;
     txn.commit().await?;
-    Ok(token.0)
+    Ok(token)
 }
 
 pub async fn login(
@@ -40,5 +40,5 @@ pub async fn login(
         User::login(&mut txn, user).await?
     };
     txn.commit().await?;
-    Ok(token.0)
+    Ok(token)
 }

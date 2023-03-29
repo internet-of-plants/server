@@ -49,10 +49,10 @@ pub async fn new(
 
     // Don't even process request if there is an update
     if let Some(firmware) = collection.update(&mut txn).await? {
-        if firmware.hash() != stat.version() {
+        if firmware.binary_hash() != stat.version() {
             return Ok(HeaderMap::from_iter([(
                 HeaderName::from_static("latest_version"),
-                HeaderValue::from_str(firmware.hash())?,
+                HeaderValue::from_str(firmware.binary_hash())?,
             )]));
         }
     }

@@ -3,18 +3,11 @@ use crate::{
     Firmware, FirmwareId, FirmwareView, Login, Organization, Result, Transaction, User, UserId,
 };
 use derive_get::Getters;
-use derive_more::FromStr;
+use derive::id;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct DeviceId(pub i64);
-
-impl DeviceId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct DeviceId;
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

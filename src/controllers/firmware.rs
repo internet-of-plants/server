@@ -24,11 +24,11 @@ pub async fn update(
         Some(update) => update,
         None => return Err(Error::NoBinaryAvailable)?,
     };
-    if firmware.hash() == md5 {
+    if firmware.binary_hash() == &md5 {
         return Err(Error::NoUpdateAvailable)?;
     }
 
-    let hash = firmware.hash().to_owned();
+    let hash = firmware.binary_hash().to_owned();
     if let Some(binary) = firmware.bin(&mut txn).await? {
         let md5 = md5::compute(&binary);
         let md5 = &*md5;

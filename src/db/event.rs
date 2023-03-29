@@ -1,6 +1,6 @@
 use crate::{logger::*, DateTime, Device, Firmware, Result, SensorMeasurementView, Transaction};
-use derive_more::FromStr;
 use derive_get::Getters;
+use derive::id;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -25,9 +25,8 @@ pub struct DeviceStat {
     pub biggest_iram_block: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct EventId(i64);
+#[id]
+pub struct EventId;
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

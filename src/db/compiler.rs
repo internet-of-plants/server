@@ -3,7 +3,7 @@ use crate::{
     DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization, Result,
     Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
 };
-use derive_more::{Display, FromStr};
+use derive::id;
 use handlebars::Handlebars;
 use random_color::RandomColor;
 use serde::{Deserialize, Serialize};
@@ -71,11 +71,8 @@ impl CompilerView {
     }
 }
 
-#[derive(
-    Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr, Display,
-)]
-#[sqlx(transparent)]
-pub struct CompilerId(i64);
+#[id]
+pub struct CompilerId;
 
 impl CompilerId {
     pub fn new(id: i64) -> Self {
@@ -125,10 +122,10 @@ impl Compiler {
         .bind(
             &sensors_and_alias
                 .iter()
-                .map(|s| s.0.id().0)
+                .map(|s| s.0.id())
                 .collect::<Vec<_>>(),
         )
-        .bind(&device_configs.iter().map(|s| s.id().0).collect::<Vec<_>>())
+        .bind(&device_configs.iter().map(|s| s.id()).collect::<Vec<_>>())
         .bind(&(sensors_and_alias.len() as i64))
         .bind(&(device_configs.len() as i64))
         .bind(target.id())

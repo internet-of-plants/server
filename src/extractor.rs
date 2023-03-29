@@ -112,6 +112,12 @@ impl headers_core::Header for AuthorizationHeader {
 #[derive(Debug)]
 pub struct MacAddress(pub String);
 
+impl From<&MacAddress> for headers_core::HeaderValue {
+    fn from(mac: &MacAddress) -> Self {
+        Self::from_str(&mac.0).expect("unable to convert mac address to header value")
+    }
+}
+
 const MAC_ADDRESS_NAME: &str = "mac_address";
 impl headers_core::Header for MacAddress {
     fn name() -> &'static headers_core::HeaderName {
@@ -139,6 +145,13 @@ impl headers_core::Header for MacAddress {
 
 #[derive(Debug)]
 pub struct Version(pub String);
+
+impl From<&Version> for headers_core::HeaderValue {
+    fn from(version: &Version) -> Self {
+        Self::from_str(&version.0).expect("unable to convert version to header value")
+    }
+}
+
 
 const VERSION_NAME: &str = "version";
 impl headers_core::Header for Version {

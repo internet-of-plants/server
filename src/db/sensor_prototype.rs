@@ -5,8 +5,8 @@ use crate::{
     SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId, Setup, Target,
     Transaction, UnauthenticatedAction,
 };
+use derive::id;
 use derive_get::Getters;
-use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -50,15 +50,8 @@ impl SensorPrototypeView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct SensorPrototypeId(pub i64);
-
-impl SensorPrototypeId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct SensorPrototypeId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Debug, Clone)]
 pub struct SensorPrototype {

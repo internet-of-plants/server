@@ -1,5 +1,5 @@
 use crate::{Result, Transaction};
-use derive_more::FromStr;
+use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
@@ -19,15 +19,8 @@ impl DeviceConfigTypeView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct DeviceConfigTypeId(i64);
-
-impl DeviceConfigTypeId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct DeviceConfigTypeId;
 
 #[derive(sqlx::Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Copy)]
 pub enum DeviceWidgetKind {

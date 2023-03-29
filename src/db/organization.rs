@@ -2,18 +2,11 @@ use crate::{
     Collection, CollectionView, Compiler, DateTime, Error, Result, Transaction, User, Username,
 };
 use derive_get::Getters;
-use derive_more::FromStr;
+use derive::id;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct OrganizationId(pub i64);
-
-impl OrganizationId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct OrganizationId;
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

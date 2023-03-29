@@ -1,5 +1,6 @@
 use crate::{utils, AuthToken, DateTime, Error, Organization, Result, Transaction};
 use derive_more::FromStr;
+use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
@@ -13,15 +14,8 @@ pub struct Login {
 #[sqlx(transparent)]
 pub struct Username(String);
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct UserId(i64);
-
-impl UserId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct UserId;
 
 #[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

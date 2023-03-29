@@ -1,5 +1,5 @@
 use crate::{logger::*, DateTime, Device, Error, Result, Transaction};
-use derive_more::FromStr;
+use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
@@ -12,9 +12,8 @@ pub struct NewDevicePanic {
     pub msg: String,
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct DevicePanicId(i64);
+#[id]
+pub struct DevicePanicId;
 
 pub type DevicePanicView = DevicePanic;
 

@@ -34,7 +34,7 @@ pub async fn signup(app: Router, new_user: NewUser) -> AuthToken {
             .to_owned(),
     )
     .unwrap();
-    AuthToken(token)
+    AuthToken::from(token)
 }
 
 pub async fn login(
@@ -71,7 +71,7 @@ pub async fn login(
             .to_owned(),
     )
     .unwrap();
-    AuthToken(token)
+    AuthToken::from(token)
 }
 
 pub async fn list_organizations(app: Router, token: &AuthToken) -> Vec<OrganizationView> {
@@ -79,7 +79,7 @@ pub async fn list_organizations(app: Router, token: &AuthToken) -> Vec<Organizat
         .oneshot(
             Request::builder()
                 .uri("/v1/organizations")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -99,8 +99,8 @@ pub async fn find_organization(
     let response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/organization?organizationId={}", id.0))
-                .header("Authorization", format!("Basic {}", token.0))
+                .uri(format!("/v1/organization?organizationId={}", id))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -120,8 +120,8 @@ pub async fn find_collection(
     let response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/collection?collectionId={}", collection_id.0))
-                .header("Authorization", format!("Basic {}", token.0))
+                .uri(format!("/v1/collection?collectionId={}", collection_id))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -145,7 +145,7 @@ pub async fn send_device_log(
         .oneshot(
             Request::builder()
                 .uri("/v1/log")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header("MAC_ADDRESS", mac_address)
                 .header("VERSION", version)
                 .method(Method::POST)
@@ -162,7 +162,7 @@ pub async fn set_device_name(app: Router, token: &AuthToken, device_id: DeviceId
         .oneshot(
             Request::builder()
                 .uri("/v1/device/name")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
                 .body(Body::from(
@@ -179,8 +179,8 @@ pub async fn find_device(app: Router, token: &AuthToken, device_id: DeviceId) ->
     let response = app
         .oneshot(
             Request::builder()
-                .uri(format!("/v1/device?deviceId={}", device_id.0,))
-                .header("Authorization", format!("Basic {}", token.0))
+                .uri(format!("/v1/device?deviceId={}", device_id))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -202,9 +202,9 @@ pub async fn list_device_logs(
             Request::builder()
                 .uri(format!(
                     "/v1/device/logs?deviceId={}&limit={}",
-                    device_id.0, 10
+                    device_id, 10
                 ))
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -227,7 +227,7 @@ pub async fn send_device_panic(
         .oneshot(
             Request::builder()
                 .uri("/v1/panic")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .header("MAC_ADDRESS", mac_address)
                 .header("VERSION", version)
@@ -250,9 +250,9 @@ pub async fn list_device_panics(
             Request::builder()
                 .uri(format!(
                     "/v1/device/panics?deviceId={}&limit={}",
-                    device_id.0, 10
+                    device_id, 10
                 ))
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -275,9 +275,9 @@ pub async fn send_event(
         .oneshot(
             Request::builder()
                 .uri("/v1/event")
-                .header("Authorization", format!("Basic {}", token.0))
-                .header("MAC_ADDRESS", &mac_address.0)
-                .header("VERSION", &version.0)
+                .header("Authorization", format!("Basic {}", token))
+                .header("MAC_ADDRESS", mac_address)
+                .header("VERSION", version)
                 .header("TIME_RUNNING", "1")
                 .header("VCC", "1")
                 .header("FREE_STACK", "10000")
@@ -324,9 +324,9 @@ Content-Type: application/octet-stream\r
             Request::builder()
                 .uri(format!(
                     "/v1/organization/{}/collection/{}/device/{}/update",
-                    organization_id.0, collection_id.0, device_id.0
+                    organization_id, collection_id, device_id
                 ))
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header(
                     http::header::CONTENT_LENGTH,
                     body.len().to_string()
@@ -349,8 +349,8 @@ pub async fn find_update(app: Router, token: &AuthToken, file_hash: &Version) ->
         .oneshot(
             Request::builder()
                 .uri("/v1/update")
-                .header("Authorization", format!("Basic {}", token.0))
-                .header("x-ESP8266-sketch-md5", &file_hash.0)
+                .header("Authorization", format!("Basic {}", token))
+                .header("x-ESP8266-sketch-md5", &file_hash)
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -368,7 +368,7 @@ pub async fn list_targets(app: Router, token: &AuthToken) -> Vec<TargetView> {
         .oneshot(
             Request::builder()
                 .uri("/v1/targets")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -390,9 +390,9 @@ pub async fn list_sensor_prototypes(
             Request::builder()
                 .uri(format!(
                     "/v1/target/sensor/prototypes?targetId={}",
-                    target_id.0
+                    target_id
                 ))
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::GET)
                 .body(Body::empty())
                 .unwrap(),
@@ -413,7 +413,7 @@ pub async fn create_compiler(
         .oneshot(
             Request::builder()
                 .uri("/v1/compiler")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .method(Method::POST)
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .body(Body::from(serde_json::to_vec(&compiler).unwrap()))
@@ -431,7 +431,7 @@ pub async fn set_sensor_alias(app: Router, token: &AuthToken, request: SetAliasR
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/alias")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
                 .body(Body::from(serde_json::to_vec(&request).unwrap()))
@@ -447,7 +447,7 @@ pub async fn set_sensor_color(app: Router, token: &AuthToken, request: SetColorR
         .oneshot(
             Request::builder()
                 .uri("/v1/sensor/color")
-                .header("Authorization", format!("Basic {}", token.0))
+                .header("Authorization", format!("Basic {}", token))
                 .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .method(Method::POST)
                 .body(Body::from(serde_json::to_vec(&request).unwrap()))

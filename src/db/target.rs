@@ -3,7 +3,7 @@ use crate::{
     TargetPrototype, TargetPrototypeId, Transaction,
 };
 use derive_get::Getters;
-use derive_more::FromStr;
+use derive::id;
 use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -46,15 +46,8 @@ impl TargetView {
     }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct TargetId(pub i64);
-
-impl TargetId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
+#[id]
+pub struct TargetId;
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Target {

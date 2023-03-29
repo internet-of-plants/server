@@ -1,11 +1,13 @@
 use crate::{Compilation, CompilationId, Device, Organization, Result, Transaction};
-use derive_more::FromStr;
+use derive_get::Getters;
+use derive::id;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FirmwareView {
+    #[copy]
     id: FirmwareId,
     hash: String,
 }
@@ -14,28 +16,19 @@ impl FirmwareView {
     pub fn new(firmware: Firmware) -> Self {
         Self {
             id: firmware.id(),
-            hash: firmware.hash().to_owned(),
+            hash: firmware.binary_hash().to_owned(),
         }
     }
-
-    pub fn id(&self) -> FirmwareId {
-        self.id
-    }
 }
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct FirmwareId(i64);
+#[id]
+pub struct FirmwareId;
 
-impl FirmwareId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
-
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Getters, Debug)]
 pub struct Firmware {
+    #[copy]
     id: FirmwareId,
+    #[copy]
     compilation_id: Option<CompilationId>,
     binary_hash: String,
 }
@@ -158,14 +151,6 @@ impl Firmware {
         .fetch_one(txn)
         .await?;
         Ok(firmware)
-    }
-
-    pub fn id(&self) -> FirmwareId {
-        self.id
-    }
-
-    pub fn hash(&self) -> &str {
-        &self.binary_hash
     }
 
     pub async fn bin(&self, txn: &mut Transaction<'_>) -> Result<Option<Vec<u8>>> {

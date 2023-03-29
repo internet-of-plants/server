@@ -1,10 +1,9 @@
 use crate::{logger::*, DateTime, Device, Error, Result, Transaction};
-use derive_more::FromStr;
+use derive::id;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Copy, Debug, PartialEq, Eq, FromStr)]
-#[sqlx(transparent)]
-pub struct DeviceLogId(i64);
+#[id]
+pub struct DeviceLogId;
 
 pub type DeviceLogView = DeviceLog;
 

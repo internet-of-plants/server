@@ -1,10 +1,24 @@
 use crate::{utils, Device, User};
 use derive_get::Getters;
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
+use axum::response::IntoResponse;
 
-#[derive(Serialize, Deserialize, sqlx::Type, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Display, sqlx::Type, Clone, Debug, PartialEq, Eq)]
 #[sqlx(transparent)]
-pub struct AuthToken(pub String);
+pub struct AuthToken(String);
+
+impl IntoResponse for AuthToken {
+    fn into_response(self) -> axum::response::Response {
+        self.0.into_response()
+    }
+}
+
+impl From<String> for AuthToken {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 impl AuthToken {
     pub fn random() -> Self {
