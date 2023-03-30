@@ -25,7 +25,7 @@ pub use crate::db::{
     organization::{Organization, OrganizationId, OrganizationView},
     secret::SecretAlgo,
     sensor::{
-        Definition, Dependency, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
+        Definition, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
         SensorReference, SensorView, Setup, UnauthenticatedAction,
     },
     sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val},
@@ -41,7 +41,9 @@ pub use crate::db::{
     },
     sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
     target::{Target, TargetId, TargetView},
-    target_prototype::{Certificate, CertificateId, TargetPrototype, TargetPrototypeId},
+    target_prototype::{
+        Certificate, CertificateId, Dependency, TargetPrototype, TargetPrototypeId,
+    },
     user::{Login, NewUser, User, UserId, Username},
 };
 pub use error::{Error, Result};

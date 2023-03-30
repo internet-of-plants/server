@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod builtin;
 pub mod collection;
 pub mod compilation;
 pub mod compiler;

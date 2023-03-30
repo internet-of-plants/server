@@ -164,7 +164,7 @@ impl Compilation {
         let target_prototype = target.prototype(txn).await?;
 
         let dependencies = sqlx::query_as::<_, (String, Option<SensorId>, String)>(
-            "SELECT url, sensor_id, commit_hash
+            "SELECT repo_url, sensor_id, commit_hash
              FROM dependency_belongs_to_compilation
              WHERE compilation_id = $1",
         )
@@ -176,14 +176,16 @@ impl Compilation {
         for sensor in compiler.sensors(txn).await? {
             let sid = sensor.id();
 
-            for dependency_url in sensor.prototype().dependencies() {
-                let url = dependency_url.clone();
+            for dependency in sensor.prototype().dependencies() {
+                let url = dependency.repo_url().clone();
+                let branch = dependency.branch().clone();
                 let commit_hash = tokio::task::spawn_blocking(move || {
                     let dir = tempfile::tempdir()?;
-                    let repo = git2::Repository::clone(&url, dir.path())?;
+                    let repo = git2::build::RepoBuilder::new()
+                        .branch(&branch)
+                        .clone(&url, dir.path())?;
 
-                    // TODO: add branch to the sensor prototype metadata
-                    let object = repo.revparse_single("main")?;
+                    let object = repo.revparse_single(&branch)?;
                     let commit = object.peel_to_commit()?;
                     let commit_hash = commit.id().to_string();
                     Ok::<_, Error>(commit_hash)
@@ -193,7 +195,7 @@ impl Compilation {
                 if !dependencies
                     .iter()
                     .any(|(url, sensor_id, expected_commit_hash)| {
-                        &url == &dependency_url
+                        url == dependency.repo_url()
                             && *sensor_id == Some(sid)
                             && &commit_hash == expected_commit_hash
                     })
@@ -204,13 +206,15 @@ impl Compilation {
         }
 
         for dependency in target_prototype.dependencies(txn).await? {
-            let url = dependency.url().clone();
+            let url = dependency.repo_url().clone();
+            let branch = dependency.repo_url().clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
                 let dir = tempfile::tempdir()?;
-                let repo = git2::Repository::clone(dependency.url(), dir.path())?;
+                let repo = git2::build::RepoBuilder::new()
+                    .branch(&branch)
+                    .clone(&url, dir.path())?;
 
-                // TODO: add branch to the sensor prototype metadata
-                let object = repo.revparse_single(dependency.branch())?;
+                let object = repo.revparse_single(&branch)?;
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
@@ -220,7 +224,9 @@ impl Compilation {
             if !dependencies
                 .iter()
                 .any(move |(dep_url, sensor_id, expected_commit_hash)| {
-                    dep_url == &url && sensor_id.is_none() && &commit_hash == expected_commit_hash
+                    &dep_url == &dependency.repo_url()
+                        && sensor_id.is_none()
+                        && &commit_hash == expected_commit_hash
                 })
             {
                 return Ok(true);
@@ -238,6 +244,7 @@ impl Compilation {
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Firmware> {
+        info!("Compiling: {:?}", self.id);
         // FIXME TODO: fix this, it's super dangerous, we need to run in a VM
         let compiler = self.compiler(txn).await?;
         let target = compiler.target(txn).await?;
@@ -251,24 +258,27 @@ impl Compilation {
         let env_name = env_name.join("-");
 
         for sensor in compiler.sensors(txn).await? {
-            for dependency_url in sensor.prototype().dependencies() {
-                let url = dependency_url.clone();
+            for dependency in sensor.prototype().dependencies() {
+                let url = dependency.repo_url().clone();
+                let branch = dependency.branch().clone();
                 // Is there any RCE danger in cloning a git repo?
                 let commit_hash = tokio::task::spawn_blocking(move || {
                     let dir = tempfile::tempdir()?;
-                    let repo = git2::Repository::clone(&url, dir.path())?;
+                    let repo = git2::build::RepoBuilder::new()
+                        .branch(&branch)
+                        .clone(&url, dir.path())?;
 
-                    // TODO: add branch to the sensor prototype metadata
-                    let object = repo.revparse_single("main")?;
+                    let object = repo.revparse_single(&branch)?;
                     let commit = object.peel_to_commit()?;
                     let commit_hash = commit.id().to_string();
                     Ok::<_, Error>(commit_hash)
                 })
                 .await??;
 
-                sqlx::query("INSERT INTO dependency_belongs_to_compilation (url, sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3, $4)
-                             ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2")
-                    .bind(&dependency_url)
+                sqlx::query("INSERT INTO dependency_belongs_to_compilation (repo_url, branch, sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3, $4, $5)
+                             ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $2")
+                    .bind(dependency.repo_url())
+                    .bind(dependency.branch())
                     .bind(&sensor.id())
                     .bind(&commit_hash)
                     .bind(&self.id())
@@ -278,13 +288,15 @@ impl Compilation {
         }
 
         for dependency in prototype.dependencies(txn).await? {
-            let dep = dependency.clone();
+            let url = dependency.repo_url().clone();
+            let branch = dependency.branch().clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
                 let dir = tempfile::tempdir()?;
-                let repo = git2::Repository::clone(dep.url(), dir.path())?;
+                let repo = git2::build::RepoBuilder::new()
+                    .branch(&branch)
+                    .clone(&url, dir.path())?;
 
-                // TODO: add branch to the sensor prototype metadata
-                let object = repo.revparse_single(dep.branch())?;
+                let object = repo.revparse_single(&branch)?;
                 let commit = object.peel_to_commit()?;
                 let commit_hash = commit.id().to_string();
                 Ok::<_, Error>(commit_hash)
@@ -292,11 +304,12 @@ impl Compilation {
             .await??;
 
             sqlx::query(
-                "INSERT INTO dependency_belongs_to_compilation (url, commit_hash, compilation_id)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (url, compilation_id) DO UPDATE SET commit_hash = $2",
+                "INSERT INTO dependency_belongs_to_compilation (repo_url, branch, commit_hash, compilation_id)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $2",
             )
-            .bind(dependency.url())
+            .bind(dependency.repo_url())
+            .bind(dependency.branch())
             .bind(&commit_hash)
             .bind(&self.id())
             .execute(&mut *txn)

@@ -1,8 +1,8 @@
 use crate::{
     Collection, CollectionView, Compiler, DateTime, Error, Result, Transaction, User, Username,
 };
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[id]

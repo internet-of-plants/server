@@ -79,8 +79,7 @@ pub async fn new(
     let mut sensor_by_local_pk: HashMap<usize, Sensor> = HashMap::new();
     for (_, mut sensor) in sorted_sensors.clone() {
         let alias = sensor.alias().to_owned();
-        let prototype =
-            SensorPrototype::find_by_id(&mut txn, sensor.prototype_id()).await?;
+        let prototype = SensorPrototype::find_by_id(&mut txn, sensor.prototype_id()).await?;
 
         for config in sensor.configs_mut() {
             let request = SensorConfigRequest::find_by_id(&mut txn, config.request_id()).await?;
@@ -94,25 +93,30 @@ pub async fn new(
                     match config.value {
                         Val::String(_) | Val::Map(_) => unimplemented!(),
                         Val::Number(local_pk) => {
-                            let index = sorted_sensors.iter().find(|(_, s)| s.local_pk() == local_pk).unwrap().0;
-                            let child_sensor = sensor_by_local_pk.get(&local_pk).ok_or_else(|| {
-                                Error::NewSensorReferencedDoesntExist(
-                                    local_pk,
-                                    sensor_by_local_pk.iter().map(|(k, _)| *k).collect(),
-                                )
-                            })?;
+                            let index = sorted_sensors
+                                .iter()
+                                .find(|(_, s)| s.local_pk() == local_pk)
+                                .unwrap()
+                                .0;
+                            let child_sensor =
+                                sensor_by_local_pk.get(&local_pk).ok_or_else(|| {
+                                    Error::NewSensorReferencedDoesntExist(
+                                        local_pk,
+                                        sensor_by_local_pk.iter().map(|(k, _)| *k).collect(),
+                                    )
+                                })?;
 
                             if child_sensor.prototype_id() == dependency_prototype_id {
                                 for def in &prototype.definitions(&mut txn).await? {
                                     for sensor_referenced in def.sensors_referenced() {
-                                        if sensor_referenced.sensor_name() != dependency_prototype.name() {
+                                        if sensor_referenced.sensor_name()
+                                            != dependency_prototype.name()
+                                        {
                                             continue;
                                         }
 
-                                        config.value = Val::String(format!(
-                                            "{}{index}",
-                                            variable_name
-                                        ));
+                                        config.value =
+                                            Val::String(format!("{}{index}", variable_name));
                                     }
                                 }
                             }

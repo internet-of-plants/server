@@ -43,9 +43,10 @@ CREATE TABLE IF NOT EXISTS target_prototypes (
 
 CREATE TABLE IF NOT EXISTS dependency_belongs_to_target_prototype (
   target_prototype_id BIGINT                    NOT NULL,
-  url                 TEXT                      NOT NULL,
+  repo_url            TEXT                      NOT NULL,
+  branch              TEXT                      NOT NULL,
   created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
-  UNIQUE (target_prototype_id, url),
+  UNIQUE (target_prototype_id, repo_url),
   FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id)
 );
 
@@ -361,9 +362,10 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_definition_sensors_referenced (
 
 CREATE TABLE IF NOT EXISTS sensor_prototype_dependencies (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
-  dependency          TEXT                  NOT NULL,
+  repo_url            TEXT                  NOT NULL,
+  branch              TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
-  UNIQUE(dependency, sensor_prototype_id),
+  UNIQUE(repo_url, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -415,12 +417,13 @@ CREATE TABLE IF NOT EXISTS sensor_belongs_to_compiler (
 );
 
 CREATE TABLE IF NOT EXISTS dependency_belongs_to_compilation (
-  url             TEXT                      NOT NULL,
+  repo_url        TEXT                      NOT NULL,
+  branch          TEXT                      NOT NULL,
   sensor_id       BIGINT,
   commit_hash     TEXT                      NOT NULL,
   compilation_id  BIGINT                    NOT NULL,
   created_at      TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
-  UNIQUE (url, compilation_id),
+  UNIQUE (repo_url, compilation_id),
   FOREIGN KEY (sensor_id)      REFERENCES sensors     (id),
   FOREIGN KEY (compilation_id) REFERENCES compilations (id)
 );

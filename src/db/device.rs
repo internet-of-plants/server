@@ -2,8 +2,8 @@ use crate::{
     utils, AuthToken, Collection, CollectionId, CompilerView, DateTime, Error, Event, EventView,
     Firmware, FirmwareId, FirmwareView, Login, Organization, Result, Transaction, User, UserId,
 };
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[id]

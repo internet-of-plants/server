@@ -22,9 +22,16 @@ where
         let mut token = TypedHeader::<AuthorizationHeader>::from_request(req)
             .await
             .map_err(|_| (StatusCode::UNAUTHORIZED, "No auth token"))?;
-        let mac = TypedHeader::<MacAddress>::from_request(req)
-            .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "No mac address"))?;
+        let mac = match TypedHeader::<MacAddress>::from_request(req).await {
+            Ok(mac) => mac.0 .0,
+            Err(_) => {
+                TypedHeader::<Esp8266StaMac>::from_request(req)
+                    .await
+                    .map_err(|_| (StatusCode::UNAUTHORIZED, "No mac address"))?
+                    .0
+                     .0
+            }
+        };
         if token.0 .0.starts_with("Basic ") {
             token.0 .0.drain(.."Basic ".len());
             let mut txn = pool
@@ -32,7 +39,7 @@ where
                 .await
                 .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
             let device =
-                crate::Device::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0), mac.0 .0)
+                crate::Device::find_by_auth_token(&mut txn, AuthToken::new(token.0 .0), mac)
                     .await
                     .map_err(|_| (StatusCode::UNAUTHORIZED, "Device not found"))?;
             txn.commit()
@@ -110,6 +117,40 @@ impl headers_core::Header for AuthorizationHeader {
 }
 
 #[derive(Debug)]
+pub struct Esp8266StaMac(pub String);
+
+impl From<&Esp8266StaMac> for headers_core::HeaderValue {
+    fn from(mac: &Esp8266StaMac) -> Self {
+        Self::from_str(&mac.0).expect("unable to convert esp8266 sta mac address to header value")
+    }
+}
+
+const ESP8266_STA_MAC_NAME: &str = "x-ESP8266-STA-MAC";
+impl headers_core::Header for Esp8266StaMac {
+    fn name() -> &'static headers_core::HeaderName {
+        thread_local! {
+            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(ESP8266_STA_MAC_NAME).into());
+        }
+        NAME.with(|n| *n)
+    }
+
+    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
+        values: &mut I,
+    ) -> Result<Self, headers_core::Error> {
+        values
+            .next()
+            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
+            .ok_or_else(headers_core::Error::invalid)
+    }
+
+    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
+        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
+            values.extend(std::iter::once(name));
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct MacAddress(pub String);
 
 impl From<&MacAddress> for headers_core::HeaderValue {
@@ -151,7 +192,6 @@ impl From<&Version> for headers_core::HeaderValue {
         Self::from_str(&version.0).expect("unable to convert version to header value")
     }
 }
-
 
 const VERSION_NAME: &str = "version";
 impl headers_core::Header for Version {

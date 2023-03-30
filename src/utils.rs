@@ -151,7 +151,7 @@ pub async fn run_migrations(pool: &'static Pool) {
 
     if has_files {
         let mut txn = pool.begin().await.expect("unable to start transaction");
-        crate::db::sensor_prototype::builtin::create_builtin(&mut txn)
+        crate::db::builtin::create_builtin(&mut txn)
             .await
             .expect("failed to create builtins");
         txn.commit().await.expect("unable to commit transaction");

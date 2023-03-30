@@ -1,5 +1,3 @@
-pub mod builtin;
-
 use crate::{
     Definition, Dependency, Include, NewSensorConfigRequest, Result, SensorConfigRequest,
     SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId, Setup, Target,
@@ -91,9 +89,10 @@ impl SensorPrototype {
 
         for dep in &dependencies {
             sqlx::query(
-                "INSERT INTO sensor_prototype_dependencies (dependency, sensor_prototype_id) VALUES ($1, $2)",
+                "INSERT INTO sensor_prototype_dependencies (repo_url, branch, sensor_prototype_id) VALUES ($1, $2, $3)",
             )
-            .bind(dep)
+            .bind(dep.repo_url())
+            .bind(dep.branch())
             .bind(&sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
@@ -180,22 +179,23 @@ impl SensorPrototype {
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: SensorPrototypeId) -> Result<Self> {
-        let prototype = sqlx::query_as("SELECT id, name, variable_name FROM sensor_prototypes WHERE id = $1")
-            .bind(id)
-            .fetch_one(txn)
-            .await?;
+        let prototype =
+            sqlx::query_as("SELECT id, name, variable_name FROM sensor_prototypes WHERE id = $1")
+                .bind(id)
+                .fetch_one(txn)
+                .await?;
         Ok(prototype)
     }
 
     /// A sensor should depend on N libraries (lib_dependencies param in platformio.ini)
     pub async fn dependencies(&self, txn: &mut Transaction<'_>) -> Result<Vec<Dependency>> {
         let list = sqlx::query_as(
-            "SELECT dependency FROM sensor_prototype_dependencies WHERE sensor_prototype_id = $1",
+            "SELECT repo_url, branch FROM sensor_prototype_dependencies WHERE sensor_prototype_id = $1",
         )
         .bind(&self.id)
         .fetch_all(&mut *txn)
         .await?;
-        Ok(list.into_iter().map(|(text,)| text).collect())
+        Ok(list)
     }
 
     /// A sensor should import N libraries (#include expressions)

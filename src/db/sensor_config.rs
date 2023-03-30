@@ -1,6 +1,6 @@
 use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction};
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

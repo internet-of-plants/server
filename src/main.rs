@@ -161,7 +161,7 @@ async fn recompile_tick(pool: &'static Pool) -> Result<()> {
 
     for compilation in all_compilations {
         wrap_panic(
-            format!("update compilation ({:?})", compilation.id()),
+            format!("recompile ({:?})", compilation.id()),
             recompile_each(pool, compilation, &latest_certificates),
         )
         .await;

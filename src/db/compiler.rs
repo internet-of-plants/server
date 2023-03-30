@@ -4,12 +4,12 @@ use crate::{
     Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
 };
 use derive::id;
+use derive_get::Getters;
 use handlebars::Handlebars;
 use random_color::RandomColor;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use derive_get::Getters;
 
 #[derive(Getters, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -386,8 +386,7 @@ impl Compiler {
                 }
             }
         }
-        lib_deps.dedup();
-        lib_deps.sort_unstable();
+        lib_deps.dedup_by_key(|d| d.repo_url().clone());
 
         includes.dedup();
         includes.sort_unstable();
@@ -447,7 +446,7 @@ constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;
 }}
 {definitions}
 
-auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Json> {{
+auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
   IOP_TRACE();
 
   loop.logger().infoln(IOP_STR(\"Collect Measurements\"));

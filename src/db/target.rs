@@ -2,8 +2,8 @@ use crate::{
     Dependency, DeviceConfigRequest, DeviceConfigRequestView, NewDeviceConfigRequest, Result,
     TargetPrototype, TargetPrototypeId, Transaction,
 };
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -207,8 +207,12 @@ impl Target {
         let extra_platformio_params = prototype.extra_platformio_params();
         let platform_packages = prototype.platform_packages();
         let mut lib_deps = lib_deps.to_owned();
-        lib_deps.sort_unstable();
-        let lib_deps = lib_deps.join("\n    ");
+        lib_deps.sort_unstable_by_key(|d| d.repo_url().clone());
+        let lib_deps = lib_deps
+            .into_iter()
+            .map(|d| format!("{}#{}", d.repo_url(), d.branch()))
+            .collect::<Vec<String>>()
+            .join("\n    ");
         let mut env_name = vec![arch.as_str()];
         let board = if let Some(board) = board {
             env_name.push(board.as_str());

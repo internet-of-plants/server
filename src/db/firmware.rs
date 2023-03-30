@@ -1,6 +1,6 @@
 use crate::{Compilation, CompilationId, Device, Organization, Result, Transaction};
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 

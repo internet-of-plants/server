@@ -1,8 +1,8 @@
 use crate::{utils, Device, User};
+use axum::response::IntoResponse;
 use derive_get::Getters;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
-use axum::response::IntoResponse;
 
 #[derive(Serialize, Deserialize, Display, sqlx::Type, Clone, Debug, PartialEq, Eq)]
 #[sqlx(transparent)]

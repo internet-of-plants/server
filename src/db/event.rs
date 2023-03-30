@@ -1,6 +1,6 @@
 use crate::{logger::*, DateTime, Device, Firmware, Result, SensorMeasurementView, Transaction};
-use derive_get::Getters;
 use derive::id;
+use derive_get::Getters;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

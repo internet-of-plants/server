@@ -1,7 +1,7 @@
 use crate::{
-    Definition, DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest, Result,
-    SecretAlgo, SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorPrototype,
-    SensorReference, SensorWidgetKind, Target, TargetPrototype, Transaction,
+    Definition, Dependency, DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest,
+    Result, SecretAlgo, SensorMeasurement, SensorMeasurementKind, SensorMeasurementType,
+    SensorPrototype, SensorReference, SensorWidgetKind, Target, TargetPrototype, Transaction,
 };
 
 pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
@@ -31,7 +31,7 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         txn,
         "DHT".to_owned(),
         "airTempAndHumidity",
-        vec!["https://github.com/internet-of-plants/dht".to_owned()],
+        vec![Dependency::new("https://github.com/internet-of-plants/dht", "main")],
         vec!["dht.hpp".to_owned()],
         vec![
             "static dht::Dht airTempAndHumidity{{index}}(IOP_PIN_RAW(config::airTempAndHumidity{{index}}), config::dhtVersion{{index}});".to_owned(),
@@ -75,7 +75,7 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
         txn,
         "Dallas Temperature".to_owned(),
         "soilTemperature",
-        vec!["https://github.com/internet-of-plants/dallas-temperature".to_owned()],
+        vec![Dependency::new("https://github.com/internet-of-plants/dallas-temperature", "main")],
         vec!["dallas_temperature.hpp".to_owned()],
         vec![
             "static dallas::TemperatureCollection soilTemperature{{index}}(IOP_PIN_RAW(config::soilTemperature{{index}}));".to_owned(),
@@ -106,7 +106,10 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
         txn,
         "Factory Reset Button".to_owned(),
         None,
-        vec!["https://github.com/internet-of-plants/factory-reset-button".to_owned()],
+        vec![Dependency::new(
+            "https://github.com/internet-of-plants/factory-reset-button",
+            "main",
+        )],
         vec!["factory_reset_button.hpp".to_owned()],
         Vec::<String>::new(),
         vec!["reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));".to_owned()],
@@ -127,7 +130,7 @@ async fn cooler(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         txn,
         "Cooler",
         Some("cooler"),
-        vec!["https://github.com/internet-of-plants/cooler".to_owned()],
+        vec![Dependency::new("https://github.com/internet-of-plants/cooler", "main")],
         vec!["cooler.hpp".to_owned()],
         vec![Definition::new("static relay::Cooler cooler{{index}}(IOP_PIN_RAW(config::cooler{{index}}), std::ref({{dhtSensor}}), config::coolerMax{{index}});".to_owned(), vec![SensorReference::new("DHT".to_owned(), "dhtSensor".to_owned())])],
         vec!["cooler{{index}}.begin();\n".to_owned()],
@@ -162,7 +165,10 @@ async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         txn,
         "Light Relay".to_owned(),
         "light",
-        vec!["https://github.com/internet-of-plants/light".to_owned()],
+        vec![Dependency::new(
+            "https://github.com/internet-of-plants/light",
+            "main",
+        )],
         vec!["light.hpp".to_owned()],
         vec!["static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));".to_owned()],
         vec![concat!(
@@ -203,7 +209,10 @@ async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
         txn,
         "Water Pump".to_owned(),
         "waterPump",
-        vec!["https://github.com/internet-of-plants/water-pump".to_owned()],
+        vec![Dependency::new(
+            "https://github.com/internet-of-plants/water-pump",
+            "main",
+        )],
         vec!["water_pump.hpp".to_owned()],
         vec![
             "static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));"
@@ -244,7 +253,7 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
         txn,
         "Soil Resistivity".to_owned(),
         "soilResistivity",
-        vec!["https://github.com/internet-of-plants/soil-resistivity".to_owned()],
+        vec![Dependency::new("https://github.com/internet-of-plants/soil-resistivity", "main")],
         vec!["soil_resistivity.hpp".to_owned()],
         vec![
             "static sensor::SoilResistivity soilResistivity{{index}}(IOP_PIN_RAW(config::soilResistivityPower{{index}}));".to_owned(),
@@ -277,12 +286,12 @@ async fn esp8266_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetPro
         "https://ccadb-public.secure.force.com/mozilla/IncludedCACertificateReportPEMCSV".to_owned(),
         "esp8266".to_owned(),
         "-D IOP_ESP8266\n    -D IOP_SSL".to_owned(),
-        "https://github.com/platformio/platform-espressif8266".to_owned(),
+        "espressif8266".to_owned(),
         Some("arduino".to_owned()),
-        Some("framework-arduinoespressif8266 @ https://github.com/internet-of-plants/Arduino".to_owned()),
+        Some("framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino".to_owned()),
         Some("monitor_filters = esp8266_exception_decoder\nboard_build.f_cpu = 160000000L\nmonitor_speed = 115200".to_owned()),
         Some("deep".to_owned()),
-        vec!["https://github.com/internet-of-plants/Arduino".to_owned(), "https://github.com/platformio/platform-espressif8266".to_owned()]
+        vec![Dependency::new("https://github.com/esp8266/Arduino", "master"), Dependency::new("https://github.com/platformio/platform-espressif8266", "master")]
     ).await
 }
 
@@ -350,7 +359,7 @@ async fn esp32_target_prototype(txn: &mut Transaction<'_>) -> Result<TargetProto
     platformio/tool-esptoolpy @ https://github.com/tasmota/esptool/releases/download/v3.2/esptool-v3.2.zip".to_owned()),
     Some("board_build.mcu = esp32\nboard_build.f_cpu = 240000000L\nmonitor_speed = 115200".to_owned()),
         Some("deep".to_owned()),
-        vec!["https://github.com/internet-of-plants/arduino-esp32".to_owned(), "https://github.com/internet-of-plants/platform-espressif32".to_owned()]
+        vec![Dependency::new("https://github.com/internet-of-plants/arduino-esp32", "master"), Dependency::new("https://github.com/internet-of-plants/platform-espressif32", "master")]
     ).await?;
     prototype
         .set_build_unflags(txn, Some("-std=gnu++11".to_owned()))

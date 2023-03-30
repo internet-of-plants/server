@@ -1,11 +1,11 @@
 use crate::{
-    db::sensor_config::Val, Compiler, Error, NewSensorConfig, Result, SensorConfig,
+    db::sensor_config::Val, Compiler, Dependency, Error, NewSensorConfig, Result, SensorConfig,
     SensorConfigRequest, SensorConfigView, SensorMeasurementView, SensorPrototype,
     SensorPrototypeId, SensorPrototypeView, Transaction,
 };
 use derive::id;
-use handlebars::Handlebars;
 use derive_get::Getters;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashSet, VecDeque};
@@ -36,7 +36,7 @@ pub struct SensorView {
     name: String,
     alias: String,
     color: String,
-    dependencies: Vec<String>,
+    dependencies: Vec<Dependency>,
     includes: Vec<String>,
     definitions: Vec<Definition>,
     setups: Vec<String>,
@@ -105,7 +105,6 @@ impl SensorView {
     }
 }
 
-pub type Dependency = String;
 pub type Include = String;
 
 #[derive(sqlx::FromRow, Getters, Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
@@ -243,7 +242,8 @@ impl Sensor {
                 prototype_id: new_sensor.prototype_id,
             };
             for config in new_sensor.configs {
-                let request = SensorConfigRequest::find_by_id(&mut *txn, config.request_id()).await?;
+                let request =
+                    SensorConfigRequest::find_by_id(&mut *txn, config.request_id()).await?;
                 SensorConfig::new(&mut *txn, &sensor, &request, config.value().to_string()).await?;
             }
             sensor

@@ -1,6 +1,6 @@
 use crate::{extractor::User, Collection, CollectionId, Error, Pool, Result, Sensor, SensorId};
-use derive_get::Getters;
 use axum::{Extension, Json};
+use derive_get::Getters;
 use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
