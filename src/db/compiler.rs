@@ -459,11 +459,12 @@ auto prepareJson(iop::EventLoop & loop) noexcept -> std::unique_ptr<iop::Api::Js
 }}
 
 auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
-  loop.registerEvent(token, *prepareJson(loop));
+  loop.registerEvent(token, prepareJson(loop));
 }}
 
 auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{
   {unauthenticated_actions}
+  (void) loop;
 }}
 
 namespace iop {{
