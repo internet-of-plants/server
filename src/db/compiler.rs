@@ -304,7 +304,8 @@ impl Compiler {
         let mut setups = Vec::new();
         let mut unauthenticated_actions = Vec::new();
         let mut configs = Vec::with_capacity(sensors.len());
-        for (index, sensor) in sensors.iter().enumerate() {
+        for sensor in &sensors {
+            let index = sensor.index();
             let prototype = sensor.prototype();
             lib_deps.extend(prototype.dependencies().clone());
             includes.extend(

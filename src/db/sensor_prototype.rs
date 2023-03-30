@@ -20,6 +20,7 @@ pub struct SensorPrototypeView {
     unauthenticated_actions: Vec<UnauthenticatedAction>,
     measurements: Vec<SensorMeasurement>,
     configuration_requests: Vec<SensorConfigRequestView>,
+    variable_name: Option<String>,
 }
 
 impl SensorPrototypeView {
@@ -37,6 +38,7 @@ impl SensorPrototypeView {
         Ok(Self {
             id: prototype.id(),
             name: prototype.name().to_owned(),
+            variable_name: prototype.variable_name().to_owned(),
             dependencies: prototype.dependencies(txn).await?,
             includes: prototype.includes(txn).await?,
             definitions: prototype.definitions(txn).await?,

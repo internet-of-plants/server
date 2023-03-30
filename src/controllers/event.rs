@@ -126,7 +126,8 @@ async fn handle_measurements(
     if let Some(compiler) = collection.compiler(txn).await? {
         let sensors = compiler.sensors(txn).await?;
         let mut measurements = Vec::new();
-        for (index, sensor) in sensors.into_iter().enumerate() {
+        for sensor in sensors {
+            let index = sensor.index();
             let prototype = sensor.prototype();
             measurements.extend(
                 prototype

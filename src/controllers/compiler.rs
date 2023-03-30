@@ -77,7 +77,7 @@ pub async fn new(
 
     let mut sensors_and_alias = Vec::new();
     let mut sensor_by_local_pk: HashMap<usize, Sensor> = HashMap::new();
-    for (_, mut sensor) in sorted_sensors.clone() {
+    for (index, mut sensor) in sorted_sensors.clone() {
         let alias = sensor.alias().to_owned();
         let prototype = SensorPrototype::find_by_id(&mut txn, sensor.prototype_id()).await?;
 
@@ -127,7 +127,7 @@ pub async fn new(
         }
 
         let local_pk = sensor.local_pk();
-        let sensor = Sensor::new(&mut txn, sensor).await?;
+        let sensor = Sensor::new(&mut txn, sensor, index as i64).await?;
         sensor_by_local_pk.insert(local_pk, sensor.clone());
         sensors_and_alias.push((sensor, alias));
     }

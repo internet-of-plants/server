@@ -30,11 +30,15 @@ impl NewSensor {
 }
 
 #[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SensorView {
     #[copy]
     id: SensorId,
     name: String,
+    #[copy]
+    index: i64,
     alias: String,
+    variable_name: Option<String>,
     color: String,
     dependencies: Vec<Dependency>,
     includes: Vec<String>,
@@ -51,8 +55,8 @@ impl SensorView {
         txn: &mut Transaction<'_>,
         compiler: &Compiler,
     ) -> Result<Vec<Self>> {
-        let sensors_metadata: Vec<(SensorId, SensorPrototypeId, String, String)> = sqlx::query_as(
-            "SELECT DISTINCT ON (sensors.id) sensors.id, sensors.prototype_id, bt.alias, bt.color
+        let sensors_metadata: Vec<(SensorId, i64, SensorPrototypeId, String, String)> = sqlx::query_as(
+            "SELECT DISTINCT ON (sensors.id) sensors.id, sensors.index, sensors.prototype_id, bt.alias, bt.color
              FROM sensors
              INNER JOIN sensor_prototypes ON sensor_prototypes.id = sensors.prototype_id
              INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
@@ -66,8 +70,8 @@ impl SensorView {
         let target = compiler.target(txn).await?;
 
         let mut sensors = Vec::with_capacity(sensors_metadata.len());
-        for (index, (id, prototype_id, alias, color)) in sensors_metadata.into_iter().enumerate() {
-            let sensor = Sensor { id, prototype_id };
+        for (id, index, prototype_id, alias, color) in sensors_metadata {
+            let sensor = Sensor { id, prototype_id, index };
             let prototype = sensor.prototype(txn).await?;
             let sensor_configs = sensor.configs(txn).await?;
 
@@ -79,6 +83,8 @@ impl SensorView {
             sensors.push(Self {
                 id: sensor.id(),
                 name: prototype.name().to_owned(),
+                index,
+                variable_name: prototype.variable_name().clone(),
                 alias,
                 color: color.clone(),
                 dependencies: prototype.dependencies(txn).await?,
@@ -156,22 +162,18 @@ pub type UnauthenticatedAction = String;
 #[id]
 pub struct SensorId;
 
-impl SensorId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
-
 #[derive(sqlx::FromRow, Getters, Debug, Clone)]
 pub struct Sensor {
     #[copy]
     id: SensorId,
     #[copy]
     prototype_id: SensorPrototypeId,
+    #[copy]
+    index: i64,
 }
 
 impl Sensor {
-    pub async fn new(txn: &mut Transaction<'_>, mut new_sensor: NewSensor) -> Result<Self> {
+    pub async fn new(txn: &mut Transaction<'_>, mut new_sensor: NewSensor, index: i64) -> Result<Self> {
         let mut uniq = HashSet::new();
         for c in &mut new_sensor.configs {
             uniq.insert(c.request_id());
@@ -228,17 +230,20 @@ impl Sensor {
         let sensor = if let Some((id,)) = id {
             Self {
                 id,
+                index,
                 prototype_id: new_sensor.prototype_id,
             }
         } else {
             let (id,): (SensorId,) =
-                sqlx::query_as("INSERT INTO sensors (prototype_id) VALUES ($1) RETURNING id")
+                sqlx::query_as("INSERT INTO sensors (prototype_id, index) VALUES ($1, $2) RETURNING id")
                     .bind(&new_sensor.prototype_id)
+                    .bind(&index)
                     .fetch_one(&mut *txn)
                     .await?;
 
             let sensor = Self {
                 id,
+                index,
                 prototype_id: new_sensor.prototype_id,
             };
             for config in new_sensor.configs {
@@ -257,7 +262,7 @@ impl Sensor {
         sensor_id: SensorId,
     ) -> Result<Self> {
         let sensor = sqlx::query_as(
-            "SELECT id, prototype_id
+            "SELECT id, prototype_id, index
              FROM sensors
              INNER JOIN sensor_belongs_to_compiler bt ON bt.sensor_id = sensors.id
              WHERE id = $1 AND compiler_id = $2",

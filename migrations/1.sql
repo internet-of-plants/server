@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototypes (
 CREATE TABLE IF NOT EXISTS sensors (
   id           BIGSERIAL     PRIMARY KEY NOT NULL,
   prototype_id BIGINT                    NOT NULL,
+  index        BIGINT                    NOT NULL,
   FOREIGN KEY (prototype_id) REFERENCES  sensor_prototypes (id)
 );
 
