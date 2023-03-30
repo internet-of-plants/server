@@ -66,7 +66,7 @@ impl Firmware {
         let md5 = &*md5;
         let mut binary_hash = String::with_capacity(md5.len() * 2);
         for byte in md5 {
-            write!(binary_hash, "{:02X}", byte)?;
+            write!(binary_hash, "{:02x}", byte)?;
         }
 
         let id: Option<(FirmwareId,)> = sqlx::query_as(

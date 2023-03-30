@@ -16,7 +16,7 @@ pub async fn update(
     //let ap_mac = headers.get("x-ESP8266-AP-MAC");
     //let free_space = headers.get("x-ESP8266-free-space");
     //let sketch_size = headers.get("x-ESP8266-sketch-size");
-    let md5 = md5.to_uppercase();
+    let md5 = md5.to_lowercase();
     //let chip_size = headers.get("x-ESP8266-chip-size");
     //let sdk_version = headers.get("x-ESP8266-sdk-version");
 
@@ -34,7 +34,7 @@ pub async fn update(
         let md5 = &*md5;
         let mut file_hash = String::with_capacity(md5.len() * 2);
         for byte in md5 {
-            write!(file_hash, "{:02X}", byte)?;
+            write!(file_hash, "{:02x}", byte)?;
         }
         if file_hash != hash {
             error!(

@@ -53,7 +53,7 @@ pub type Pool = sqlx::PgPool;
 pub type Transaction<'a> = sqlx::Transaction<'a, sqlx::Postgres>;
 
 pub mod logger {
-    pub use log::{debug, error, info, trace, warn};
+    pub use tracing::{debug, error, info, trace, warn};
 }
 
 use logger::*;
@@ -64,14 +64,13 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use once_cell::sync::Lazy;
 use sqlx::Connection;
 use tokio::sync::Mutex;
 use tower_http::cors::{CorsLayer, Origin};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 pub async fn test_router() -> Router {
-    static LOCK: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+    static LOCK: Mutex<bool> = Mutex::const_new(false);
     let mut guard = LOCK.lock().await;
     if !std::mem::replace(&mut *guard, true) {
         let url = "postgres://postgres:postgres@127.0.0.1:5432";
@@ -137,6 +136,7 @@ pub async fn router(pool: &'static Pool) -> Router {
             HeaderName::from_static("free_stack"),
             HeaderName::from_static("biggest_block_dram"),
             HeaderName::from_static("biggest_block_iram"),
+            HeaderName::from_static("x-esp8266-sta-mac"),
             HeaderName::from_static("x-esp8266-sketch-md5"),
         ])
         .allow_methods(vec![

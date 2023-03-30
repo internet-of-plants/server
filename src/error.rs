@@ -2,7 +2,7 @@ use crate::CompilerId;
 use axum::response::{IntoResponse, Response};
 use axum::{http::StatusCode, Json};
 use backtrace::Backtrace;
-use log::{error, warn};
+use tracing::{error, warn};
 use serde_json::json;
 use std::collections::HashSet;
 

@@ -99,7 +99,7 @@ impl Device {
         {
             firmware
         } else {
-            Firmware::new_unknown(txn, new_device.file_hash.clone(), organization).await?
+            Firmware::new_unknown(txn, new_device.file_hash.to_lowercase(), organization).await?
         };
 
         let compiler = if let Some(compilation) = firmware.compilation(txn).await? {

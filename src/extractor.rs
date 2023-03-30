@@ -125,31 +125,6 @@ impl From<&Esp8266StaMac> for headers_core::HeaderValue {
     }
 }
 
-const ESP8266_STA_MAC_NAME: &str = "x-ESP8266-STA-MAC";
-impl headers_core::Header for Esp8266StaMac {
-    fn name() -> &'static headers_core::HeaderName {
-        thread_local! {
-            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(ESP8266_STA_MAC_NAME).into());
-        }
-        NAME.with(|n| *n)
-    }
-
-    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
-        values: &mut I,
-    ) -> Result<Self, headers_core::Error> {
-        values
-            .next()
-            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
-            .ok_or_else(headers_core::Error::invalid)
-    }
-
-    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
-        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
-            values.extend(std::iter::once(name));
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct MacAddress(pub String);
 
@@ -366,6 +341,31 @@ impl headers_core::Header for Esp8266Md5 {
     fn name() -> &'static headers_core::HeaderName {
         thread_local! {
             static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(ESP8266_MD5_NAME).into());
+        }
+        NAME.with(|n| *n)
+    }
+
+    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
+        values: &mut I,
+    ) -> Result<Self, headers_core::Error> {
+        values
+            .next()
+            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
+            .ok_or_else(headers_core::Error::invalid)
+    }
+
+    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
+        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
+            values.extend(std::iter::once(name));
+        }
+    }
+}
+
+const ESP8266_STA_MAC_NAME: &str = "x-esp8266-sta-mac";
+impl headers_core::Header for Esp8266StaMac {
+    fn name() -> &'static headers_core::HeaderName {
+        thread_local! {
+            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(ESP8266_STA_MAC_NAME).into());
         }
         NAME.with(|n| *n)
     }

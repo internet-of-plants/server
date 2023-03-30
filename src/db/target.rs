@@ -184,11 +184,7 @@ impl Target {
     ) -> Result<String> {
         let prototype = self.prototype(txn).await?;
         let arch = prototype.arch();
-        let build_type = "debug".to_owned();
-        //match prototype.kind {
-        //    CompilationType::Debug => "debug",
-        //    CompilationType::Release => "release",
-        //};
+        let build_type = "release".to_owned();
         let framework = prototype
             .framework()
             .as_ref()

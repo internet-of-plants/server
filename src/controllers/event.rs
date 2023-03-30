@@ -30,7 +30,7 @@ pub async fn new(
     biggest_iram_block: Option<TypedHeader<BiggestIramBlock>>,
 ) -> Result<impl IntoResponse> {
     let stat = DeviceStat {
-        version,
+        version: version.to_lowercase(),
         time_running: time_running.parse()?,
         vcc: vcc.parse()?,
         free_dram: free_dram.parse()?,
@@ -52,7 +52,7 @@ pub async fn new(
         if firmware.binary_hash() != stat.version() {
             return Ok(HeaderMap::from_iter([(
                 HeaderName::from_static("latest_version"),
-                HeaderValue::from_str(firmware.binary_hash())?,
+                HeaderValue::from_str(&firmware.binary_hash().to_lowercase())?,
             )]));
         }
     }

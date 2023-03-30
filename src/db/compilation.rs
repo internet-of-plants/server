@@ -207,7 +207,7 @@ impl Compilation {
 
         for dependency in target_prototype.dependencies(txn).await? {
             let url = dependency.repo_url().clone();
-            let branch = dependency.repo_url().clone();
+            let branch = dependency.branch().clone();
             let commit_hash = tokio::task::spawn_blocking(move || {
                 let dir = tempfile::tempdir()?;
                 let repo = git2::build::RepoBuilder::new()

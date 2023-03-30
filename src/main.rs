@@ -193,12 +193,12 @@ async fn wrap_panic<F: Future<Output = Result<()>>>(label: String, future: F) {
         Err(any) => {
             // Note: Technically panics can be of any form, but most should be &str or String
             match any.downcast::<String>() {
-                Ok(msg) => error!("Panic at {label}: {msg}"),
+                Ok(msg) => println!("Panic at {label}: {msg}"),
                 Err(any) => match any.downcast::<&str>() {
-                    Ok(msg) => error!("Panic at {label}: {msg}"),
+                    Ok(msg) => println!("Panic at {label}: {msg}"),
                     Err(any) => {
                         let type_id = any.type_id();
-                        error!("{label}: Unable to downcast panic message {type_id:?}",);
+                        println!("PANIC: {label}: Unable to downcast panic message {type_id:?}");
                     }
                 },
             }
