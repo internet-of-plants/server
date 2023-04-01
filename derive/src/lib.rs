@@ -61,7 +61,7 @@ fn produce(ast: &DeriveInput) -> TokenStream  {
 
                 impl #impl_generics From<i64> for #name #ty_generics #where_clause {
                     fn from(id: i64) -> #name #ty_generics {
-                        Self(0)
+                        Self(id)
                     }
                 }
 

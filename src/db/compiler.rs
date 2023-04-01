@@ -24,7 +24,7 @@ pub struct NewCompiler {
     sensors: Vec<NewSensor>,
 }
 
-#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CompilerView {
     #[copy]
@@ -74,15 +74,11 @@ impl CompilerView {
 #[id]
 pub struct CompilerId;
 
-impl CompilerId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
-
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Getters, Debug)]
 pub struct Compiler {
+    #[copy]
     id: CompilerId,
+    #[copy]
     target_id: TargetId,
 }
 
@@ -100,7 +96,7 @@ impl Compiler {
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());
 
-        let id: Option<(CompilerId,)> = sqlx::query_as(
+        let id: Option<(CompilerId,)> = dbg!(sqlx::query_as(
             "SELECT compilers.id
              FROM (SELECT COUNT(sensor_id) as count, compiler_id
                    FROM (SELECT sbt.sensor_id, sbt.compiler_id
@@ -126,12 +122,12 @@ impl Compiler {
                 .collect::<Vec<_>>(),
         )
         .bind(&device_configs.iter().map(|s| s.id()).collect::<Vec<_>>())
-        .bind(&(sensors_and_alias.len() as i64))
-        .bind(&(device_configs.len() as i64))
+        .bind(sensors_and_alias.len() as i64)
+        .bind(device_configs.len() as i64)
         .bind(target.id())
         .bind(organization.id())
         .fetch_optional(&mut *txn)
-        .await?;
+        .await)?;
 
         let mut should_compile = false;
         let id = if let Some((id,)) = id {
@@ -153,7 +149,7 @@ impl Compiler {
                     "INSERT INTO sensor_belongs_to_compiler (sensor_id, compiler_id, alias, color) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
                 )
                     .bind(sensor.id())
-                    .bind(&id)
+                    .bind(id)
                     .bind(&alias)
                     .bind(&color)
                     .execute(&mut *txn)
@@ -165,7 +161,7 @@ impl Compiler {
                     "INSERT INTO device_config_belongs_to_compiler (config_id, compiler_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                 )
                     .bind(device_config.id())
-                    .bind(&id)
+                    .bind(id)
                     .execute(&mut *txn)
                     .await?;
             }
@@ -188,7 +184,7 @@ impl Compiler {
             }
             *collection = col;
         } else if let Some(device) = device {
-            if Device::from_collection(txn, &collection).await?.len() == 1 {
+            if Device::from_collection(txn, collection).await?.len() == 1 {
                 collection.set_compiler(txn, Some(&compiler)).await?;
             } else {
                 let mut col = Collection::new(txn, device.name().to_owned(), &organization).await?;
@@ -261,10 +257,6 @@ impl Compiler {
         Ok(comp)
     }
 
-    pub fn id(&self) -> CompilerId {
-        self.id
-    }
-
     pub async fn target(&self, txn: &mut Transaction<'_>) -> Result<Target> {
         Target::find_by_id(txn, self.target_id).await
     }
@@ -274,6 +266,7 @@ impl Compiler {
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {
+        let target = self.target(txn).await?;
         let sensors = self.sensors(txn).await?;
 
         let device_configs_raw = self.device_configs(txn).await?;
@@ -283,6 +276,7 @@ impl Compiler {
             let request = config.request(txn).await?;
             let ty = request.ty(txn).await?;
             // TODO: validate SSID and PSK sizes and Timezone
+
             match ty.widget() {
                 DeviceWidgetKind::SSID => device_configs.push(
                     format!("constexpr static char SSID_ROM_RAW[] IOP_ROM = \"{0}\";\nstatic const iop::StaticString SSID = reinterpret_cast<const __FlashStringHelper*>(SSID_ROM_RAW);", config.value().replace('"', "\\\""))
@@ -311,7 +305,7 @@ impl Compiler {
             includes.extend(
                 prototype
                     .includes()
-                    .into_iter()
+                    .iter()
                     .map(|name| format!("#include <{name}>")),
             );
             let mut local_definitions = Vec::with_capacity(prototype.definitions().len());
@@ -324,11 +318,12 @@ impl Compiler {
                         if other_sensor.name() == sensor_referenced.sensor_name() {
                             for c in sensor.configurations() {
                                 let req =
-                                    SensorConfigRequest::find_by_id(txn, c.request_id()).await?;
+                                    SensorConfigRequest::find_by_id(txn, c.request().id()).await?;
                                 if req.name() == sensor_referenced.request_name() {
+                                    let widget = req.ty(txn).await?.widget(txn, &[&target]).await?;
                                     map.insert(
                                         sensor_referenced.request_name().clone(),
-                                        c.value().clone(),
+                                        c.value().compile(txn, widget).await?,
                                     );
                                     continue 'outer;
                                 }
@@ -343,7 +338,7 @@ impl Compiler {
             measurements.push(
                 prototype
                     .measurements()
-                    .into_iter()
+                    .iter()
                     .map(|m| {
                         let reg = Handlebars::new();
                         let name = reg.render_template(m.name(), &json!({ "index": index }))?;
@@ -356,7 +351,7 @@ impl Compiler {
             setups.extend(
                 prototype
                     .setups()
-                    .into_iter()
+                    .iter()
                     .map(|setup| {
                         let reg = Handlebars::new();
                         reg.render_template(setup, &json!({ "index": index }))
@@ -375,14 +370,16 @@ impl Compiler {
             );
 
             for c in sensor.configurations() {
-                let req = SensorConfigRequest::find_by_id(txn, c.request_id()).await?;
+                let req = SensorConfigRequest::find_by_id(txn, c.request().id()).await?;
                 let reg = Handlebars::new();
                 let ty = req.ty(txn).await?;
                 if let Some(type_name) = ty.name() {
                     let name = reg.render_template(req.name(), &json!({ "index": index }))?;
+                    let widget = req.ty(txn).await?.widget(txn, &[&target]).await?;
+                    let value = c.value().compile(txn, widget).await?;
                     configs.push((
                         req.name().clone(),
-                        format!("static const {} {} = {};", type_name, name, c.value()),
+                        format!("static const {} {} = {};", type_name, name, value),
                     ));
                 }
             }
@@ -418,7 +415,6 @@ impl Compiler {
 
         definitions.sort_unstable();
 
-        let target = self.target(txn).await?;
         let pin_hpp = target.pin_hpp().to_owned();
         let platformio_ini = target.compile_platformio_ini(txn, &lib_deps).await?;
 
@@ -453,6 +449,7 @@ auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
   loop.logger().infoln(IOP_STR(\"Collect Measurements\"));
   auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{
     {measurements}
+    (void) doc;
   }});
   iop_assert(json, IOP_STR(\"Unable to generate request payload, OOM or buffer overflow\"));
   return json;

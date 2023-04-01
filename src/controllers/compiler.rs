@@ -1,12 +1,11 @@
 use crate::{
     extractor::User, Collection, CollectionId, CompilationView, Compiler, CompilerId, CompilerView,
-    Device, DeviceConfig, DeviceId, Error, NewCompiler, NewSensor, Organization, OrganizationId,
-    Pool, Result, Sensor, SensorConfigRequest, SensorPrototype, SensorWidgetKindView, Target,
-    TargetId, Val,
+    Device, DeviceConfig, DeviceId, NewCompiler, NewSensor, Organization, OrganizationId, Pool,
+    Result, Sensor, Target, TargetId,
 };
 use axum::extract::{Extension, Json, Query};
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
 pub async fn new(
     Extension(pool): Extension<&'static Pool>,
@@ -23,120 +22,32 @@ pub async fn new(
         Collection::find_by_id(&mut txn, new_compiler.collection_id(), &user).await?;
     let organization = collection.organization(&mut txn).await?;
 
-    let sensor_by_local_pk: HashMap<usize, NewSensor> = new_compiler
-        .sensors()
-        .iter()
-        .map(|s| (s.local_pk(), s.clone()))
-        .collect();
-    let mut graph: HashMap<usize, HashSet<usize>> = HashMap::new();
-
     let target = Target::find_by_id(&mut txn, new_compiler.target_id()).await?;
 
-    for sensor in sensor_by_local_pk.values() {
-        let value = graph.entry(sensor.local_pk()).or_default();
-        for config in sensor.configs() {
-            let request = SensorConfigRequest::find_by_id(&mut txn, config.request_id()).await?;
-            let ty = request.ty(&mut txn).await?;
-            if let SensorWidgetKindView::Sensor(_) = ty.widget(&mut txn, &[&target]).await? {
-                match config.value {
-                    Val::String(_) | Val::Map(_) => unimplemented!(),
-                    Val::Number(number) => {
-                        value.insert(number);
-                    }
-                }
-            }
-        }
-    }
+    let sensors = NewSensor::sort(&mut txn, new_compiler.sensors(), &[&target]).await?;
 
-    let mut sorted_sensors = Vec::new();
-    let mut work_queue: VecDeque<usize> = graph
-        .iter()
-        .filter(|(_, c)| c.is_empty())
-        .map(|(p, _)| *p)
-        .collect();
-
-    while let Some(local_pk) = work_queue.pop_front() {
-        let sensor = sensor_by_local_pk.get(&local_pk).ok_or_else(|| {
-            Error::NewSensorReferencedDoesntExist(
-                local_pk,
-                sensor_by_local_pk.iter().map(|(k, _)| *k).collect(),
-            )
-        })?;
-        sorted_sensors.push(sensor.clone());
-
-        graph.remove(&sensor.local_pk());
-
-        for (parent, children) in graph.iter_mut() {
-            children.retain(|el| *el != sensor.local_pk());
-            if children.is_empty() {
-                work_queue.push_back(*parent);
-            }
-        }
-    }
-    let sorted_sensors: Vec<(usize, NewSensor)> = sorted_sensors.into_iter().enumerate().collect();
-
+    let mut sensor_by_local_pk: HashMap<u64, Sensor> = HashMap::new();
     let mut sensors_and_alias = Vec::new();
-    let mut sensor_by_local_pk: HashMap<usize, Sensor> = HashMap::new();
-    for (index, mut sensor) in sorted_sensors.clone() {
+    for (index, mut sensor) in sensors.into_iter().enumerate() {
         let alias = sensor.alias().to_owned();
-        let prototype = SensorPrototype::find_by_id(&mut txn, sensor.prototype_id()).await?;
-
-        for config in sensor.configs_mut() {
-            let request = SensorConfigRequest::find_by_id(&mut txn, config.request_id()).await?;
-            let ty = request.ty(&mut txn).await?;
-            if let SensorWidgetKindView::Sensor(dependency_prototype_id) =
-                ty.widget(&mut txn, &[&target]).await?
-            {
-                let dependency_prototype =
-                    SensorPrototype::find_by_id(&mut txn, dependency_prototype_id).await?;
-                if let Some(variable_name) = dependency_prototype.variable_name() {
-                    match config.value {
-                        Val::String(_) | Val::Map(_) => unimplemented!(),
-                        Val::Number(local_pk) => {
-                            let index = sorted_sensors
-                                .iter()
-                                .find(|(_, s)| s.local_pk() == local_pk)
-                                .unwrap()
-                                .0;
-                            let child_sensor =
-                                sensor_by_local_pk.get(&local_pk).ok_or_else(|| {
-                                    Error::NewSensorReferencedDoesntExist(
-                                        local_pk,
-                                        sensor_by_local_pk.iter().map(|(k, _)| *k).collect(),
-                                    )
-                                })?;
-
-                            if child_sensor.prototype_id() == dependency_prototype_id {
-                                for def in &prototype.definitions(&mut txn).await? {
-                                    for sensor_referenced in def.sensors_referenced() {
-                                        if sensor_referenced.sensor_name()
-                                            != dependency_prototype.name()
-                                        {
-                                            continue;
-                                        }
-
-                                        config.value =
-                                            Val::String(format!("{}{index}", variable_name));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         let local_pk = sensor.local_pk();
-        let sensor = Sensor::new(&mut txn, sensor, index as i64).await?;
+
+        sensor
+            .normalize(&mut txn, &mut sensor_by_local_pk, &[&target])
+            .await?;
+
+        let sensor = Sensor::new(&mut txn, sensor, index as i64, &[&target]).await?;
         sensor_by_local_pk.insert(local_pk, sensor.clone());
         sensors_and_alias.push((sensor, alias));
     }
+
     let mut device_configs = Vec::new();
     for config in new_compiler.device_configs() {
         let config = DeviceConfig::new(&mut txn, config.clone(), &organization).await?;
         device_configs.push(config);
     }
-    // TODO: encrypt secrets
+
+    // TODO: encrypt secret
     let (_compiler, compilation) = Compiler::new(
         &mut txn,
         &target,
@@ -232,7 +143,7 @@ pub async fn list(
     for compiler in compilers {
         // Compilers without collections aren't helpful
         if let Some(collection) = compiler.collection(&mut txn).await? {
-            if Device::from_collection(&mut txn, &collection).await?.len() > 0 {
+            if !Device::from_collection(&mut txn, &collection).await?.is_empty() {
                 views.push(CompilerView::new(&mut txn, compiler).await?);
             }
         }

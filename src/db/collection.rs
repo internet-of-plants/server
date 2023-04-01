@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[id]
 pub struct CollectionId;
 
-#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionView {
     #[copy]
@@ -241,11 +241,11 @@ impl Collection {
 
     pub async fn delete(self, txn: &mut Transaction<'_>) -> Result<()> {
         sqlx::query("DELETE FROM collection_belongs_to_organization where collection_id = $1")
-            .bind(&self.id)
+            .bind(self.id)
             .execute(&mut *txn)
             .await?;
         sqlx::query("DELETE FROM collections where id = $1")
-            .bind(&self.id)
+            .bind(self.id)
             .execute(txn)
             .await?;
         Ok(())

@@ -94,7 +94,7 @@ impl DeviceConfigRequest {
             .bind(&name)
             .bind(&human_name)
             .bind(target.id())
-            .bind(&secret_algo)
+            .bind(secret_algo)
             .fetch_one(txn)
             .await?;
         Ok(Self {

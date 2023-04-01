@@ -90,7 +90,7 @@ impl DevicePanic {
             LIMIT $2",
         )
         .bind(device.id())
-        .bind(&limit)
+        .bind(limit)
         .fetch_all(txn)
         .await?;
         Ok(device_panics.into_iter().rev().collect())

@@ -1,7 +1,7 @@
 use crate::{
     Definition, Dependency, DeviceWidgetKind, NewDeviceConfigRequest, NewSensorConfigRequest,
-    Result, SecretAlgo, SensorMeasurement, SensorMeasurementKind, SensorMeasurementType,
-    SensorPrototype, SensorReference, SensorWidgetKind, Target, TargetPrototype, Transaction,
+    NewSensorWidgetKind, Result, SecretAlgo, SensorMeasurement, SensorMeasurementKind,
+    SensorMeasurementType, SensorPrototype, SensorReference, Target, TargetPrototype, Transaction,
 };
 
 pub async fn create_builtin(txn: &mut Transaction<'_>) -> Result<()> {
@@ -58,8 +58,8 @@ async fn dht(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
             },
         ],
         vec![
-            NewSensorConfigRequest::new("Port".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
-            NewSensorConfigRequest::new("Model".to_owned(), "dhtVersion{{index}}".to_owned(), "dht::Version".to_owned(), SensorWidgetKind::Selection(vec![
+            NewSensorConfigRequest::new("Port".to_owned(), "airTempAndHumidity{{index}}".to_owned(), "Pin".to_owned(), NewSensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Model".to_owned(), "dhtVersion{{index}}".to_owned(), "dht::Version".to_owned(), NewSensorWidgetKind::Selection(vec![
                 "dht::Version::DHT11".to_owned(),
                 "dht::Version::DHT12".to_owned(),
                 "dht::Version::DHT21".to_owned(),
@@ -96,7 +96,7 @@ async fn dallas_temperature(txn: &mut Transaction<'_>) -> Result<SensorPrototype
             },
         ],
         vec![
-            NewSensorConfigRequest::new("Port".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Port".to_owned(), "soilTemperature{{index}}".to_owned(), "Pin".to_owned(), NewSensorWidgetKind::PinSelection),
         ],
     ).await
 }
@@ -119,7 +119,7 @@ async fn factory_reset_button(txn: &mut Transaction<'_>) -> Result<SensorPrototy
             "Button".to_owned(),
             "factoryResetButton{{index}}".to_owned(),
             "Pin".to_owned(),
-            SensorWidgetKind::PinSelection,
+            NewSensorWidgetKind::PinSelection,
         )],
     )
     .await
@@ -141,19 +141,19 @@ async fn cooler(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
                 "Port".to_owned(),
                 "cooler{{index}}".to_owned(),
                 "Pin".to_owned(),
-                SensorWidgetKind::PinSelection,
+                NewSensorWidgetKind::PinSelection,
             ),
             NewSensorConfigRequest::new(
                 "Max Celsius".to_owned(),
                 "coolerMax{{index}}".to_owned(),
                 "float".to_owned(),
-                SensorWidgetKind::F32,
+                NewSensorWidgetKind::F32,
             ),
             NewSensorConfigRequest::new(
                 "DHT Sensor".to_owned(),
                 "dhtSensor".to_owned(),
                 None,
-                SensorWidgetKind::Sensor("DHT".to_owned()),
+                NewSensorWidgetKind::Sensor("DHT".to_owned()),
             ),
         ],
     )
@@ -185,15 +185,15 @@ async fn light_relay(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
                 "Port".to_owned(),
                 "light{{index}}".to_owned(),
                 "Pin".to_owned(),
-                SensorWidgetKind::PinSelection,
+                NewSensorWidgetKind::PinSelection,
             ),
             NewSensorConfigRequest::new(
                 "Timed Switches".to_owned(),
                 "lightActions{{index}}[]".to_owned(),
                 "std::pair<relay::Moment, relay::State>".to_owned(),
-                SensorWidgetKind::Map(
-                    Box::new(SensorWidgetKind::Moment),
-                    Box::new(SensorWidgetKind::Selection(vec![
+                NewSensorWidgetKind::Map(
+                    Box::new(NewSensorWidgetKind::Moment),
+                    Box::new(NewSensorWidgetKind::Selection(vec![
                         "relay::State::ON".to_owned(),
                         "relay::State::OFF".to_owned(),
                     ])),
@@ -232,15 +232,15 @@ async fn water_pump(txn: &mut Transaction<'_>) -> Result<SensorPrototype> {
                 "Port".to_owned(),
                 "waterPump{{index}}".to_owned(),
                 "Pin".to_owned(),
-                SensorWidgetKind::PinSelection,
+                NewSensorWidgetKind::PinSelection,
             ),
             NewSensorConfigRequest::new(
                 "Timed Action".to_owned(),
                 "waterPumpActions{{index}}[]".to_owned(),
                 "std::pair<relay::Moment, iop::time::seconds>".to_owned(),
-                SensorWidgetKind::Map(
-                    Box::new(SensorWidgetKind::Moment),
-                    Box::new(SensorWidgetKind::Seconds),
+                NewSensorWidgetKind::Map(
+                    Box::new(NewSensorWidgetKind::Moment),
+                    Box::new(NewSensorWidgetKind::Seconds),
                 ),
             ),
         ],
@@ -275,7 +275,7 @@ async fn soil_resistivity(txn: &mut Transaction<'_>) -> Result<SensorPrototype> 
         ],
         vec![
             // TODO: we should configure the analog pin here too
-            NewSensorConfigRequest::new("Port".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), SensorWidgetKind::PinSelection),
+            NewSensorConfigRequest::new("Port".to_owned(), "soilResistivityPower{{index}}".to_owned(), "Pin".to_owned(), NewSensorWidgetKind::PinSelection),
         ],
     ).await
 }

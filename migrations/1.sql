@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototypes (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- TODO: add organization filter here and in a bunch of other tables
 CREATE TABLE IF NOT EXISTS sensors (
   id           BIGSERIAL     PRIMARY KEY NOT NULL,
   prototype_id BIGINT                    NOT NULL,
@@ -266,9 +267,8 @@ CREATE TABLE IF NOT EXISTS sensor_configs (
   id                BIGSERIAL PRIMARY KEY NOT NULL,
   sensor_id         BIGINT                NOT NULL,
   request_id        BIGINT                NOT NULL,
-  value             TEXT                  NOT NULL,
+  value             JSONB                 NOT NULL,
   created_at        TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(sensor_id, request_id, value),
   FOREIGN KEY (sensor_id) REFERENCES sensors (id),
   FOREIGN KEY (request_id) REFERENCES sensor_config_requests (id)
 );

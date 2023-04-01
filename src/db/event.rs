@@ -87,7 +87,7 @@ impl Event {
                 measurements.extend(
                     prototype
                         .measurements()
-                        .into_iter()
+                        .iter()
                         .map(|m| {
                             let reg = Handlebars::new();
                             let name = reg.render_template(m.name(), &json!({ "index": index }))?;

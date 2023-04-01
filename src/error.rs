@@ -1,10 +1,10 @@
-use crate::CompilerId;
+use crate::{CompilerId, NewSensor, SensorPrototypeId, SensorWidgetKindView, ValRaw};
 use axum::response::{IntoResponse, Response};
 use axum::{http::StatusCode, Json};
 use backtrace::Backtrace;
-use tracing::{error, warn};
 use serde_json::json;
 use std::collections::HashSet;
+use tracing::{error, warn};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -28,6 +28,18 @@ pub enum Error {
     Utf8(#[from] std::str::Utf8Error),
     #[error(transparent)]
     Handlebars(#[from] handlebars::RenderError),
+    #[error(transparent)]
+    ParseInt(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    Hyper(#[from] hyper::Error),
+    #[error(transparent)]
+    InvalidHeaderValue(#[from] axum::http::header::InvalidHeaderValue),
+    #[error(transparent)]
+    Http(#[from] axum::http::Error),
+    #[error(transparent)]
+    Multipart(#[from] axum::extract::multipart::MultipartError),
+    #[error(transparent)]
+    Git2(#[from] git2::Error),
     #[error("event must be object")]
     EventMustBeObject,
     #[error("measurement missing")]
@@ -69,19 +81,25 @@ pub enum Error {
     #[error("invalid timezone {1}: {0}")]
     InvalidTimezone(std::num::ParseIntError, String),
     #[error("new sensor referenced by {0} doesnt exist in {1:?}")]
-    NewSensorReferencedDoesntExist(usize, HashSet<usize>),
-    #[error(transparent)]
-    ParseInt(#[from] std::num::ParseIntError),
-    #[error(transparent)]
-    Hyper(#[from] hyper::Error),
-    #[error(transparent)]
-    InvalidHeaderValue(#[from] axum::http::header::InvalidHeaderValue),
-    #[error(transparent)]
-    Http(#[from] axum::http::Error),
-    #[error(transparent)]
-    Multipart(#[from] axum::extract::multipart::MultipartError),
-    #[error(transparent)]
-    Git2(#[from] git2::Error),
+    NewSensorReferencedDoesntExist(u64, HashSet<u64>),
+    #[error("no variable name for referenced sensor")]
+    NoVariableNameForReferencedSensor(SensorPrototypeId),
+    #[error("invalid moment {0:02}:{1:02}:{2:02}")]
+    InvalidMoment(u8, u8, u8),
+    #[error("integer {0} out of range {1:?}")]
+    IntegerOutOfRange(u64, SensorWidgetKindView),
+    #[error("float {0} out of range {1:?}")]
+    FloatOutOfRange(f64, SensorWidgetKindView),
+    #[error("wrong sensor kind got {0} expected {1}")]
+    WrongSensorKind(SensorPrototypeId, SensorPrototypeId),
+    #[error("invalid {0} selection of {1:?}")]
+    InvalidSelection(String, Vec<String>),
+    #[error("invalid val for sensor {0:?}")]
+    InvalidValForSensor(ValRaw),
+    #[error("invalid val type of {0:?} for {1:?}")]
+    InvalidValType(ValRaw, SensorWidgetKindView),
+    #[error("sensor {0} referenced not found {1:?}")]
+    SensorReferencedNotFound(u64, NewSensor),
 }
 
 impl From<sqlx::error::Error> for Error {
@@ -156,6 +174,10 @@ impl IntoResponse for Error {
             }
             Self::NewSensorReferencedDoesntExist(pk, list) => {
                 error!("Unable to find sensor {} in {:?}", pk, list);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }
+            Self::NoVariableNameForReferencedSensor(prototype_id) => {
+                warn!("No variable name for referenced sensor {prototype_id}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
             }
             Self::Unauthorized => {
@@ -233,6 +255,38 @@ impl IntoResponse for Error {
             Self::InvalidTimezone(err, tz) => {
                 warn!("Invalid Timezone {tz}: {err}");
                 (StatusCode::BAD_REQUEST, "Invalid Timezone")
+            }
+            Self::InvalidMoment(hours, minutes, seconds) => {
+                warn!("Invalid moment {hours:02}:{minutes:02}:{seconds:02}");
+                (StatusCode::BAD_REQUEST, "Invalid Moment")
+            }
+            Self::IntegerOutOfRange(num, widget) => {
+                warn!("Integer {num} out of range of widget {widget:?}");
+                (StatusCode::BAD_REQUEST, "Integer Out Of Range")
+            }
+            Self::FloatOutOfRange(num, widget) => {
+                warn!("Float {num} out of range of widget {widget:?}");
+                (StatusCode::BAD_REQUEST, "Invalid Timezone")
+            }
+            Self::WrongSensorKind(got, expected) => {
+                warn!("wrong sensor kind got {got} expected {expected}");
+                (StatusCode::BAD_REQUEST, "Invalid Sensor Kind")
+            }
+            Self::InvalidSelection(selected, selection) => {
+                warn!("invalid {selected} selection of {selection:?}");
+                (StatusCode::BAD_REQUEST, "Invalid Selection")
+            }
+            Self::InvalidValForSensor(raw) => {
+                warn!("invalid val for sensor {raw:?}");
+                (StatusCode::BAD_REQUEST, "Invalid Sensor")
+            }
+            Self::InvalidValType(raw, widget) => {
+                warn!("invalid val type of {raw:?} for {widget:?}");
+                (StatusCode::BAD_REQUEST, "Invalid Type")
+            }
+            Self::SensorReferencedNotFound(pk, sensor) => {
+                warn!("sensor {pk} referenced not found {sensor:?}");
+                (StatusCode::BAD_REQUEST, "Invalid Sensor")
             }
             Self::NothingFound => {
                 warn!("Nothing Found");

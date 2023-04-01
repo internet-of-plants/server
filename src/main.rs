@@ -176,7 +176,7 @@ async fn recompile_each(
 ) -> Result<()> {
     if latest_certificates
         .iter()
-        .any(|c| c.id() == compilation.certificate_id())
+        .any(|c| c.id() != compilation.certificate_id())
     {
         let mut txn = pool.begin().await?;
         let compiler = compilation.compiler(&mut txn).await?;

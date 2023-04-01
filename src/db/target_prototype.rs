@@ -84,7 +84,7 @@ impl TargetPrototype {
             sqlx::query(
                 "INSERT INTO dependency_belongs_to_target_prototype (target_prototype_id, repo_url, branch) VALUES ($1, $2, $3)",
             )
-                .bind(&id)
+                .bind(id)
                 .bind(dependency.repo_url())
                 .bind(dependency.branch())
                 .execute(&mut *txn)
@@ -109,7 +109,7 @@ impl TargetPrototype {
         Ok(sqlx::query_as(
             "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE id = $1"
         )
-            .bind(&id)
+            .bind(id)
             .fetch_one(txn)
             .await?)
     }
@@ -129,7 +129,7 @@ impl TargetPrototype {
     ) -> Result<()> {
         sqlx::query("UPDATE target_prototypes SET build_unflags = $1 WHERE id = $2")
             .bind(&build_unflags)
-            .bind(&self.id)
+            .bind(self.id)
             .execute(txn)
             .await?;
         self.build_unflags = build_unflags;
@@ -155,7 +155,7 @@ impl TargetPrototype {
         let dependencies: Vec<Dependency> = sqlx::query_as(
             "SELECT repo_url, branch FROM dependency_belongs_to_target_prototype WHERE target_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(txn)
         .await?;
 
@@ -176,7 +176,7 @@ impl TargetPrototype {
             "INSERT INTO certificates (target_prototype_id, hash, payload) VALUES ($1, $2, $3)
              ON CONFLICT (target_prototype_id, hash) DO NOTHING",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .bind(&hash)
         .bind(content.as_bytes())
         .execute(txn)
@@ -201,7 +201,7 @@ impl TargetPrototype {
             FROM certificates WHERE target_prototype_id = $1
             ORDER BY created_at DESC",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_one(txn)
         .await?;
         Ok(certificate)

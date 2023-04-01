@@ -66,7 +66,7 @@ impl Compilation {
         .bind(&platformio_ini)
         .bind(&main_cpp)
         .bind(&pin_hpp)
-        .bind(&certificate_id)
+        .bind(certificate_id)
         .fetch_optional(&mut *txn)
         .await?;
 
@@ -81,7 +81,7 @@ impl Compilation {
                     .bind(&platformio_ini)
                     .bind(&main_cpp)
                     .bind(&pin_hpp)
-                    .bind(&certificate_id)
+                    .bind(certificate_id)
                     .fetch_one(&mut *txn)
                     .await?;
             id
@@ -168,7 +168,7 @@ impl Compilation {
              FROM dependency_belongs_to_compilation
              WHERE compilation_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
 
@@ -192,12 +192,12 @@ impl Compilation {
                 })
                 .await??;
 
-                if !dependencies
+                if dependencies
                     .iter()
                     .any(|(url, sensor_id, expected_commit_hash)| {
                         url == dependency.repo_url()
                             && *sensor_id == Some(sid)
-                            && &commit_hash == expected_commit_hash
+                            && &commit_hash != expected_commit_hash
                     })
                 {
                     return Ok(true);
@@ -221,12 +221,12 @@ impl Compilation {
             })
             .await??;
 
-            if !dependencies
+            if dependencies
                 .iter()
                 .any(move |(dep_url, sensor_id, expected_commit_hash)| {
-                    &dep_url == &dependency.repo_url()
+                    dep_url == dependency.repo_url()
                         && sensor_id.is_none()
-                        && &commit_hash == expected_commit_hash
+                        && &commit_hash != expected_commit_hash
                 })
             {
                 return Ok(true);
@@ -279,9 +279,9 @@ impl Compilation {
                              ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $2")
                     .bind(dependency.repo_url())
                     .bind(dependency.branch())
-                    .bind(&sensor.id())
+                    .bind(sensor.id())
                     .bind(&commit_hash)
-                    .bind(&self.id())
+                    .bind(self.id())
                     .execute(&mut *txn)
                     .await?;
             }
@@ -311,7 +311,7 @@ impl Compilation {
             .bind(dependency.repo_url())
             .bind(dependency.branch())
             .bind(&commit_hash)
-            .bind(&self.id())
+            .bind(self.id())
             .execute(&mut *txn)
             .await?;
         }

@@ -80,7 +80,7 @@ impl SensorPrototype {
             "INSERT INTO sensor_prototypes (name, variable_name) VALUES ($1, $2) RETURNING id",
         )
         .bind(&name)
-        .bind(&variable_name)
+        .bind(variable_name)
         .fetch_one(&mut *txn)
         .await?;
         let sensor_prototype = Self {
@@ -95,7 +95,7 @@ impl SensorPrototype {
             )
             .bind(dep.repo_url())
             .bind(dep.branch())
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
         }
@@ -104,7 +104,7 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_includes (include, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(include)
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
         }
@@ -114,7 +114,7 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_definitions (line, sensor_prototype_id) VALUES ($1, $2) RETURNING id",
             )
             .bind(define.line())
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .fetch_one(&mut *txn)
             .await?;
             for sensor_referenced in define.sensors_referenced() {
@@ -123,7 +123,7 @@ impl SensorPrototype {
                 )
                 .bind(sensor_referenced.sensor_name())
                 .bind(sensor_referenced.request_name())
-                .bind(&sensor_prototype_definition_id)
+                .bind(sensor_prototype_definition_id)
                 .execute(&mut *txn)
                 .await?;
             }
@@ -133,7 +133,7 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_setups (setup, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(setup)
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
         }
@@ -142,7 +142,7 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_unauthenticated_actions (unauthenticated_action, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(unauthenticated_action)
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .execute(&mut *txn)
             .await?;
         }
@@ -153,7 +153,7 @@ impl SensorPrototype {
             .bind(measurement.name())
             .bind(measurement.value())
             .bind(measurement.ty())
-            .bind(&sensor_prototype_id)
+            .bind(sensor_prototype_id)
             .bind(measurement.human_name())
             .bind(measurement.kind())
             .execute(&mut *txn)
@@ -194,7 +194,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT repo_url, branch FROM sensor_prototype_dependencies WHERE sensor_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list)
@@ -205,7 +205,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT include FROM sensor_prototype_includes WHERE sensor_prototype_id = $1 ORDER BY include ASC",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list.into_iter().map(|(text,)| text).collect())
@@ -216,12 +216,12 @@ impl SensorPrototype {
         let defs: Vec<(SensorPrototypeDefinitionId, String)> = sqlx::query_as(
             "SELECT id, line FROM sensor_prototype_definitions WHERE sensor_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         let mut list = Vec::with_capacity(defs.len());
         for (id, line) in defs {
-            list.push(Definition::new(line, sqlx::query_as("SELECT sensor_name, request_name FROM sensor_prototype_definition_sensors_referenced WHERE sensor_prototype_definition_id = $1").bind(&id).fetch_all(&mut *txn).await?));
+            list.push(Definition::new(line, sqlx::query_as("SELECT sensor_name, request_name FROM sensor_prototype_definition_sensors_referenced WHERE sensor_prototype_definition_id = $1").bind(id).fetch_all(&mut *txn).await?));
         }
         Ok(list)
     }
@@ -231,7 +231,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT setup FROM sensor_prototype_setups WHERE sensor_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list.into_iter().map(|(text,)| text).collect())
@@ -242,7 +242,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT unauthenticated_action FROM sensor_prototype_unauthenticated_actions WHERE sensor_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list.into_iter().map(|(text,)| text).collect())
@@ -253,7 +253,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT human_name, name, value, ty, kind FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1 ORDER BY id ASC",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list)
@@ -267,7 +267,7 @@ impl SensorPrototype {
         let list = sqlx::query_as(
             "SELECT id, name, human_name, type_id FROM sensor_config_requests WHERE sensor_prototype_id = $1",
         )
-        .bind(&self.id)
+        .bind(self.id)
         .fetch_all(&mut *txn)
         .await?;
         Ok(list)

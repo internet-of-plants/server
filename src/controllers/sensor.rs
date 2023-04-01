@@ -40,6 +40,7 @@ pub struct SetColorRequest {
     collection_id: CollectionId,
     #[copy]
     sensor_id: SensorId,
+    // TODO FIXME: js injection risks
     color: String,
 }
 

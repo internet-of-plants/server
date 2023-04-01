@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[id]
 pub struct OrganizationId;
 
-#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OrganizationView {
     #[copy]

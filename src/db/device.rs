@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[id]
 pub struct DeviceId;
 
-#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceView {
     #[copy]
@@ -120,12 +120,10 @@ impl Device {
                     }
                 } else {
                     // Assume all devices with the same firmware are of the same collection, a race might make this not true, but let's pick one
-                    for dev in
-                        crate::Device::list_by_firmware(txn, &firmware, &organization).await?
-                    {
+                    if let Some(dev) =  
+                        crate::Device::list_by_firmware(txn, &firmware, organization).await?.pop() {
                         let col = dev.collection(txn).await?;
                         device.set_collection(txn, &col).await?;
-                        break;
                     }
                 }
             }
@@ -246,8 +244,8 @@ impl Device {
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              WHERE cbt.organization_id = $1 AND dev.firmware_id = $2"
         )
-        .bind(&organization.id())
-        .bind(&firmware.id())
+        .bind(organization.id())
+        .bind(firmware.id())
         .fetch_all(&mut *txn)
         .await?;
         Ok(device)
@@ -313,7 +311,7 @@ impl Device {
         let (updated_at,): (DateTime,) = sqlx::query_as(
             "UPDATE devices SET collection_id = $1, updated_at = NOW() WHERE id = $2 RETURNING updated_at",
         )
-        .bind(&collection.id())
+        .bind(collection.id())
         .bind(id)
         .fetch_one(&mut *txn)
         .await?;
@@ -330,7 +328,7 @@ impl Device {
 
         let updated_at = Self::update_collection(txn, self.id, collection).await?;
 
-        if old_collection.devices(txn).await?.len() == 0 {
+        if old_collection.devices(txn).await?.is_empty() {
             old_collection.delete(txn).await?;
         }
 

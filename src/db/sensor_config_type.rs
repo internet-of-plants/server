@@ -32,7 +32,7 @@ pub struct SensorConfigTypeId;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "kind", content = "data")]
-pub enum SensorWidgetKind {
+pub enum NewSensorWidgetKind {
     Seconds,
     U8,
     U16,
@@ -41,9 +41,8 @@ pub enum SensorWidgetKind {
     F32,
     F64,
     Sensor(String),
-    String,
     Moment,
-    Map(Box<SensorWidgetKind>, Box<SensorWidgetKind>),
+    Map(Box<NewSensorWidgetKind>, Box<NewSensorWidgetKind>),
     PinSelection,
     Selection(Vec<String>),
 }
@@ -58,7 +57,6 @@ pub enum SensorWidgetKindView {
     U64,
     F32,
     F64,
-    String,
     Sensor(SensorPrototypeId),
     Moment,
     Map(Box<SensorWidgetKindView>, Box<SensorWidgetKindView>),
@@ -74,7 +72,6 @@ pub enum SensorWidgetKindRaw {
     U64,
     F32,
     F64,
-    String,
     Sensor,
     Moment,
     Map,
@@ -82,22 +79,21 @@ pub enum SensorWidgetKindRaw {
     Selection,
 }
 
-impl From<&SensorWidgetKind> for SensorWidgetKindRaw {
-    fn from(kind: &SensorWidgetKind) -> Self {
+impl From<&NewSensorWidgetKind> for SensorWidgetKindRaw {
+    fn from(kind: &NewSensorWidgetKind) -> Self {
         match kind {
-            SensorWidgetKind::Seconds => SensorWidgetKindRaw::Seconds,
-            SensorWidgetKind::U8 => SensorWidgetKindRaw::U8,
-            SensorWidgetKind::U16 => SensorWidgetKindRaw::U16,
-            SensorWidgetKind::U32 => SensorWidgetKindRaw::U32,
-            SensorWidgetKind::U64 => SensorWidgetKindRaw::U64,
-            SensorWidgetKind::F32 => SensorWidgetKindRaw::F32,
-            SensorWidgetKind::F64 => SensorWidgetKindRaw::F64,
-            SensorWidgetKind::Sensor(_) => SensorWidgetKindRaw::Sensor,
-            SensorWidgetKind::String => SensorWidgetKindRaw::String,
-            SensorWidgetKind::Moment => SensorWidgetKindRaw::Moment,
-            SensorWidgetKind::Map(_, _) => SensorWidgetKindRaw::Map,
-            SensorWidgetKind::PinSelection => SensorWidgetKindRaw::PinSelection,
-            SensorWidgetKind::Selection(_) => SensorWidgetKindRaw::Selection,
+            NewSensorWidgetKind::Seconds => SensorWidgetKindRaw::Seconds,
+            NewSensorWidgetKind::U8 => SensorWidgetKindRaw::U8,
+            NewSensorWidgetKind::U16 => SensorWidgetKindRaw::U16,
+            NewSensorWidgetKind::U32 => SensorWidgetKindRaw::U32,
+            NewSensorWidgetKind::U64 => SensorWidgetKindRaw::U64,
+            NewSensorWidgetKind::F32 => SensorWidgetKindRaw::F32,
+            NewSensorWidgetKind::F64 => SensorWidgetKindRaw::F64,
+            NewSensorWidgetKind::Sensor(_) => SensorWidgetKindRaw::Sensor,
+            NewSensorWidgetKind::Moment => SensorWidgetKindRaw::Moment,
+            NewSensorWidgetKind::Map(_, _) => SensorWidgetKindRaw::Map,
+            NewSensorWidgetKind::PinSelection => SensorWidgetKindRaw::PinSelection,
+            NewSensorWidgetKind::Selection(_) => SensorWidgetKindRaw::Selection,
         }
     }
 }
@@ -128,7 +124,6 @@ impl SensorWidgetKindView {
             SensorWidgetKindRaw::U64 => SensorWidgetKindView::U64,
             SensorWidgetKindRaw::F32 => SensorWidgetKindView::F32,
             SensorWidgetKindRaw::F64 => SensorWidgetKindView::F64,
-            SensorWidgetKindRaw::String => SensorWidgetKindView::String,
             SensorWidgetKindRaw::Moment => SensorWidgetKindView::Moment,
             SensorWidgetKindRaw::Map => {
                 let (map_id, key, value) = sqlx::query_as::<
@@ -145,7 +140,7 @@ impl SensorWidgetKindView {
                           AND (parent_id = $2 OR (parent_id IS NULL AND $2 IS NULL))
                           AND (parent_metadata = $3 OR (parent_metadata IS NULL AND $3 IS NULL))",
                 )
-                .bind(&id)
+                .bind(id)
                 .bind(parent.as_ref().map(|p| p.0))
                 .bind(parent.as_ref().map(|p| p.1))
                 .fetch_one(&mut *txn)
@@ -178,7 +173,7 @@ impl SensorWidgetKindView {
                            AND (parent_id = $2 OR (parent_id IS NULL AND $2 IS NULL))
                            AND (parent_metadata = $3 OR (parent_metadata IS NULL AND $3 IS NULL))",
                 )
-                .bind(&id)
+                .bind(id)
                 .bind(parent.as_ref().map(|p| p.0))
                 .bind(parent.as_ref().map(|p| p.1))
                 .fetch_one(txn)
@@ -193,7 +188,7 @@ impl SensorWidgetKindView {
                            AND (parent_id = $2 OR (parent_id IS NULL AND $2 IS NULL))
                            AND (parent_metadata = $3 OR (parent_metadata IS NULL AND $3 IS NULL))",
                 )
-                .bind(&id)
+                .bind(id)
                 .bind(parent.as_ref().map(|p| p.0))
                 .bind(parent.as_ref().map(|p| p.1))
                 .fetch_all(txn)
@@ -234,7 +229,7 @@ pub struct SensorConfigType {
 impl SensorConfigType {
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: SensorConfigTypeId) -> Result<Self> {
         let ty = sqlx::query_as("SELECT id, name, widget FROM sensor_config_types WHERE id = $1")
-            .bind(&id)
+            .bind(id)
             .fetch_one(txn)
             .await?;
         Ok(ty)
@@ -243,7 +238,7 @@ impl SensorConfigType {
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: Option<String>,
-        widget: SensorWidgetKind,
+        widget: NewSensorWidgetKind,
     ) -> Result<Self> {
         let widget_kind_raw = SensorWidgetKindRaw::from(&widget);
         let (id,) = sqlx::query_as::<_, (SensorConfigTypeId,)>(
@@ -255,16 +250,16 @@ impl SensorConfigType {
         .await?;
 
         let mut work_queue: VecDeque<(
-            SensorWidgetKind,
+            NewSensorWidgetKind,
             Option<(SensorConfigTypeMapId, ParentMetadata)>,
         )> = VecDeque::from_iter(vec![(widget, None)]);
         while let Some((widget, parent)) = work_queue.pop_front() {
             match widget {
-                SensorWidgetKind::Map(key, value) => {
+                NewSensorWidgetKind::Map(key, value) => {
                     let (map_id,) = sqlx::query_as::<_, (SensorConfigTypeMapId,)>(
                         "INSERT INTO sensor_config_type_selection_maps (type_id, parent_id, parent_metadata, key, value) VALUES ($1, $2, $3, $4, $5) RETURNING id",
                     )
-                        .bind(&id)
+                        .bind(id)
                         .bind(parent.as_ref().map(|p| p.0))
                         .bind(parent.as_ref().map(|p| p.1))
                         .bind(&SensorWidgetKindRaw::from(&*key))
@@ -275,12 +270,12 @@ impl SensorConfigType {
                     work_queue.push_back((*key, Some((map_id, ParentMetadata::Key))));
                     work_queue.push_back((*value, Some((map_id, ParentMetadata::Value))));
                 }
-                SensorWidgetKind::Selection(options) => {
+                NewSensorWidgetKind::Selection(options) => {
                     for option in options {
                         sqlx::query(
                             "INSERT INTO sensor_config_type_selection_options (type_id, parent_id, parent_metadata, option) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
                         )
-                            .bind(&id)
+                            .bind(id)
                             .bind(parent.as_ref().map(|p| p.0))
                             .bind(parent.as_ref().map(|p| p.1))
                             .bind(&option)
@@ -288,11 +283,11 @@ impl SensorConfigType {
                             .await?;
                     }
                 }
-                SensorWidgetKind::Sensor(sensor_prototype_name) => {
+                NewSensorWidgetKind::Sensor(sensor_prototype_name) => {
                     sqlx::query(
                         "INSERT INTO sensor_config_type_selection_sensors (type_id, parent_id, parent_metadata, sensor_prototype_name) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
                     )
-                        .bind(&id)
+                        .bind(id)
                         .bind(parent.as_ref().map(|p| p.0))
                         .bind(parent.as_ref().map(|p| p.1))
                         .bind(&sensor_prototype_name)

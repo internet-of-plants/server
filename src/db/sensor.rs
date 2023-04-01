@@ -1,14 +1,14 @@
 use crate::{
     db::sensor_config::Val, Compiler, Dependency, Error, NewSensorConfig, Result, SensorConfig,
     SensorConfigRequest, SensorConfigView, SensorMeasurementView, SensorPrototype,
-    SensorPrototypeId, SensorPrototypeView, Transaction,
+    SensorPrototypeId, SensorPrototypeView, SensorWidgetKindView, Target, Transaction, ValRaw,
 };
 use derive::id;
 use derive_get::Getters;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 #[derive(Getters, Debug, Serialize, Deserialize, Clone)]
@@ -20,16 +20,100 @@ pub struct NewSensor {
     configs: Vec<NewSensorConfig>,
     // Slot identifier for sensor select
     #[copy]
-    local_pk: usize,
+    local_pk: u64,
 }
 
 impl NewSensor {
     pub fn configs_mut(&mut self) -> &mut [NewSensorConfig] {
         &mut self.configs
     }
+
+    pub async fn sort(
+        txn: &mut Transaction<'_>,
+        sensors: &[Self],
+        targets: &[&Target],
+    ) -> Result<Vec<Self>> {
+        let sensor_by_local_pk: HashMap<u64, NewSensor> =
+            sensors.iter().map(|s| (s.local_pk(), s.clone())).collect();
+        let mut graph: HashMap<u64, HashSet<u64>> = HashMap::new();
+
+        for sensor in sensor_by_local_pk.values() {
+            let value = graph.entry(sensor.local_pk()).or_default();
+            for config in sensor.configs() {
+                let request = SensorConfigRequest::find_by_id(txn, config.request_id()).await?;
+                let ty = request.ty(txn).await?;
+                if let SensorWidgetKindView::Sensor(_) = ty.widget(txn, targets).await? {
+                    match config.value() {
+                        ValRaw::Integer(number) => {
+                            value.insert(*number);
+                        }
+                        raw => return Err(Error::InvalidValForSensor(raw.clone())),
+                    }
+                }
+            }
+        }
+
+        let mut sorted_sensors = Vec::new();
+        let mut work_queue: VecDeque<u64> = graph
+            .iter()
+            .filter(|(_, c)| c.is_empty())
+            .map(|(p, _)| *p)
+            .collect();
+
+        while let Some(local_pk) = work_queue.pop_front() {
+            let sensor = sensor_by_local_pk.get(&local_pk).ok_or_else(|| {
+                Error::NewSensorReferencedDoesntExist(
+                    local_pk,
+                    sensor_by_local_pk.keys().copied().collect(),
+                )
+            })?;
+            sorted_sensors.push(sensor.clone());
+
+            graph.remove(&sensor.local_pk());
+
+            for (parent, children) in graph.iter_mut() {
+                let was_empty = children.is_empty();
+                children.retain(|el| *el != sensor.local_pk());
+                if !was_empty && children.is_empty() {
+                    work_queue.push_back(*parent);
+                }
+            }
+        }
+
+        Ok(sorted_sensors)
+    }
+
+    pub async fn normalize(
+        &mut self,
+        txn: &mut Transaction<'_>,
+        sensor_by_local_pk: &mut HashMap<u64, Sensor>,
+        targets: &[&Target],
+    ) -> Result<()> {
+        for config in self.configs_mut() {
+            let request = SensorConfigRequest::find_by_id(txn, config.request_id()).await?;
+            let ty = request.ty(txn).await?;
+
+            if let SensorWidgetKindView::Sensor(prototype_id) = ty.widget(txn, targets).await? {
+                let prototype = SensorPrototype::find_by_id(txn, prototype_id).await?;
+
+                if prototype.variable_name().is_none() {
+                    return Err(Error::NoVariableNameForReferencedSensor(prototype.id()));
+                }
+
+                match &mut config.value {
+                    ValRaw::Integer(number) => match sensor_by_local_pk.get(number) {
+                        Some(sensor) => *number = i64::from(sensor.id()) as u64,
+                        None => return Err(Error::SensorReferencedNotFound(*number, self.clone())),
+                    },
+                    raw => return Err(Error::InvalidValForSensor(raw.clone())),
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
-#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Getters, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SensorView {
     #[copy]
@@ -71,13 +155,17 @@ impl SensorView {
 
         let mut sensors = Vec::with_capacity(sensors_metadata.len());
         for (id, index, prototype_id, alias, color) in sensors_metadata {
-            let sensor = Sensor { id, prototype_id, index };
+            let sensor = Sensor {
+                id,
+                prototype_id,
+                index,
+            };
             let prototype = sensor.prototype(txn).await?;
             let sensor_configs = sensor.configs(txn).await?;
 
             let mut configurations = Vec::with_capacity(sensor_configs.len());
             for config in sensor_configs {
-                configurations.push(SensorConfigView::new(txn, config).await?);
+                configurations.push(SensorConfigView::new(txn, config, &[&target]).await?);
             }
 
             sensors.push(Self {
@@ -103,7 +191,7 @@ impl SensorView {
                     })
                     .collect::<Result<Vec<_>>>()?,
                 configurations,
-                prototype: SensorPrototypeView::new(txn, prototype, &[&target]).await?,
+                prototype: SensorPrototypeView::new(txn, prototype.clone(), &[&target]).await?,
             });
         }
 
@@ -130,11 +218,6 @@ impl SensorReference {
 #[id]
 pub struct SensorPrototypeDefinitionId;
 
-impl SensorPrototypeDefinitionId {
-    pub fn new(id: i64) -> Self {
-        Self(id)
-    }
-}
 #[derive(sqlx::FromRow, Getters, Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct Definition {
     line: String,
@@ -173,7 +256,12 @@ pub struct Sensor {
 }
 
 impl Sensor {
-    pub async fn new(txn: &mut Transaction<'_>, mut new_sensor: NewSensor, index: i64) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        mut new_sensor: NewSensor,
+        index: i64,
+        targets: &[&Target],
+    ) -> Result<Self> {
         let mut uniq = HashSet::new();
         for c in &mut new_sensor.configs {
             uniq.insert(c.request_id());
@@ -182,17 +270,18 @@ impl Sensor {
             return Err(Error::DuplicatedConfig);
         }
 
+        // Deduplicates new sensors
         for config in &new_sensor.configs {
             let mut queue = VecDeque::from_iter(vec![config.value()]);
             while let Some(value) = queue.pop_front() {
-                if let Val::Map(vec) = value {
-                    let mut uniq = HashSet::new();
+                if let ValRaw::Map(vec) = value {
+                    let mut uniq = Vec::new();
                     for c in vec {
-                        uniq.insert(c.key());
-                        queue.push_back(c.key())
-                    }
-                    if uniq.len() != vec.len() {
-                        return Err(Error::DuplicatedKey);
+                        if uniq.contains(&c.key()) {
+                            return Err(Error::DuplicatedKey);
+                        }
+                        uniq.push(c.key());
+                        queue.push_back(c.key());
                     }
                 }
             }
@@ -200,17 +289,24 @@ impl Sensor {
 
         new_sensor
             .configs
-            .sort_by(|a, b| a.request_id().cmp(&b.request_id()));
-        let serialized = new_sensor
-            .configs
-            .iter()
-            .map(|c| format!("{}-{}", c.request_id(), c.value().to_string()))
-            .collect::<Vec<_>>()
-            .join(",");
+            .sort_by_key(|a| a.request_id());
+        let mut serialized = Vec::with_capacity(new_sensor.configs.len());
+        for c in &new_sensor.configs {
+            let request = SensorConfigRequest::find_by_id(&mut *txn, c.request_id()).await?;
+            let widget = request.ty(txn).await?.widget(txn, targets).await?;
+            let val = Val::new(txn, c.value().clone(), widget.clone()).await?;
+            serialized.push(format!(
+                "{}-{}",
+                c.request_id(),
+                val.compile(txn, widget).await?
+            ));
+        }
+        let serialized = serialized.join(",");
 
         // TODO: move this to array matching, string has injection risks
-        let id: Option<(SensorId,)> = sqlx::query_as(
-            "
+        let id: Option<(SensorId,)> = dbg!(
+            sqlx::query_as(
+                "
             SELECT sensor_id
             FROM (SELECT sensor_id, string_agg(concat, ',') as str, COUNT(*) as count
                   FROM (SELECT concat(request_id, '-', value) as concat, sensor_id
@@ -220,12 +316,13 @@ impl Sensor {
             WHERE prototype_id = $1
                   AND count = $2
                   AND str = $3",
-        )
-        .bind(&new_sensor.prototype_id)
-        .bind(new_sensor.configs.len() as i64)
-        .bind(&serialized)
-        .fetch_optional(&mut *txn)
-        .await?;
+            )
+            .bind(new_sensor.prototype_id)
+            .bind(new_sensor.configs.len() as i64)
+            .bind(&serialized)
+            .fetch_optional(&mut *txn)
+            .await
+        )?;
 
         let sensor = if let Some((id,)) = id {
             Self {
@@ -234,12 +331,13 @@ impl Sensor {
                 prototype_id: new_sensor.prototype_id,
             }
         } else {
-            let (id,): (SensorId,) =
-                sqlx::query_as("INSERT INTO sensors (prototype_id, index) VALUES ($1, $2) RETURNING id")
-                    .bind(&new_sensor.prototype_id)
-                    .bind(&index)
-                    .fetch_one(&mut *txn)
-                    .await?;
+            let (id,): (SensorId,) = sqlx::query_as(
+                "INSERT INTO sensors (prototype_id, index) VALUES ($1, $2) RETURNING id",
+            )
+            .bind(new_sensor.prototype_id)
+            .bind(index)
+            .fetch_one(&mut *txn)
+            .await?;
 
             let sensor = Self {
                 id,
@@ -249,10 +347,24 @@ impl Sensor {
             for config in new_sensor.configs {
                 let request =
                     SensorConfigRequest::find_by_id(&mut *txn, config.request_id()).await?;
-                SensorConfig::new(&mut *txn, &sensor, &request, config.value().to_string()).await?;
+                let widget = request.ty(txn).await?.widget(txn, targets).await?;
+                let val = Val::new(txn, config.value().clone(), widget).await?;
+                SensorConfig::new(&mut *txn, &sensor, &request, val).await?;
             }
             sensor
         };
+        Ok(sensor)
+    }
+
+    pub async fn raw_find_by_id(txn: &mut Transaction<'_>, sensor_id: SensorId) -> Result<Self> {
+        let sensor = sqlx::query_as(
+            "SELECT id, prototype_id, index
+             FROM sensors
+             WHERE id = $1",
+        )
+        .bind(sensor_id)
+        .fetch_one(txn)
+        .await?;
         Ok(sensor)
     }
 

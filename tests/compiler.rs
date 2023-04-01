@@ -4,7 +4,7 @@ use server::test_helpers::{
 };
 use server::{
     test_router, DeviceWidgetKind, Login, NewCompiler, NewDeviceConfig, NewSensor, NewSensorConfig,
-    NewUser, SensorWidgetKind,
+    NewSensorWidgetKind, NewUser,
 };
 use tower::ServiceExt;
 
@@ -76,7 +76,7 @@ async fn compiler() {
     };
     for request in &sensor_prototypes[0].configuration_requests {
         let value = match &request.ty.widget {
-            SensorWidgetKind::Selection(options) => options[0].clone(),
+            NewSensorWidgetKind::Selection(options) => options[0].clone(),
             _ => todo!(),
         };
         new_sensor1.configs.push(NewSensorConfig {
@@ -92,7 +92,7 @@ async fn compiler() {
     };
     for request in &sensor_prototypes[1].configuration_requests {
         let value = match &request.ty.widget {
-            SensorWidgetKind::Selection(options) => options[0].clone(),
+            NewSensorWidgetKind::Selection(options) => options[0].clone(),
             _ => todo!(),
         };
         new_sensor2.configs.push(NewSensorConfig {
@@ -108,7 +108,7 @@ async fn compiler() {
     };
     for request in &sensor_prototypes[2].configuration_requests {
         let value = match &request.ty.widget {
-            SensorWidgetKind::Selection(options) => options[0].clone(),
+            NewSensorWidgetKind::Selection(options) => options[0].clone(),
             _ => todo!(),
         };
         new_sensor3.configs.push(NewSensorConfig {

@@ -72,12 +72,10 @@ pub async fn new(
                 }
             } else {
                 // Assume all devices with the same firmware are of the same collection, a race might make this not true, but let's pick one
-                for dev in
-                    crate::Device::list_by_firmware(&mut txn, &firmware, &organization).await?
-                {
+                if let Some(dev) =
+                    crate::Device::list_by_firmware(&mut txn, &firmware, &organization).await?.pop() {
                     let col = dev.collection(&mut txn).await?;
                     device.set_collection(&mut txn, &col).await?;
-                    break;
                 }
             }
         }
@@ -132,7 +130,7 @@ async fn handle_measurements(
             measurements.extend(
                 prototype
                     .measurements()
-                    .into_iter()
+                    .iter()
                     .cloned()
                     .map(|m| {
                         let reg = Handlebars::new();

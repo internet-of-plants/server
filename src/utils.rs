@@ -135,7 +135,7 @@ pub async fn run_migrations(pool: &'static Pool) {
         }
 
         sqlx::query("INSERT INTO migrations (id, code_hash) VALUES ($1, $2)")
-            .bind(file as i16)
+            .bind(file)
             .bind(&code_hash)
             .execute(&mut txn)
             .await

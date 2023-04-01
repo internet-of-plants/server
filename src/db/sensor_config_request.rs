@@ -1,6 +1,6 @@
 use crate::{
-    Result, SensorConfigType, SensorConfigTypeId, SensorConfigTypeView, SensorPrototype,
-    SensorWidgetKind, Target, Transaction,
+    NewSensorWidgetKind, Result, SensorConfigType, SensorConfigTypeId, SensorConfigTypeView,
+    SensorPrototype, Target, Transaction,
 };
 use derive::id;
 use derive_get::Getters;
@@ -40,7 +40,7 @@ pub struct NewSensorConfigRequest {
     name: String,
     human_name: String,
     type_name: Option<String>,
-    widget: SensorWidgetKind,
+    widget: NewSensorWidgetKind,
 }
 
 impl NewSensorConfigRequest {
@@ -48,7 +48,7 @@ impl NewSensorConfigRequest {
         human_name: String,
         name: String,
         type_name: impl Into<Option<String>>,
-        widget: SensorWidgetKind,
+        widget: NewSensorWidgetKind,
     ) -> Self {
         Self {
             name,
@@ -74,7 +74,7 @@ impl SensorConfigRequest {
         name: String,
         human_name: String,
         type_name: Option<String>,
-        widget: SensorWidgetKind,
+        widget: NewSensorWidgetKind,
         sensor_prototype: &SensorPrototype,
     ) -> Result<Self> {
         let ty = SensorConfigType::new(txn, type_name, widget).await?;
@@ -107,6 +107,6 @@ impl SensorConfigRequest {
     }
 
     pub async fn ty(&self, txn: &mut Transaction<'_>) -> Result<SensorConfigType> {
-        Ok(SensorConfigType::find_by_id(txn, self.type_id).await?)
+        SensorConfigType::find_by_id(txn, self.type_id).await
     }
 }

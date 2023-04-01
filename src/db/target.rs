@@ -121,7 +121,7 @@ impl Target {
         let target = sqlx::query_as(
             "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
         )
-        .bind(&id)
+        .bind(id)
         .fetch_one(txn)
         .await?;
         Ok(target)
@@ -145,7 +145,7 @@ impl Target {
     ) -> Result<()> {
         sqlx::query("UPDATE targets SET name = $1 WHERE id = $2")
             .bind(&name)
-            .bind(&self.id)
+            .bind(self.id)
             .execute(txn)
             .await?;
         self.name = name;
@@ -159,7 +159,7 @@ impl Target {
     ) -> Result<()> {
         sqlx::query("UPDATE targets SET build_flags = $1 WHERE id = $2")
             .bind(&build_flags)
-            .bind(&self.id)
+            .bind(self.id)
             .execute(txn)
             .await?;
         self.build_flags = build_flags;

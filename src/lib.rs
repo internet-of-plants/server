@@ -28,13 +28,13 @@ pub use crate::db::{
         Definition, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
         SensorReference, SensorView, Setup, UnauthenticatedAction,
     },
-    sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val},
+    sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val, ValRaw},
     sensor_config_request::{
         NewSensorConfigRequest, SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView,
     },
     sensor_config_type::{
-        SensorConfigType, SensorConfigTypeId, SensorConfigTypeMapId, SensorConfigTypeView,
-        SensorWidgetKind, SensorWidgetKindRaw, SensorWidgetKindView,
+        NewSensorWidgetKind, SensorConfigType, SensorConfigTypeId, SensorConfigTypeMapId,
+        SensorConfigTypeView, SensorWidgetKindRaw, SensorWidgetKindView,
     },
     sensor_measurement::{
         SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView,

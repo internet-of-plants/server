@@ -41,7 +41,7 @@ pub struct DeviceConfigType {
 impl DeviceConfigType {
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: DeviceConfigTypeId) -> Result<Self> {
         let ty = sqlx::query_as("SELECT id, name, widget FROM device_config_types WHERE id = $1")
-            .bind(&id)
+            .bind(id)
             .fetch_one(txn)
             .await?;
         Ok(ty)
@@ -56,7 +56,7 @@ impl DeviceConfigType {
             "INSERT INTO device_config_types (name, widget) VALUES ($1, $2) RETURNING id",
         )
         .bind(&name)
-        .bind(&widget_kind)
+        .bind(widget_kind)
         .fetch_one(&mut *txn)
         .await?;
 
