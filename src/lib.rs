@@ -108,6 +108,8 @@ pub async fn router(pool: &'static Pool) -> Router {
 
     #[cfg(debug_assertions)]
     let allowed_origin = vec![
+        HeaderValue::from_static("http://127.0.0.1:5173"),
+        HeaderValue::from_static("http://localhost:5173"),
         HeaderValue::from_static("http://127.0.0.1:8080"),
         HeaderValue::from_static("http://localhost:8080"),
         HeaderValue::from_static("http://127.0.0.1:4001"),
@@ -116,7 +118,10 @@ pub async fn router(pool: &'static Pool) -> Router {
 
     #[cfg(not(debug_assertions))]
     let allowed_origin = vec![
-        HeaderValue::from_static("http://localhost:8080"),
+        HeaderValue::from_static("http://127.0.0.1:5173"),
+        HeaderValue::from_static("http://localhost:5173"),
+        HeaderValue::from_static("http://127.0.0.1:5173"),
+        HeaderValue::from_static("http://localhost:5173"),
         HeaderValue::from_static("https://web.internet-of-plants.org"),
         HeaderValue::from_static("https://api.internet-of-plants.org:4001"),
     ];
