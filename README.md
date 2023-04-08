@@ -37,7 +37,7 @@ The device can have an empty compiler, providing arbitrary data, although that m
 - GET `/v1/device`
     - URL encoded: `deviceId=${DeviceId}`
 - GET `/v1/device/events`
-    - JSON request: `{ deviceId: DeviceId; limit: u32 }`
+    - JSON request: `{ deviceId: DeviceId; since: <string rfc3339> }`
 - GET `/v1/device/logs`
     - JSON request: `{ deviceId: DeviceId; limit: u32 }`
 - GET `/v1/device/panics`
@@ -49,7 +49,9 @@ The device can have an empty compiler, providing arbitrary data, although that m
 - POST `/v1/sensor/alias`
     - JSON request: `{ deviceId: DeviceId; sensorId: SensorId; alias: string }`
 - POST `/v1/compiler`
-    - NewConfig: `{ requestId: ConfigRequestId; value: string }`
+    - ValRaw depends on the configuration requests type for each sensor
+    - ValRaw: `string | u64 | i64 | { hours: u8, minutes: u8, seconds: u8 } | { key: ValRaw, value: ValRaw }`
+    - NewSensorConfig: `{ requestId: ConfigRequestId; value: ValRaw }`
         - value is encoded the way it will be used by C++
     - NewSensor: `{ prototypeId: SensorPrototypeId; alias: string; configs: NewConfig[] }`
     - JSON request: `{ deviceId: DeviceId; targetId: TargetId; sensors: NewSensor[] }`

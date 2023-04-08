@@ -117,9 +117,10 @@ async fn handle_measurements(
     collection: &Collection,
     device: &crate::Device,
     stat: DeviceStat,
-    event: serde_json::Value,
+    mut event: serde_json::Value,
 ) -> Result<Event> {
-    let obj = event.as_object().ok_or(Error::EventMustBeObject)?;
+    let obj = event.as_object_mut().ok_or(Error::EventMustBeObject)?;
+
     // If there is no compiler accept whatever. This makes processing in the frontend worse as we lack metadata about types
     if let Some(compiler) = collection.compiler(txn).await? {
         let sensors = compiler.sensors(txn).await?;
@@ -147,18 +148,15 @@ async fn handle_measurements(
             return Err(Error::MeasurementMissing);
         }
         for (ty, name) in measurements {
-            if let Some(value) = obj.get(&name) {
+            if let Some(value) = obj.get_mut(&name) {
                 match ty {
                     SensorMeasurementType::FloatCelsius => {
-                        if let Some(value) = value.as_f64() {
-                            if !(-100. ..=100.).contains(&value) {
-                                error!("Invalid celsius measured (-100 to 100): {}", value);
-                                return Err(Error::MeasurementOutOfRange(
-                                    value.to_string(),
-                                    "-100..=100".to_owned(),
-                                ));
-                            }
-                        } else {
+                        // There is no NaN in JSON, most serializers cast it to null
+                        if value.as_null().is_some() {
+                            *value = serde_json::json!(f64::NAN);
+                        }
+
+                        if value.as_f64().is_none() {
                             error!("Invalid celsius measured: {:?}", value);
                             return Err(Error::InvalidMeasurementType(
                                 value.clone(),
@@ -167,15 +165,7 @@ async fn handle_measurements(
                         }
                     }
                     SensorMeasurementType::RawAnalogRead => {
-                        if let Some(value) = value.as_i64() {
-                            if !(0..=1024).contains(&value) {
-                                error!("Invalid raw analog read (0-1024): {}", value);
-                                return Err(Error::MeasurementOutOfRange(
-                                    value.to_string(),
-                                    "0..=1024".to_owned(),
-                                ));
-                            }
-                        } else {
+                        if value.as_i64().is_none() {
                             error!("Invalid raw analog read: {:?}", value);
                             return Err(Error::InvalidMeasurementType(
                                 value.clone(),
@@ -184,15 +174,12 @@ async fn handle_measurements(
                         }
                     }
                     SensorMeasurementType::Percentage => {
-                        if let Some(value) = value.as_f64() {
-                            if !(0. ..=100.).contains(&value) {
-                                error!("Invalid percentage: {}", value);
-                                return Err(Error::MeasurementOutOfRange(
-                                    value.to_string(),
-                                    "0..=100".to_owned(),
-                                ));
-                            }
-                        } else {
+                        // There is no NaN in JSON, most serializers cast it to null
+                        if value.as_null().is_some() {
+                            *value = serde_json::json!(f64::NAN);
+                        }
+
+                        if value.as_f64().is_none() {
                             error!("Invalid percentage measured: {:?}", value);
                             return Err(Error::InvalidMeasurementType(
                                 value.clone(),
