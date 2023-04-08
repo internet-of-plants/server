@@ -69,31 +69,16 @@ impl Firmware {
             write!(binary_hash, "{:02x}", byte)?;
         }
 
-        let id: Option<(FirmwareId,)> = sqlx::query_as(
-            "
-            SELECT id
-            FROM firmwares
-            WHERE organization_id = $1 AND binary_hash = $2",
+        let (id,): (FirmwareId,) = sqlx::query_as(
+            "INSERT INTO firmwares (compilation_id, organization_id, bin, binary_hash) VALUES ($1, $2, $3, $4) RETURNING id",
         )
+        .bind(compilation.id())
         .bind(organization.id())
+        .bind(&bin)
         .bind(&binary_hash)
-        .fetch_optional(&mut *txn)
+        .fetch_one(txn)
         .await?;
 
-        let id = if let Some((id,)) = id {
-            id
-        } else {
-            let (id,): (FirmwareId,) = sqlx::query_as(
-                "INSERT INTO firmwares (compilation_id, organization_id, bin, binary_hash) VALUES ($1, $2, $3, $4) RETURNING id",
-            )
-            .bind(compilation.id())
-            .bind(organization.id())
-            .bind(&bin)
-            .bind(&binary_hash)
-            .fetch_one(txn)
-            .await?;
-            id
-        };
         Ok(Self {
             id,
             compilation_id: Some(compilation.id()),
