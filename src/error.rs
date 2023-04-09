@@ -1,4 +1,6 @@
-use crate::{CompilerId, NewSensor, SensorPrototypeId, SensorWidgetKindView, ValRaw};
+use crate::{
+    CompilerId, NewSensor, SensorPrototypeId, SensorWidgetKindView, TargetPrototypeId, ValRaw,
+};
 use axum::response::{IntoResponse, Response};
 use axum::{http::StatusCode, Json};
 use backtrace::Backtrace;
@@ -100,6 +102,8 @@ pub enum Error {
     InvalidValType(ValRaw, SensorWidgetKindView),
     #[error("sensor {0} referenced not found {1:?}")]
     SensorReferencedNotFound(u64, NewSensor),
+    #[error("wrong target prototype, expected {0} and got {1}")]
+    WrongTargetPrototype(TargetPrototypeId, TargetPrototypeId),
 }
 
 impl From<sqlx::error::Error> for Error {
@@ -287,6 +291,10 @@ impl IntoResponse for Error {
             Self::SensorReferencedNotFound(pk, sensor) => {
                 warn!("sensor {pk} referenced not found {sensor:?}");
                 (StatusCode::BAD_REQUEST, "Invalid Sensor")
+            }
+            Self::WrongTargetPrototype(expected, got) => {
+                warn!("wrong target prototype, expected {expected} and got {got}");
+                (StatusCode::BAD_REQUEST, "Wrong Target Prototype")
             }
             Self::NothingFound => {
                 warn!("Nothing Found");

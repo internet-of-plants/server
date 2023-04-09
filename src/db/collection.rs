@@ -1,6 +1,6 @@
 use crate::{
     Compiler, CompilerId, CompilerView, DateTime, Device, DeviceView, Error, Firmware,
-    Organization, Result, Transaction, User,
+    Organization, Result, TargetPrototype, TargetPrototypeId, Transaction, User,
 };
 use derive::id;
 use derive_get::Getters;
@@ -18,6 +18,7 @@ pub struct CollectionView {
     description: Option<String>,
     compiler: Option<CompilerView>,
     devices: Vec<DeviceView>,
+    target_prototype: TargetPrototype,
     #[copy]
     created_at: DateTime,
     #[copy]
@@ -34,6 +35,7 @@ impl CollectionView {
         };
         Ok(Self {
             id: collection.id,
+            target_prototype: collection.target_prototype(txn).await?,
             name: collection.name,
             description: collection.description,
             compiler,
@@ -51,6 +53,8 @@ pub struct Collection {
     name: String,
     description: Option<String>,
     #[copy]
+    target_prototype_id: TargetPrototypeId,
+    #[copy]
     compiler_id: Option<CompilerId>,
     #[copy]
     created_at: DateTime,
@@ -62,6 +66,7 @@ impl Collection {
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: String,
+        target_prototype_id: TargetPrototypeId,
         organization: &Organization,
     ) -> Result<Self> {
         if name.is_empty() {
@@ -69,15 +74,17 @@ impl Collection {
         }
 
         let (id, now) = sqlx::query_as::<_, (CollectionId, DateTime)>(
-            "INSERT INTO collections (name) VALUES ($1) RETURNING id, created_at",
+            "INSERT INTO collections (name, target_prototype_id) VALUES ($1, $2) RETURNING id, created_at",
         )
         .bind(&name)
+        .bind(&target_prototype_id)
         .fetch_one(&mut *txn)
         .await?;
 
         let mut col = Self {
             id,
             name,
+            target_prototype_id,
             description: None,
             compiler_id: None,
             created_at: now,
@@ -94,7 +101,7 @@ impl Collection {
         user: &User,
     ) -> Result<Self> {
         let collection: Self = sqlx::query_as(
-            "SELECT col.id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
+            "SELECT col.id, col.target_prototype_id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
              FROM collections as col
              INNER JOIN collection_belongs_to_organization cbt ON cbt.collection_id = col.id
              INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
@@ -112,7 +119,7 @@ impl Collection {
         organization: &Organization,
     ) -> Result<Vec<Self>> {
         let collections: Vec<Self> = sqlx::query_as(
-            "SELECT col.id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
+            "SELECT col.id, col.target_prototype_id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
              FROM collections as col
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = col.id
              WHERE cbt.organization_id = $1",
@@ -157,7 +164,7 @@ impl Collection {
 
     pub async fn find_by_device(txn: &mut Transaction<'_>, device: &Device) -> Result<Self> {
         let collection = sqlx::query_as(
-            "SELECT col.id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
+            "SELECT col.id, col.target_prototype_id, col.name, col.description, col.compiler_id, col.created_at, col.updated_at
              FROM collections as col
              INNER JOIN devices ON devices.collection_id = col.id
              WHERE devices.id = $1",
@@ -173,7 +180,7 @@ impl Collection {
         compiler: &Compiler,
     ) -> Result<Option<Self>> {
         let collection = sqlx::query_as(
-            "SELECT col.id, col.name, col.description, col.compiler_id,  col.created_at, col.updated_at
+            "SELECT col.id, col.target_prototype_id, col.name, col.description, col.compiler_id,  col.created_at, col.updated_at
             FROM collections as col
             WHERE col.compiler_id = $1",
         )
@@ -249,5 +256,9 @@ impl Collection {
             .execute(txn)
             .await?;
         Ok(())
+    }
+
+    pub async fn target_prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+        TargetPrototype::find_by_id(txn, self.target_prototype_id).await
     }
 }

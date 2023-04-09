@@ -88,6 +88,37 @@ where
     }
 }
 
+pub struct MaybeTargetPrototype(pub Option<super::TargetPrototype>);
+
+#[async_trait]
+impl<B> FromRequest<B> for MaybeTargetPrototype
+where
+    B: Send,
+{
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let Extension(pool) = Extension::<&'static Pool>::from_request(req)
+            .await
+            .expect("`Pool` extension missing");
+
+        let driver = TypedHeader::<Driver>::from_request(req)
+            .await
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "No driver header"))?;
+
+        let mut txn = pool
+            .begin()
+            .await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+
+        let maybe_target_prototype =
+            crate::TargetPrototype::try_find_by_arch(&mut txn, &driver.0 .0.to_lowercase())
+                .await
+                .map_err(|_| (StatusCode::UNAUTHORIZED, "Device not found"))?;
+        Ok(Self(maybe_target_prototype))
+    }
+}
+
 #[derive(Debug)]
 struct AuthorizationHeader(String);
 
@@ -173,6 +204,40 @@ impl headers_core::Header for Version {
     fn name() -> &'static headers_core::HeaderName {
         thread_local! {
             static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(VERSION_NAME).into());
+        }
+        NAME.with(|n| *n)
+    }
+
+    fn decode<'i, I: Iterator<Item = &'i headers_core::HeaderValue>>(
+        values: &mut I,
+    ) -> Result<Self, headers_core::Error> {
+        values
+            .next()
+            .and_then(|val| val.to_str().ok().map(|v| Self(v.to_owned())))
+            .ok_or_else(headers_core::Error::invalid)
+    }
+
+    fn encode<E: Extend<headers_core::HeaderValue>>(&self, values: &mut E) {
+        if let Ok(name) = headers_core::HeaderValue::from_str(&self.0) {
+            values.extend(std::iter::once(name));
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Driver(pub String);
+
+impl From<&Driver> for headers_core::HeaderValue {
+    fn from(driver: &Driver) -> Self {
+        Self::from_str(&driver.0).expect("unable to convert driver to header value")
+    }
+}
+
+const DRIVER_NAME: &str = "driver";
+impl headers_core::Header for Driver {
+    fn name() -> &'static headers_core::HeaderName {
+        thread_local! {
+            static NAME: &'static headers_core::HeaderName = Box::leak(headers_core::HeaderName::from_static(DRIVER_NAME).into());
         }
         NAME.with(|n| *n)
     }

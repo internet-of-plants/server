@@ -156,6 +156,15 @@ impl TargetPrototype {
             .await?)
     }
 
+    pub async fn try_find_by_arch(txn: &mut Transaction<'_>, arch: &str) -> Result<Option<Self>> {
+        Ok(sqlx::query_as(
+            "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE arch = $1"
+        )
+            .bind(arch)
+            .fetch_optional(txn)
+            .await?)
+    }
+
     pub async fn find_by_arch(txn: &mut Transaction<'_>, arch: &str) -> Result<Self> {
         Ok(sqlx::query_as(
             "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE arch = $1"

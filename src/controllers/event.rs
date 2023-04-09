@@ -65,9 +65,25 @@ pub async fn new(
             if let Some(compilation) = firmware.compilation(&mut txn).await? {
                 let compiler = compilation.compiler(&mut txn).await?;
                 if let Some(col) = Collection::find_by_compiler(&mut txn, &compiler).await? {
+                    if col.target_prototype_id() != device.target_prototype_id() {
+                        return Err(Error::WrongTargetPrototype(
+                            col.target_prototype_id(),
+                            device.target_prototype_id(),
+                        ));
+                    }
+
                     device.set_collection(&mut txn, &col).await?;
                     collection = col;
                 } else {
+                    let target = compiler.target(&mut txn).await?;
+                    let prototype = target.prototype(&mut txn).await?;
+                    if collection.target_prototype_id() != prototype.id() {
+                        return Err(Error::WrongTargetPrototype(
+                            collection.target_prototype_id(),
+                            prototype.id(),
+                        ));
+                    }
+
                     collection.set_compiler(&mut txn, Some(&compiler)).await?;
                 }
             } else {
@@ -78,6 +94,13 @@ pub async fn new(
                         .pop()
                 {
                     let col = dev.collection(&mut txn).await?;
+
+                    if col.target_prototype_id() != device.target_prototype_id() {
+                        return Err(Error::WrongTargetPrototype(
+                            col.target_prototype_id(),
+                            device.target_prototype_id(),
+                        ));
+                    }
                     device.set_collection(&mut txn, &col).await?;
                 }
             }

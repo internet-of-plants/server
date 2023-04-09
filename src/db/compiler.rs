@@ -177,23 +177,69 @@ impl Compiler {
 
         if let Some(col) = compiler.collection(txn).await? {
             match device {
-                Some(device) => device.set_collection(txn, &col).await?,
+                Some(device) => {
+                    if col.target_prototype_id() != device.target_prototype_id() {
+                        return Err(Error::WrongTargetPrototype(
+                            col.target_prototype_id(),
+                            device.target_prototype_id(),
+                        ));
+                    }
+                    device.set_collection(txn, &col).await?;
+                }
                 None => {
                     for mut device in Device::from_collection(txn, collection).await? {
+                        if col.target_prototype_id() != device.target_prototype_id() {
+                            return Err(Error::WrongTargetPrototype(
+                                col.target_prototype_id(),
+                                device.target_prototype_id(),
+                            ));
+                        }
                         device.set_collection(txn, &col).await?;
                     }
                 }
             }
             *collection = col;
         } else if let Some(device) = device {
+            let target = compiler.target(txn).await?;
+            let prototype = target.prototype(txn).await?;
+            if collection.target_prototype_id() != prototype.id() {
+                return Err(Error::WrongTargetPrototype(
+                    collection.target_prototype_id(),
+                    prototype.id(),
+                ));
+            }
+
             if Device::from_collection(txn, collection).await?.len() == 1 {
                 collection.set_compiler(txn, Some(&compiler)).await?;
             } else {
-                let mut col = Collection::new(txn, device.name().to_owned(), &organization).await?;
+                let mut col = Collection::new(
+                    txn,
+                    device.name().to_owned(),
+                    device.target_prototype_id(),
+                    &organization,
+                )
+                .await?;
                 col.set_compiler(txn, Some(&compiler)).await?;
+                *collection = col;
+
+                if collection.target_prototype_id() != device.target_prototype_id() {
+                    return Err(Error::WrongTargetPrototype(
+                        collection.target_prototype_id(),
+                        device.target_prototype_id(),
+                    ));
+                }
                 device.set_collection(txn, collection).await?;
             }
         } else {
+            let target = compiler.target(txn).await?;
+            let prototype = target.prototype(txn).await?;
+            if collection.target_prototype_id() != prototype.id() {
+                return Err(Error::WrongTargetPrototype(
+                    collection.target_prototype_id(),
+                    prototype.id(),
+                ));
+            }
+
             collection.set_compiler(txn, Some(&compiler)).await?;
         }
 

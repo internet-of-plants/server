@@ -1,6 +1,7 @@
 use crate::{
     utils, AuthToken, Collection, CollectionId, CompilerView, DateTime, Error, Event, EventView,
-    Firmware, FirmwareId, FirmwareView, Login, Organization, Result, Transaction, User, UserId,
+    Firmware, FirmwareId, FirmwareView, Login, Organization, Result, TargetPrototype,
+    TargetPrototypeId, Transaction, User, UserId,
 };
 use derive::id;
 use derive_get::Getters;
@@ -17,6 +18,7 @@ pub struct DeviceView {
     name: String,
     description: Option<String>,
     mac: String,
+    target_prototype: TargetPrototype,
     firmware: FirmwareView,
     compiler: Option<CompilerView>,
     last_event: Option<EventView>,
@@ -45,6 +47,7 @@ impl DeviceView {
         };
         Ok(DeviceView {
             id: device.id,
+            target_prototype: device.target_prototype(txn).await?,
             name: device.name,
             description: device.description,
             firmware,
@@ -69,6 +72,8 @@ pub struct Device {
     description: Option<String>,
     mac: String,
     #[copy]
+    target_prototype_id: TargetPrototypeId,
+    #[copy]
     created_at: DateTime,
     #[copy]
     updated_at: DateTime,
@@ -78,11 +83,16 @@ pub struct Device {
 pub struct NewDevice {
     mac: String,
     file_hash: String,
+    target_prototype: TargetPrototype,
 }
 
 impl NewDevice {
-    pub fn new(mac: String, file_hash: String) -> Self {
-        Self { mac, file_hash }
+    pub fn new(mac: String, file_hash: String, target_prototype: TargetPrototype) -> Self {
+        Self {
+            mac,
+            file_hash,
+            target_prototype,
+        }
     }
 }
 
@@ -94,6 +104,7 @@ impl Device {
     ) -> Result<Device> {
         let device = Self::try_find_by_mac(txn, organization, &new_device.mac).await?;
 
+        // TODO: add target prototype check here
         let firmware = if let Some(firmware) =
             Firmware::try_find_by_hash(txn, organization, &new_device.file_hash).await?
         {
@@ -103,19 +114,51 @@ impl Device {
         };
 
         let compiler = if let Some(compilation) = firmware.compilation(txn).await? {
-            Some(compilation.compiler(txn).await?)
+            let compiler = compilation.compiler(txn).await?;
+            let target = compiler.target(txn).await?;
+
+            if target.target_prototype_id() != new_device.target_prototype.id() {
+                return Err(Error::WrongTargetPrototype(
+                    target.target_prototype_id(),
+                    new_device.target_prototype.id(),
+                ));
+            }
+
+            Some(compiler)
         } else {
             None
         };
 
         if let Some(mut device) = device {
+            if device.target_prototype_id != new_device.target_prototype.id() {
+                return Err(Error::WrongTargetPrototype(
+                    device.target_prototype_id,
+                    new_device.target_prototype.id(),
+                ));
+            }
+
             let mut collection = device.collection(txn).await?;
 
             if collection.compiler(txn).await?.is_none() {
                 if let Some(compiler) = compiler {
                     if let Some(col) = Collection::find_by_compiler(txn, &compiler).await? {
+                        if col.target_prototype_id() != device.target_prototype_id() {
+                            return Err(Error::WrongTargetPrototype(
+                                col.target_prototype_id(),
+                                device.target_prototype_id(),
+                            ));
+                        }
+
                         device.set_collection(txn, &col).await?;
                     } else {
+                        let target = compiler.target(txn).await?;
+                        let prototype = target.prototype(txn).await?;
+                        if collection.target_prototype_id() != prototype.id() {
+                            return Err(Error::WrongTargetPrototype(
+                                collection.target_prototype_id(),
+                                prototype.id(),
+                            ));
+                        }
                         collection.set_compiler(txn, Some(&compiler)).await?;
                     }
                 } else {
@@ -125,6 +168,13 @@ impl Device {
                         .pop()
                     {
                         let col = dev.collection(txn).await?;
+
+                        if col.target_prototype_id() != device.target_prototype_id() {
+                            return Err(Error::WrongTargetPrototype(
+                                col.target_prototype_id(),
+                                device.target_prototype_id(),
+                            ));
+                        }
                         device.set_collection(txn, &col).await?;
                     }
                 }
@@ -137,24 +187,42 @@ impl Device {
         }
 
         let name = format!("device-{}", utils::random_string(5));
-        let mut collection = Collection::new(txn, name.clone(), organization).await?;
+        let mut collection = Collection::new(
+            txn,
+            name.clone(),
+            new_device.target_prototype.id(),
+            organization,
+        )
+        .await?;
 
         if device.is_none() {
+            if let Some(compiler) = &compiler {
+                let target = compiler.target(txn).await?;
+                let prototype = target.prototype(txn).await?;
+                if collection.target_prototype_id() != prototype.id() {
+                    return Err(Error::WrongTargetPrototype(
+                        collection.target_prototype_id(),
+                        prototype.id(),
+                    ));
+                }
+            }
             collection.set_compiler(txn, compiler.as_ref()).await?;
         }
 
         let (id, now) =
-            sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, number_of_plants, collection_id, name, firmware_id) VALUES ($1, '1', $2, $3, $4) RETURNING id, created_at")
-                .bind(&new_device.mac)
+            sqlx::query_as::<_, (DeviceId, DateTime)>("INSERT INTO devices (mac, collection_id, name, firmware_id, target_prototype_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at")
+                .bind(new_device.mac())
                 .bind(collection.id())
                 .bind(&name)
                 .bind(firmware.id())
+                .bind(new_device.target_prototype.id())
                 .fetch_one(&mut *txn)
                 .await?;
         Ok(Self {
             id,
             collection_id: collection.id(),
             firmware_id: firmware.id(),
+            target_prototype_id: new_device.target_prototype.id(),
             name,
             description: None,
             mac: new_device.mac,
@@ -169,7 +237,7 @@ impl Device {
         mac: &str,
     ) -> Result<Option<Self>> {
         let device: Option<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.target_prototype_id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
@@ -188,7 +256,7 @@ impl Device {
         user: &User,
     ) -> Result<Self> {
         let device: Self = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.target_prototype_id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              INNER JOIN user_belongs_to_organization ubt ON ubt.organization_id = cbt.organization_id
@@ -206,7 +274,7 @@ impl Device {
         collection: &Collection,
     ) -> Result<Vec<Self>> {
         let devices: Vec<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.target_prototype_id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              WHERE dev.collection_id = $1",
@@ -223,7 +291,7 @@ impl Device {
         mac: String,
     ) -> Result<Self> {
         let device: Option<Self> = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.target_prototype_id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN authentications ON authentications.device_id = dev.id AND authentications.mac = dev.mac AND authentications.expired = false
              WHERE authentications.token = $1 AND authentications.mac = $2",
@@ -241,7 +309,7 @@ impl Device {
         organization: &Organization,
     ) -> Result<Vec<Self>> {
         let device = sqlx::query_as(
-            "SELECT dev.id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
+            "SELECT dev.id, dev.target_prototype_id, dev.collection_id, dev.firmware_id, dev.name, dev.description, dev.mac, dev.created_at, dev.updated_at
              FROM devices as dev
              INNER JOIN collection_belongs_to_organization as cbt ON cbt.collection_id = dev.collection_id
              WHERE cbt.organization_id = $1 AND dev.firmware_id = $2"
@@ -377,5 +445,9 @@ impl Device {
 
     pub async fn collection(&self, txn: &mut Transaction<'_>) -> Result<Collection> {
         Collection::find_by_device(txn, self).await
+    }
+
+    pub async fn target_prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
+        TargetPrototype::find_by_id(txn, self.target_prototype_id).await
     }
 }

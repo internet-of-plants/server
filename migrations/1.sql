@@ -74,12 +74,13 @@ CREATE TABLE IF NOT EXISTS compilers (
 );
 
 CREATE TABLE IF NOT EXISTS collections (
-  id          BIGSERIAL    PRIMARY KEY NOT NULL,
-  name        TEXT                     NOT NULL,
-  compiler_id BIGINT,
-  description TEXT,
-  created_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
+  id                  BIGSERIAL    PRIMARY KEY NOT NULL,
+  name                TEXT                     NOT NULL,
+  compiler_id         BIGINT,
+  description         TEXT,
+  target_prototype_id BIGINT                   NOT NULL,
+  created_at          TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ              NOT NULL DEFAULT NOW(),
   FOREIGN KEY (compiler_id) REFERENCES compilers (id)
 );
 
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS compilations (
   FOREIGN KEY (certificate_id) REFERENCES certificates (id)
 );
 
+-- TODO: connect to target prototype id and maybe target_id
 CREATE TABLE IF NOT EXISTS firmwares (
   id              BIGSERIAL PRIMARY KEY NOT NULL,
   compilation_id  BIGINT,
@@ -127,17 +129,18 @@ CREATE TABLE IF NOT EXISTS firmwares (
 );
 
 CREATE TABLE IF NOT EXISTS devices (
-  id               BIGSERIAL PRIMARY KEY NOT NULL,
-  name             TEXT                  NOT NULL,
-  description      TEXT,
-  collection_id    BIGINT                NOT NULL,
-  firmware_id      BIGINT                NOT NULL,
-  mac              CHAR(17)              NOT NULL,
-  number_of_plants INTEGER               NOT NULL,
-  created_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
+  id                  BIGSERIAL PRIMARY KEY NOT NULL,
+  name                TEXT                  NOT NULL,
+  description         TEXT,
+  collection_id       BIGINT                NOT NULL,
+  firmware_id         BIGINT                NOT NULL,
+  mac                 CHAR(17)              NOT NULL,
+  target_prototype_id BIGINT                NOT NULL,
+  created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   UNIQUE (mac, collection_id),
   FOREIGN KEY (collection_id) REFERENCES collections (id),
+  FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id),
   FOREIGN KEY (firmware_id) REFERENCES firmwares (id)
 );
 

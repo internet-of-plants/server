@@ -1,7 +1,7 @@
 use crate::{
     extractor::User, Collection, CollectionId, CompilationView, Compiler, CompilerId, CompilerView,
-    Device, DeviceConfig, DeviceId, NewCompiler, NewSensor, Organization, OrganizationId, Pool,
-    Result, Sensor, Target, TargetId,
+    Device, DeviceConfig, DeviceId, Error, NewCompiler, NewSensor, Organization, OrganizationId,
+    Pool, Result, Sensor, Target, TargetId,
 };
 use axum::extract::{Extension, Json, Query};
 use serde::Deserialize;
@@ -103,16 +103,46 @@ pub async fn set(
         }
         collection.delete(&mut txn).await?;
     } else if let Id::DeviceId { device_id } = request.id {
+        let target = compiler.target(&mut txn).await?;
+        let prototype = target.prototype(&mut txn).await?;
+        if collection.target_prototype_id() != prototype.id() {
+            return Err(Error::WrongTargetPrototype(
+                collection.target_prototype_id(),
+                prototype.id(),
+            ));
+        }
+
         if Device::from_collection(&mut txn, &collection).await?.len() == 1 {
             collection.set_compiler(&mut txn, Some(&compiler)).await?;
         } else {
             let mut device = Device::find_by_id(&mut txn, device_id, &user).await?;
-            collection = Collection::new(&mut txn, device.name().to_owned(), &organization).await?;
+            collection = Collection::new(
+                &mut txn,
+                device.name().to_owned(),
+                device.target_prototype_id(),
+                &organization,
+            )
+            .await?;
             collection.set_compiler(&mut txn, Some(&compiler)).await?;
+
+            if collection.target_prototype_id() != device.target_prototype_id() {
+                return Err(Error::WrongTargetPrototype(
+                    collection.target_prototype_id(),
+                    device.target_prototype_id(),
+                ));
+            }
             device.set_collection(&mut txn, &collection).await?;
         }
     } else if let Id::CollectionId { collection_id } = request.id {
         let mut collection = Collection::find_by_id(&mut txn, collection_id, &user).await?;
+        let target = compiler.target(&mut txn).await?;
+        let prototype = target.prototype(&mut txn).await?;
+        if collection.target_prototype_id() != prototype.id() {
+            return Err(Error::WrongTargetPrototype(
+                collection.target_prototype_id(),
+                prototype.id(),
+            ));
+        }
         collection.set_compiler(&mut txn, Some(&compiler)).await?;
     }
     let compilation = CompilationView::new(compiler.latest_compilation(&mut txn).await?);

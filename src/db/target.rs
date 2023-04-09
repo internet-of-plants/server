@@ -155,11 +155,15 @@ impl Target {
         Ok(target)
     }
 
-    pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+    pub async fn list_for_prototype(
+        txn: &mut Transaction<'_>,
+        prototype_id: TargetPrototypeId,
+    ) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
             "SELECT id, board, target_prototype_id, pin_hpp, build_flags
-            FROM targets",
+            FROM targets WHERE target_prototype_id = $1",
         )
+        .bind(prototype_id)
         .fetch_all(txn)
         .await?)
     }
