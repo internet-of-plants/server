@@ -1,7 +1,7 @@
 use crate::{
-    Collection, CollectionId, Compilation, Device, DeviceConfig, DeviceConfigView, DeviceId,
-    DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization, Result,
-    Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
+    logger::*, Collection, CollectionId, Compilation, Device, DeviceConfig, DeviceConfigView,
+    DeviceId, DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization,
+    Result, Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
 };
 use derive::id;
 use derive_get::Getters;
@@ -314,6 +314,7 @@ impl Compiler {
     }
 
     pub async fn compile(&self, txn: &mut Transaction<'_>) -> Result<Compilation> {
+        info!("Recompiling: {:?}", self.id);
         let target = self.target(txn).await?;
         let sensors = self.sensors(txn).await?;
 

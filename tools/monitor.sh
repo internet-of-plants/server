@@ -9,7 +9,6 @@ for f in /tmp/iop-*.root; do
   #umount -l $f/var/lock
   umount -l $f/var/tmp
   #umount -l $f/var/run
-  umount -l $f/var/log/iop
   umount -l $f/tmp
   #umount -l $f/sys
   umount -l $f/usr
@@ -31,26 +30,28 @@ done
 
 # Allows to update the binary without stopping it, and jails it
 echo $FOLDER
-mkdir -p $FOLDER/migrations $FOLDER/packages $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDER/var/lock $FOLDER/bin $FOLDER/sbin $FOLDER/sys $FOLDER/var/log/iop $FOLDER/var/run $FOLDER/var/crash $FOLDER/usr $FOLDER/lib $FOLDER/run $FOLDER/home/iop $FOLDER/boot $FOLDER/lib32 $FOLDER/lib64 $FOLDER/libx32 $FOLDER/home/iop
+mkdir -p $FOLDER/migrations $FOLDER/packages $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDER/var/lock $FOLDER/bin $FOLDER/sbin $FOLDER/sys $FOLDER/var/run $FOLDER/var/crash $FOLDER/usr $FOLDER/lib $FOLDER/run $FOLDER/home/iop $FOLDER/boot $FOLDER/lib32 $FOLDER/lib64 $FOLDER/libx32 $FOLDER/home/iop
 
-mkdir -p $FOLDER.tmpfs $FOLDER.var.tmpfs
-mount --bind $FOLDER.tmpfs $FOLDER/tmp
-mount --bind $FOLDER.var.tmpfs $FOLDER/var/tmp
-#mount --bind /var/lock $FOLDER/var/lock
-#mount --bind /var/run $FOLDER/var/run
-mount --bind /var/log/iop $FOLDER/var/log/iop
+ln /var/log/iop/monitor.log $FOLDER/monitor.log
+
 mount --bind /bin $FOLDER/bin
-#mount --bind /sbin $FOLDER/sbin
 mount --bind /lib $FOLDER/lib
-#mount --bind /lib32 $FOLDER/lib32
 mount --bind /lib64 $FOLDER/lib64
-#mount --bind /libx32 $FOLDER/libx32
-#mount --bind /sys $FOLDER/sys
 mount --bind /usr $FOLDER/usr
-#mount --bind /dev $FOLDER/dev
-#mount --bind /run $FOLDER/run
 mount --bind /proc $FOLDER/proc
 mount --bind /etc $FOLDER/etc
+
+#mkdir -p $FOLDER.tmpfs $FOLDER.var.tmpfs
+#mount --bind $FOLDER.tmpfs $FOLDER/tmp
+#mount --bind $FOLDER.var.tmpfs $FOLDER/var/tmp
+#mount --bind /var/lock $FOLDER/var/lock
+#mount --bind /var/run $FOLDER/var/run
+#mount --bind /sbin $FOLDER/sbin
+#mount --bind /lib32 $FOLDER/lib32
+#mount --bind /libx32 $FOLDER/libx32
+#mount --bind /sys $FOLDER/sys
+#mount --bind /dev $FOLDER/dev
+#mount --bind /run $FOLDER/run
 #mount --bind /boot $FOLDER/boot
 
 #echo "root:x:0:0:root:/root:/bin/bash" > $FOLDER/etc/passwd
@@ -61,6 +62,7 @@ mount --bind /etc $FOLDER/etc
 #cp -r /etc/ssl $FOLDER/etc/ssl
 #cp -r /etc/pam.d $FOLDER/etc/pam.d
 #cp -r /etc/pam.d $FOLDER/etc/pam.d
+
 cp /var/run/utmp $FOLDER/var/run/utmp
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
 cp -r $SCRIPTPATH/packages/* $FOLDER/packages/
@@ -102,7 +104,7 @@ sudo chown iop.iop $FOLDER/packages
 sudo chown iop.iop $FOLDER/packages/*
 sudo chown iop.iop $FOLDER/packages/target_prototypes/*
 sudo chown iop.iop $FOLDER/packages/sensor_prototypes/*
-sudo chown root.iop $FOLDER
+sudo chown iop.iop $FOLDER
 
 for path in "$FOLDER/packages/target_prototypes/"*; do
   folder=$(basename "$path")

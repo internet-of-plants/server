@@ -1,6 +1,6 @@
 use crate::{
     extractor::MacAddress, extractor::MaybeTargetPrototype, extractor::Version, logger::*, Device,
-    Login, NewDevice, NewUser, Pool, Result, User,
+    Error, Login, NewDevice, NewUser, Pool, Result, User,
 };
 use axum::{extract::Extension, extract::Json, extract::TypedHeader, response::IntoResponse};
 
@@ -41,18 +41,20 @@ pub async fn login(
         file_hash
     );
     let mut txn = pool.begin().await?;
-    let token = if let (Some(mac), Some(file_hash), Some(target_prototype)) =
-        (mac, file_hash, maybe_target_prototype)
-    {
-        let (mac, file_hash) = (mac.0 .0, file_hash.0 .0);
-        Device::login(
-            &mut txn,
-            user,
-            NewDevice::new(mac, file_hash, target_prototype),
-        )
-        .await?
-    } else {
-        User::login(&mut txn, user).await?
+    let token = match (mac, file_hash, maybe_target_prototype) {
+        (Some(mac), Some(file_hash), Some(target_prototype)) => {
+            let (mac, file_hash) = (mac.0 .0, file_hash.0 .0);
+            Device::login(
+                &mut txn,
+                user,
+                NewDevice::new(mac, file_hash, target_prototype),
+            )
+            .await?
+        }
+        (None, None, None) => User::login(&mut txn, user).await?,
+        (_, _, None) => return Err(Error::MissingHeader("DRIVER")),
+        (_, None, _) => return Err(Error::MissingHeader("VERSION")),
+        (None, _, _) => return Err(Error::MissingHeader("MAC_ADDRESS")),
     };
     txn.commit().await?;
     Ok(token)
