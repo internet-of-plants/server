@@ -120,8 +120,10 @@ impl Device {
                     }
                 } else {
                     // Assume all devices with the same firmware are of the same collection, a race might make this not true, but let's pick one
-                    if let Some(dev) =  
-                        crate::Device::list_by_firmware(txn, &firmware, organization).await?.pop() {
+                    if let Some(dev) = crate::Device::list_by_firmware(txn, &firmware, organization)
+                        .await?
+                        .pop()
+                    {
                         let col = dev.collection(txn).await?;
                         device.set_collection(txn, &col).await?;
                     }

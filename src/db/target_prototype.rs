@@ -2,7 +2,7 @@ use crate::{Result, Transaction};
 use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
+use std::{convert::TryFrom, fmt::Write};
 
 #[id]
 pub struct CertificateId;
@@ -15,6 +15,12 @@ pub struct Certificate {
     #[copy]
     target_prototype_id: TargetPrototypeId,
     hash: String,
+}
+
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct NewDependency {
+    repo_url: String,
+    branch: String,
 }
 
 #[derive(sqlx::FromRow, Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -52,57 +58,93 @@ pub struct TargetPrototype {
     ldf_mode: Option<String>,
 }
 
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct NewTargetPrototype {
+    certs_url: String,
+    arch: String,
+    build_flags: String,
+    #[serde(default)]
+    build_unflags: Option<String>,
+    platform: String,
+    #[serde(default)]
+    framework: Option<String>,
+    #[serde(default)]
+    platform_packages: Option<String>,
+    #[serde(default)]
+    extra_platformio_params: Option<String>,
+    #[serde(default)]
+    ldf_mode: Option<String>,
+    #[serde(default)]
+    dependencies: Vec<NewDependency>,
+}
+
+impl TryFrom<serde_json::Value> for NewTargetPrototype {
+    type Error = serde_json::Error;
+
+    fn try_from(json: serde_json::Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(json)
+    }
+}
+
 impl TargetPrototype {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        certs_url: String,
-        arch: String,
-        build_flags: String,
-        platform: String,
-        framework: Option<String>,
-        platform_packages: Option<String>,
-        extra_platformio_params: Option<String>,
-        ldf_mode: Option<String>,
-        dependencies: Vec<Dependency>,
-    ) -> Result<Self> {
-        let (id,): (TargetPrototypeId,) = sqlx::query_as(
-            "INSERT INTO target_prototypes (certs_url, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+    pub async fn new(txn: &mut Transaction<'_>, prototype: NewTargetPrototype) -> Result<Self> {
+        sqlx::query(
+            "INSERT INTO target_prototypes
+            (certs_url, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (arch)
+            DO UPDATE SET certs_url = $1,
+                          build_flags = $3,
+                          platform = $4,
+                          framework = $5,
+                          platform_packages = $6,
+                          extra_platformio_params = $7,
+                          ldf_mode = $8",
         )
-            .bind(&certs_url)
-            .bind(&arch)
-            .bind(&build_flags)
-            .bind(&platform)
-            .bind(&framework)
-            .bind(&platform_packages)
-            .bind(&extra_platformio_params)
-            .bind(&ldf_mode)
-            .fetch_one(&mut *txn)
+            .bind(prototype.certs_url())
+            .bind(prototype.arch())
+            .bind(prototype.build_flags())
+            .bind(prototype.platform())
+            .bind(prototype.framework())
+            .bind(prototype.platform_packages())
+            .bind(prototype.extra_platformio_params())
+            .bind(prototype.ldf_mode())
+            .execute(&mut *txn)
             .await?;
+
+        let result = Self::find_by_arch(txn, prototype.arch()).await?;
+        let mut dependencies = result.dependencies(txn).await?;
+
+        for dependency in prototype.dependencies() {
+            dependencies.retain(|d| d.repo_url() != dependency.repo_url());
+
+            sqlx::query(
+                "INSERT INTO dependency_belongs_to_target_prototype
+                (target_prototype_id, repo_url, branch)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (target_prototype_id, repo_url)
+                DO UPDATE SET branch = $3",
+            )
+            .bind(result.id())
+            .bind(dependency.repo_url())
+            .bind(dependency.branch())
+            .execute(&mut *txn)
+            .await?;
+        }
 
         for dependency in dependencies {
             sqlx::query(
-                "INSERT INTO dependency_belongs_to_target_prototype (target_prototype_id, repo_url, branch) VALUES ($1, $2, $3)",
+                "DELETE FROM dependency_belongs_to_target_prototype
+                WHERE target_prototype_id = $1 AND repo_url = $2",
             )
-                .bind(id)
-                .bind(dependency.repo_url())
-                .bind(dependency.branch())
-                .execute(&mut *txn)
-                .await?;
+            .bind(result.id())
+            .bind(dependency.repo_url())
+            .execute(&mut *txn)
+            .await?;
         }
 
-        Ok(Self {
-            id,
-            certs_url,
-            arch,
-            build_flags,
-            build_unflags: None,
-            platform,
-            framework,
-            platform_packages,
-            extra_platformio_params,
-            ldf_mode,
-        })
+        Ok(result)
     }
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetPrototypeId) -> Result<Self> {
@@ -114,26 +156,21 @@ impl TargetPrototype {
             .await?)
     }
 
+    pub async fn find_by_arch(txn: &mut Transaction<'_>, arch: &str) -> Result<Self> {
+        Ok(sqlx::query_as(
+            "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes WHERE arch = $1"
+        )
+            .bind(arch)
+            .fetch_one(txn)
+            .await?)
+    }
+
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
             "SELECT id, certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode FROM target_prototypes"
         )
             .fetch_all(txn)
             .await?)
-    }
-
-    pub async fn set_build_unflags(
-        &mut self,
-        txn: &mut Transaction<'_>,
-        build_unflags: Option<String>,
-    ) -> Result<()> {
-        sqlx::query("UPDATE target_prototypes SET build_unflags = $1 WHERE id = $2")
-            .bind(&build_unflags)
-            .bind(self.id)
-            .execute(txn)
-            .await?;
-        self.build_unflags = build_unflags;
-        Ok(())
     }
 
     pub async fn dependencies(&self, txn: &mut Transaction<'_>) -> Result<Vec<Dependency>> {

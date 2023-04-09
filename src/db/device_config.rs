@@ -29,7 +29,7 @@ impl DeviceConfigView {
         Ok(Self {
             request_id: config.request_id,
             type_name: request.ty(txn).await?.name().to_owned(),
-            name: request.name().to_owned(),
+            name: request.variable_name().to_owned(),
             value: config.value,
         })
     }

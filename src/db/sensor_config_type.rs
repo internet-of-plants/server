@@ -235,6 +235,7 @@ impl SensorConfigType {
         Ok(ty)
     }
 
+    // TODO: find_or_create
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: Option<String>,

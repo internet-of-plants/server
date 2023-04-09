@@ -39,31 +39,41 @@ pub struct DeviceConfigType {
 }
 
 impl DeviceConfigType {
-    pub async fn find_by_id(txn: &mut Transaction<'_>, id: DeviceConfigTypeId) -> Result<Self> {
-        let ty = sqlx::query_as("SELECT id, name, widget FROM device_config_types WHERE id = $1")
-            .bind(id)
-            .fetch_one(txn)
-            .await?;
-        Ok(ty)
-    }
-
     pub async fn new(
         txn: &mut Transaction<'_>,
         name: String,
         widget_kind: DeviceWidgetKind,
     ) -> Result<Self> {
-        let (id,) = sqlx::query_as::<_, (DeviceConfigTypeId,)>(
-            "INSERT INTO device_config_types (name, widget) VALUES ($1, $2) RETURNING id",
+        sqlx::query(
+            "INSERT INTO device_config_types
+            (name, widget)
+            VALUES ($1, $2)
+            ON CONFLICT (name, widget) DO NOTHING",
         )
         .bind(&name)
         .bind(widget_kind)
-        .fetch_one(&mut *txn)
+        .execute(&mut *txn)
         .await?;
+
+        let (id,): (DeviceConfigTypeId,) =
+            sqlx::query_as("SELECT id FROM device_config_types WHERE name = $1 AND widget = $2")
+                .bind(&name)
+                .bind(widget_kind)
+                .fetch_one(&mut *txn)
+                .await?;
 
         Ok(Self {
             id,
             name,
             widget: widget_kind,
         })
+    }
+
+    pub async fn find_by_id(txn: &mut Transaction<'_>, id: DeviceConfigTypeId) -> Result<Self> {
+        let ty = sqlx::query_as("SELECT id, name, widget FROM device_config_types WHERE id = $1")
+            .bind(id)
+            .fetch_one(txn)
+            .await?;
+        Ok(ty)
     }
 }

@@ -96,8 +96,9 @@ impl Compiler {
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());
 
-        let id: Option<(CompilerId,)> = dbg!(sqlx::query_as(
-            "SELECT compilers.id
+        let id: Option<(CompilerId,)> = dbg!(
+            sqlx::query_as(
+                "SELECT compilers.id
              FROM (SELECT COUNT(sensor_id) as count, compiler_id
                    FROM (SELECT sbt.sensor_id, sbt.compiler_id
                          FROM sensor_belongs_to_compiler as sbt
@@ -114,20 +115,21 @@ impl Compiler {
                    AND compilers.organization_id = $6
              GROUP BY compilers.id, device.count, sensor.count
              HAVING sensor.count = $3 AND device.count = $4",
-        )
-        .bind(
-            &sensors_and_alias
-                .iter()
-                .map(|s| s.0.id())
-                .collect::<Vec<_>>(),
-        )
-        .bind(&device_configs.iter().map(|s| s.id()).collect::<Vec<_>>())
-        .bind(sensors_and_alias.len() as i64)
-        .bind(device_configs.len() as i64)
-        .bind(target.id())
-        .bind(organization.id())
-        .fetch_optional(&mut *txn)
-        .await)?;
+            )
+            .bind(
+                &sensors_and_alias
+                    .iter()
+                    .map(|s| s.0.id())
+                    .collect::<Vec<_>>(),
+            )
+            .bind(&device_configs.iter().map(|s| s.id()).collect::<Vec<_>>())
+            .bind(sensors_and_alias.len() as i64)
+            .bind(device_configs.len() as i64)
+            .bind(target.id())
+            .bind(organization.id())
+            .fetch_optional(&mut *txn)
+            .await
+        )?;
 
         let mut should_compile = false;
         let id = if let Some((id,)) = id {
@@ -319,7 +321,7 @@ impl Compiler {
                             for c in sensor.configurations() {
                                 let req =
                                     SensorConfigRequest::find_by_id(txn, c.request().id()).await?;
-                                if req.name() == sensor_referenced.request_name() {
+                                if req.variable_name() == sensor_referenced.request_name() {
                                     let widget = req.ty(txn).await?.widget(txn, &[&target]).await?;
                                     map.insert(
                                         sensor_referenced.request_name().clone(),
@@ -341,9 +343,10 @@ impl Compiler {
                     .iter()
                     .map(|m| {
                         let reg = Handlebars::new();
-                        let name = reg.render_template(m.name(), &json!({ "index": index }))?;
+                        let name =
+                            reg.render_template(m.variable_name(), &json!({ "index": index }))?;
                         let value = reg.render_template(m.value(), &json!({ "index": index }))?;
-                        Ok(format!("doc[\"{}\"] = {}", name, value))
+                        Ok(format!("doc[\"{}\"] = {};", name, value))
                     })
                     .collect::<Result<Vec<String>>>()?
                     .join("\n    "),
@@ -374,11 +377,12 @@ impl Compiler {
                 let reg = Handlebars::new();
                 let ty = req.ty(txn).await?;
                 if let Some(type_name) = ty.name() {
-                    let name = reg.render_template(req.name(), &json!({ "index": index }))?;
+                    let name =
+                        reg.render_template(req.variable_name(), &json!({ "index": index }))?;
                     let widget = req.ty(txn).await?.widget(txn, &[&target]).await?;
                     let value = c.value().compile(txn, widget).await?;
                     configs.push((
-                        req.name().clone(),
+                        req.variable_name().clone(),
                         format!("static const {} {} = {};", type_name, name, value),
                     ));
                 }

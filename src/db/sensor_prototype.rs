@@ -1,11 +1,12 @@
 use crate::{
-    Definition, Dependency, Include, NewSensorConfigRequest, Result, SensorConfigRequest,
-    SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId, Setup, Target,
-    Transaction, UnauthenticatedAction,
+    Definition, Dependency, Include, NewDependency, NewSensorConfigRequest, Result,
+    SensorConfigRequest, SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId,
+    Setup, Target, Transaction, UnauthenticatedAction,
 };
 use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 #[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -61,60 +62,89 @@ pub struct SensorPrototype {
     variable_name: Option<String>,
 }
 
+#[derive(Getters, Serialize, Deserialize, Debug, Clone)]
+pub struct NewSensorPrototype {
+    name: String,
+    #[serde(default)]
+    variable_name: Option<String>,
+    #[serde(default)]
+    dependencies: Vec<NewDependency>,
+    includes: Vec<Include>,
+    #[serde(default)]
+    definitions: Vec<Definition>,
+    setups: Vec<Setup>,
+    #[serde(default)]
+    unauthenticated_actions: Vec<UnauthenticatedAction>,
+    #[serde(default)]
+    measurements: Vec<SensorMeasurement>,
+    config_requests: Vec<NewSensorConfigRequest>,
+}
+
+impl TryFrom<serde_json::Value> for NewSensorPrototype {
+    type Error = serde_json::Error;
+
+    fn try_from(json: serde_json::Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(json)
+    }
+}
+
 impl SensorPrototype {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        name: impl Into<String>,
-        variable_name: impl Into<Option<&str>>,
-        dependencies: Vec<Dependency>,
-        includes: Vec<Include>,
-        definitions: Vec<impl Into<Definition>>,
-        setups: Vec<Setup>,
-        unauthenticated_actions: Vec<UnauthenticatedAction>,
-        measurements: Vec<SensorMeasurement>,
-        new_config_requests: Vec<NewSensorConfigRequest>,
-    ) -> Result<Self> {
-        let (name, variable_name) = (name.into(), variable_name.into());
-        let (sensor_prototype_id,) = sqlx::query_as::<_, (SensorPrototypeId,)>(
+    pub async fn new(txn: &mut Transaction<'_>, prototype: NewSensorPrototype) -> Result<Self> {
+        let (name, variable_name) = (prototype.name, prototype.variable_name);
+        let maybe: Option<Self> = sqlx::query_as(
+            "SELECT id, name, variable_name FROM sensor_prototypes
+            WHERE (variable_name = $1 OR (variable_name IS NULL AND $1 IS NULL)) AND name = $2",
+        )
+        .bind(&variable_name)
+        .bind(&name)
+        .fetch_optional(&mut *txn)
+        .await?;
+
+        if let Some(sensor) = maybe {
+            // TODO: support changing sensor prototypes
+            return Ok(sensor);
+        }
+
+        let (id,): (SensorPrototypeId,) = sqlx::query_as(
             "INSERT INTO sensor_prototypes (name, variable_name) VALUES ($1, $2) RETURNING id",
         )
         .bind(&name)
-        .bind(variable_name)
+        .bind(&variable_name)
         .fetch_one(&mut *txn)
         .await?;
+
         let sensor_prototype = Self {
-            id: sensor_prototype_id,
-            variable_name: variable_name.map(ToOwned::to_owned),
+            id,
+            variable_name,
             name,
         };
 
-        for dep in &dependencies {
+        for dep in &prototype.dependencies {
             sqlx::query(
                 "INSERT INTO sensor_prototype_dependencies (repo_url, branch, sensor_prototype_id) VALUES ($1, $2, $3)",
             )
             .bind(dep.repo_url())
             .bind(dep.branch())
-            .bind(sensor_prototype_id)
+            .bind(id)
             .execute(&mut *txn)
             .await?;
         }
-        for include in &includes {
+        for include in &prototype.includes {
             sqlx::query(
                 "INSERT INTO sensor_prototype_includes (include, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(include)
-            .bind(sensor_prototype_id)
+            .bind(id)
             .execute(&mut *txn)
             .await?;
         }
-        for define in definitions {
-            let define = define.into();
+        for define in prototype.definitions {
             let (sensor_prototype_definition_id,) = sqlx::query_as::<_, (SensorPrototypeDefinitionId,)>(
                 "INSERT INTO sensor_prototype_definitions (line, sensor_prototype_id) VALUES ($1, $2) RETURNING id",
             )
             .bind(define.line())
-            .bind(sensor_prototype_id)
+            .bind(id)
             .fetch_one(&mut *txn)
             .await?;
             for sensor_referenced in define.sensors_referenced() {
@@ -128,42 +158,42 @@ impl SensorPrototype {
                 .await?;
             }
         }
-        for setup in &setups {
+        for setup in &prototype.setups {
             sqlx::query(
                 "INSERT INTO sensor_prototype_setups (setup, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(setup)
-            .bind(sensor_prototype_id)
+            .bind(id)
             .execute(&mut *txn)
             .await?;
         }
-        for unauthenticated_action in &unauthenticated_actions {
+        for unauthenticated_action in &prototype.unauthenticated_actions {
             sqlx::query(
                 "INSERT INTO sensor_prototype_unauthenticated_actions (unauthenticated_action, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(unauthenticated_action)
-            .bind(sensor_prototype_id)
+            .bind(id)
             .execute(&mut *txn)
             .await?;
         }
-        for measurement in &measurements {
+        for measurement in &prototype.measurements {
             sqlx::query(
-                "INSERT INTO sensor_prototype_measurements (name, value, ty, sensor_prototype_id, human_name, kind) VALUES ($1, $2, $3, $4, $5, $6)",
+                "INSERT INTO sensor_prototype_measurements (variable_name, value, ty, sensor_prototype_id, name, kind) VALUES ($1, $2, $3, $4, $5, $6)",
             )
-            .bind(measurement.name())
+            .bind(measurement.variable_name())
             .bind(measurement.value())
             .bind(measurement.ty())
-            .bind(sensor_prototype_id)
-            .bind(measurement.human_name())
+            .bind(id)
+            .bind(measurement.name())
             .bind(measurement.kind())
             .execute(&mut *txn)
             .await?;
         }
-        for config_request in new_config_requests {
+        for config_request in prototype.config_requests {
             SensorConfigRequest::new(
                 &mut *txn,
+                config_request.variable_name().clone(),
                 config_request.name().clone(),
-                config_request.human_name().clone(),
                 config_request.type_name().clone(),
                 config_request.widget().clone(),
                 &sensor_prototype,
@@ -251,7 +281,7 @@ impl SensorPrototype {
     /// A sensor should execute N measurements and store them in the JSON
     pub async fn measurements(&self, txn: &mut Transaction<'_>) -> Result<Vec<SensorMeasurement>> {
         let list = sqlx::query_as(
-            "SELECT human_name, name, value, ty, kind FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1 ORDER BY id ASC",
+            "SELECT name, variable_name, value, ty, kind FROM sensor_prototype_measurements WHERE sensor_prototype_id = $1 ORDER BY id ASC",
         )
         .bind(self.id)
         .fetch_all(&mut *txn)
@@ -264,13 +294,7 @@ impl SensorPrototype {
         &self,
         txn: &mut Transaction<'_>,
     ) -> Result<Vec<SensorConfigRequest>> {
-        let list = sqlx::query_as(
-            "SELECT id, name, human_name, type_id FROM sensor_config_requests WHERE sensor_prototype_id = $1",
-        )
-        .bind(self.id)
-        .fetch_all(&mut *txn)
-        .await?;
-        Ok(list)
+        SensorConfigRequest::configuration_requests(txn, self).await
     }
 }
 

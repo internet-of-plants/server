@@ -186,7 +186,8 @@ impl SensorView {
                     .iter()
                     .map(|m| {
                         let reg = Handlebars::new();
-                        let name = reg.render_template(m.name(), &json!({ "index": index }))?;
+                        let name =
+                            reg.render_template(m.variable_name(), &json!({ "index": index }))?;
                         Ok(SensorMeasurementView::new(m.clone(), name, color.clone()))
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -221,6 +222,7 @@ pub struct SensorPrototypeDefinitionId;
 #[derive(sqlx::FromRow, Getters, Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub struct Definition {
     line: String,
+    #[serde(default)]
     sensors_referenced: Vec<SensorReference>,
 }
 impl Definition {
@@ -287,9 +289,7 @@ impl Sensor {
             }
         }
 
-        new_sensor
-            .configs
-            .sort_by_key(|a| a.request_id());
+        new_sensor.configs.sort_by_key(|a| a.request_id());
         let mut serialized = Vec::with_capacity(new_sensor.configs.len());
         for c in &new_sensor.configs {
             let request = SensorConfigRequest::find_by_id(&mut *txn, c.request_id()).await?;

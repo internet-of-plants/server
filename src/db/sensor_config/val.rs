@@ -39,9 +39,13 @@ pub enum Val {
     Float(f64),
     #[serde(rename_all = "camelCase")]
     Sensor {
-        sensor_id: SensorId
+        sensor_id: SensorId,
     },
-    Moment { hours: u8, minutes: u8, seconds: u8 },
+    Moment {
+        hours: u8,
+        minutes: u8,
+        seconds: u8,
+    },
     Map(Vec<Element>),
 }
 
@@ -136,7 +140,7 @@ impl Val {
                         if prototype.variable_name().is_none() {
                             Err(Error::NoVariableNameForReferencedSensor(prototype.id()))
                         } else {
-                            Ok(Val::Sensor {sensor_id })
+                            Ok(Val::Sensor { sensor_id })
                         }
                     }
                 }
@@ -201,8 +205,7 @@ impl Val {
                     let mut elements = Vec::with_capacity(raw_elements.len());
                     for raw in raw_elements {
                         let key = Self::new(txn, raw.key.clone(), *key.clone()).await?;
-                        let value =
-                            Self::new(txn, raw.value.clone(), *value.clone()).await?;
+                        let value = Self::new(txn, raw.value.clone(), *value.clone()).await?;
                         elements.push(Element { key, value });
                     }
                     Ok(Val::Map(elements))
@@ -223,7 +226,7 @@ impl Val {
             Val::Integer(number) => Ok(number.to_string()),
             Val::Float(number) => Ok(number.to_string()),
             Val::Symbol(string) => Ok(string.clone()),
-            Val::Sensor {sensor_id} => {
+            Val::Sensor { sensor_id } => {
                 let sensor = Sensor::raw_find_by_id(txn, *sensor_id).await?;
                 let prototype = sensor.prototype(txn).await?;
                 let variable_name = prototype
@@ -240,7 +243,7 @@ impl Val {
             } => Ok(format!("relay::Moment({hours}, {minutes}, {seconds})")),
             val @ Val::Map(vec) => {
                 let mut string = String::new();
-                string.push_str("{");
+                string.push('{');
                 let (key, value) = if let SensorWidgetKindView::Map(key, value) = &widget {
                     (key.clone(), value.clone())
                 } else {
@@ -248,11 +251,7 @@ impl Val {
                 };
 
                 for (index, el) in vec.iter().enumerate() {
-                    let separator = if index + 1 == vec.len() {
-                        ""
-                    } else {
-                        ","
-                    };
+                    let separator = if index + 1 == vec.len() { "" } else { "," };
                     string.push_str(&format!(
                         "\n  std::make_pair({}, {}){separator}",
                         el.key.compile(txn, *key.clone()).await?,
@@ -260,7 +259,7 @@ impl Val {
                     ));
                 }
 
-                string.push_str("}");
+                string.push('}');
 
                 Ok(string)
             }

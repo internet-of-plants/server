@@ -1,4 +1,7 @@
-use crate::{Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorId, Transaction, SensorConfigRequestView, Target};
+use crate::{
+    Result, Sensor, SensorConfigRequest, SensorConfigRequestId, SensorConfigRequestView, SensorId,
+    Target, Transaction,
+};
 use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
@@ -25,11 +28,15 @@ pub struct SensorConfigView {
 }
 
 impl SensorConfigView {
-    pub async fn new(txn: &mut Transaction<'_>, config: SensorConfig, targets: &[&Target]) -> Result<Self> {
+    pub async fn new(
+        txn: &mut Transaction<'_>,
+        config: SensorConfig,
+        targets: &[&Target],
+    ) -> Result<Self> {
         let request = config.request(txn).await?;
         Ok(Self {
             type_name: request.ty(txn).await?.name().clone(),
-            name: request.name().to_owned(),
+            name: request.variable_name().to_owned(),
             value: config.value,
             request: SensorConfigRequestView::new(txn, request, targets).await?,
         })

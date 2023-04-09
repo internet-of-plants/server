@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS target_prototypes (
   platform_packages       TEXT,
   extra_platformio_params TEXT,
   ldf_mode                TEXT,
-  created_at              TIMESTAMPTZ             NOT NULL DEFAULT NOW()
+  created_at              TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
+  UNIQUE (arch)
 );
 
 CREATE TABLE IF NOT EXISTS dependency_belongs_to_target_prototype (
@@ -52,14 +53,16 @@ CREATE TABLE IF NOT EXISTS dependency_belongs_to_target_prototype (
 
 CREATE TABLE IF NOT EXISTS targets (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
-  name                TEXT,
   board               TEXT,
   pin_hpp             TEXT                  NOT NULL,
   build_flags         TEXT,
   target_prototype_id BIGINT                NOT NULL,
-  UNIQUE (name, board, target_prototype_id),
   FOREIGN KEY (target_prototype_id) REFERENCES target_prototypes (id)
 );
+
+CREATE UNIQUE INDEX board_target ON targets (board, target_prototype_id) WHERE board IS NOT NULL;
+CREATE UNIQUE INDEX board_target_null ON targets (target_prototype_id) WHERE board IS NULL;
+
 
 CREATE TABLE IF NOT EXISTS compilers (
   id              BIGSERIAL PRIMARY KEY NOT NULL,
@@ -133,7 +136,7 @@ CREATE TABLE IF NOT EXISTS devices (
   number_of_plants INTEGER               NOT NULL,
   created_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(mac, collection_id),
+  UNIQUE (mac, collection_id),
   FOREIGN KEY (collection_id) REFERENCES collections (id),
   FOREIGN KEY (firmware_id) REFERENCES firmwares (id)
 );
@@ -222,7 +225,7 @@ CREATE TABLE IF NOT EXISTS sensor_config_type_selection_maps (
   key             SensorWidgetKindRaw NOT NULL,
   value           SensorWidgetKindRaw NOT NULL,
   created_at      TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, parent_id, parent_metadata, key),
+  UNIQUE (type_id, parent_id, parent_metadata, key),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
   FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
 );
@@ -234,7 +237,7 @@ CREATE TABLE IF NOT EXISTS sensor_config_type_selection_options (
   parent_metadata     ParentMetadata,
   option              TEXT            NOT NULL,
   created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, parent_id, parent_metadata, option),
+  UNIQUE (type_id, parent_id, parent_metadata, option),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
   FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
 );
@@ -246,7 +249,7 @@ CREATE TABLE IF NOT EXISTS sensor_config_type_selection_sensors (
   parent_metadata       ParentMetadata,
   sensor_prototype_name TEXT            NOT NULL,
   created_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, parent_id, parent_metadata, sensor_prototype_name),
+  UNIQUE (type_id, parent_id, parent_metadata, sensor_prototype_name),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
   FOREIGN KEY (parent_id) REFERENCES sensor_config_type_selection_maps (id)
 );
@@ -255,10 +258,10 @@ CREATE TABLE IF NOT EXISTS sensor_config_requests (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   type_id             BIGINT                NOT NULL,
   name                TEXT                  NOT NULL,
-  human_name          TEXT                  NOT NULL,
+  variable_name       TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
   created_at          TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(name, sensor_prototype_id),
+  UNIQUE (variable_name, sensor_prototype_id),
   FOREIGN KEY (type_id) REFERENCES sensor_config_types (id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
@@ -281,7 +284,8 @@ CREATE TABLE IF NOT EXISTS device_config_types (
   id         BIGSERIAL PRIMARY KEY NOT NULL,
   name       TEXT NOT NULL,
   widget     DeviceWidgetKind NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (name, widget)
 );
 
 CREATE TABLE IF NOT EXISTS device_config_type_selection_options (
@@ -289,22 +293,18 @@ CREATE TABLE IF NOT EXISTS device_config_type_selection_options (
   type_id    BIGINT NOT NULL,
   option     TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, option),
+  UNIQUE (type_id, option),
   FOREIGN KEY (type_id) REFERENCES device_config_types (id)
 );
 
-CREATE TYPE SecretAlgo AS ENUM (
-  'LibsodiumSealedBox'
-);
 CREATE TABLE IF NOT EXISTS device_config_requests (
-  id          BIGSERIAL PRIMARY KEY NOT NULL,
-  type_id     BIGINT                NOT NULL,
-  name        TEXT                  NOT NULL,
-  human_name  TEXT                  NOT NULL,
-  target_id   BIGINT                NOT NULL,
-  secret_algo SecretAlgo,
-  created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(type_id, name, target_id),
+  id            BIGSERIAL PRIMARY KEY NOT NULL,
+  type_id       BIGINT                NOT NULL,
+  name          TEXT                  NOT NULL,
+  variable_name TEXT                  NOT NULL,
+  target_id     BIGINT                NOT NULL,
+  created_at    TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
+  UNIQUE (type_id, variable_name, target_id),
   FOREIGN KEY (type_id) REFERENCES device_config_types (id),
   FOREIGN KEY (target_id) REFERENCES targets (id)
 );
@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS device_configs (
   request_id        BIGINT                NOT NULL,
   value             TEXT                  NOT NULL,
   created_at        TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
-  UNIQUE(organization_id, request_id, value),
+  UNIQUE (organization_id, request_id, value),
   FOREIGN KEY (organization_id) REFERENCES organizations (id),
   FOREIGN KEY (request_id) REFERENCES device_config_requests (id)
 );
@@ -332,7 +332,7 @@ CREATE TABLE IF NOT EXISTS pins (
   id        BIGSERIAL PRIMARY KEY NOT NULL,
   target_id BIGINT                NOT NULL,
   name      TEXT                   NOT NULL,
-  UNIQUE(target_id, name),
+  UNIQUE (target_id, name),
   FOREIGN KEY (target_id) REFERENCES targets (id)
 );
 
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_includes (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   include             TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
-  UNIQUE(include, sensor_prototype_id),
+  UNIQUE (include, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -348,7 +348,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_definitions (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   line                TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
-  UNIQUE(line, sensor_prototype_id),
+  UNIQUE (line, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -357,7 +357,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_definition_sensors_referenced (
   sensor_name                    TEXT                  NOT NULL,
   request_name                   TEXT                  NOT NULL,
   sensor_prototype_definition_id BIGINT                NOT NULL,
-  UNIQUE(request_name, sensor_prototype_definition_id),
+  UNIQUE (request_name, sensor_prototype_definition_id),
   FOREIGN KEY (sensor_prototype_definition_id) REFERENCES sensor_prototype_definitions (id)
 );
 
@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_dependencies (
   repo_url            TEXT                  NOT NULL,
   branch              TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
-  UNIQUE(repo_url, sensor_prototype_id),
+  UNIQUE (repo_url, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -374,7 +374,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_setups (
   id                  BIGSERIAL   PRIMARY KEY NOT NULL,
   setup               TEXT        NOT NULL,
   sensor_prototype_id BIGINT      NOT NULL,
-  UNIQUE(setup, sensor_prototype_id),
+  UNIQUE (setup, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -382,7 +382,7 @@ CREATE TABLE IF NOT EXISTS sensor_prototype_unauthenticated_actions (
   id                     BIGSERIAL   PRIMARY KEY NOT NULL,
   unauthenticated_action TEXT        NOT NULL,
   sensor_prototype_id    BIGINT      NOT NULL,
-  UNIQUE(unauthenticated_action, sensor_prototype_id),
+  UNIQUE (unauthenticated_action, sensor_prototype_id),
   FOREIGN KEY (sensor_prototype_id) REFERENCES sensor_prototypes (id)
 );
 
@@ -397,7 +397,7 @@ CREATE TYPE SensorMeasurementKind AS ENUM (
 CREATE TABLE IF NOT EXISTS sensor_prototype_measurements (
   id                  BIGSERIAL PRIMARY KEY NOT NULL,
   name                TEXT                  NOT NULL,
-  human_name          TEXT                  NOT NULL,
+  variable_name       TEXT                  NOT NULL,
   value               TEXT                  NOT NULL,
   sensor_prototype_id BIGINT                NOT NULL,
   ty                  SensorMeasurementType       NOT NULL,
@@ -428,3 +428,4 @@ CREATE TABLE IF NOT EXISTS dependency_belongs_to_compilation (
   FOREIGN KEY (sensor_id)      REFERENCES sensors     (id),
   FOREIGN KEY (compilation_id) REFERENCES compilations (id)
 );
+

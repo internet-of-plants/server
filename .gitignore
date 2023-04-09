@@ -5,3 +5,4 @@ target
 run.log
 workspace.code-workspace
 bins/
+packages

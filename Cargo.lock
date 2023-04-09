@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "derive_get"
 version = "0.1.0"
-source = "git+https://github.com/paulocsanz/derive_get.git#215fb14fd0a193ebadae930fd57f1a567ea1ec39"
+source = "git+https://github.com/paulocsanz/derive_get.git#b8f361c5c60de96d4f12c786b5d769d7d7801a61"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",

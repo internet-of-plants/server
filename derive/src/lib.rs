@@ -6,13 +6,10 @@ use quote::quote;
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn id(_args: TokenStream, input: TokenStream) -> TokenStream {
-    // Parse the string representation
-    let ast: DeriveInput = syn::parse(input).expect_or_abort("#[id] is only defined for unit structs");
+    let ast: DeriveInput = syn::parse(input).expect_or_abort("#[id] is only supported for unit structs");
 
-    // Build the impl
     let gen = produce(&ast);
 
-    // Return the generated impl
     gen.into()
 }
 
@@ -25,7 +22,7 @@ fn produce(ast: &DeriveInput) -> TokenStream  {
     match &ast.data {
         syn::Data::Struct(struct_data) => {           
             if !matches!(struct_data.fields, Fields::Unit) {
-                abort!(struct_data.fields.span(), "#[id] is only defined for unit structs");
+                abort!(struct_data.fields.span(), "#[id] is only supported for unit structs");
             }
 
             quote! {
@@ -74,7 +71,7 @@ fn produce(ast: &DeriveInput) -> TokenStream  {
         }
         syn::Data::Enum(_) => {
             // Nope. This is an Enum. We cannot handle these!
-            abort_call_site!("#[id] is only defined for unit structs, not for enums!");
+            abort_call_site!("#[id] is only supported for unit structs, not for enums!");
         }
         syn::Data::Union(_) => {
             // Nope. This is an Enum. We cannot handle these!

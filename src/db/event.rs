@@ -90,7 +90,8 @@ impl Event {
                         .iter()
                         .map(|m| {
                             let reg = Handlebars::new();
-                            let name = reg.render_template(m.name(), &json!({ "index": index }))?;
+                            let name =
+                                reg.render_template(m.variable_name(), &json!({ "index": index }))?;
                             Ok(SensorMeasurementView::new(
                                 m.clone(),
                                 name,

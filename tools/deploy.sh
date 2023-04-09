@@ -52,4 +52,8 @@ scp $SCRIPTPATH/../migrations/* root@$DOMAIN:/opt/iop/migrations/
 ssh root@$DOMAIN "chmod 420 /opt/iop/migrations/*"
 ssh root@$DOMAIN "chown iop.root /opt/iop/migrations/*"
 
+scp $SCRIPTPATH/../packages/* root@$DOMAIN:/opt/iop/packages/
+ssh root@$DOMAIN "chmod 420 /opt/iop/packages/*"
+ssh root@$DOMAIN "chown iop.root /opt/iop/packages/*"
+
 ssh root@$DOMAIN "reboot"

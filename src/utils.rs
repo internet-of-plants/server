@@ -63,7 +63,6 @@ pub async fn run_migrations(pool: &'static Pool) {
         .await
         .expect("Unable to find migrations folder");
 
-    // TODO: this is bugged, doesnt ensure file sorting mode
     while let Some(entry) = reader
         .next_entry()
         .await
@@ -110,7 +109,6 @@ pub async fn run_migrations(pool: &'static Pool) {
             }
         }
     }
-    let has_files = !files.is_empty();
     files.sort_unstable();
 
     for file in files {
@@ -149,13 +147,11 @@ pub async fn run_migrations(pool: &'static Pool) {
         txn.commit().await.expect("unable to commit transaction");
     }
 
-    if has_files {
-        let mut txn = pool.begin().await.expect("unable to start transaction");
-        crate::db::builtin::create_builtin(&mut txn)
-            .await
-            .expect("failed to create builtins");
-        txn.commit().await.expect("unable to commit transaction");
-    }
+    let mut txn = pool.begin().await.expect("unable to start transaction");
+    crate::db::builtin::create_builtins(&mut txn)
+        .await
+        .expect("failed to create builtins");
+    txn.commit().await.expect("unable to commit transaction");
 }
 
 pub fn random_string(size: usize) -> String {

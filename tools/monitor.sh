@@ -31,8 +31,7 @@ done
 
 # Allows to update the binary without stopping it, and jails it
 echo $FOLDER
-mkdir -p $FOLDER/migrations
-mkdir -p $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDER/var/lock $FOLDER/bin $FOLDER/sbin $FOLDER/sys $FOLDER/var/log/iop $FOLDER/var/run $FOLDER/var/crash $FOLDER/usr $FOLDER/lib $FOLDER/run $FOLDER/home/iop $FOLDER/boot $FOLDER/lib32 $FOLDER/lib64 $FOLDER/libx32 $FOLDER/home/iop
+mkdir -p $FOLDER/migrations $FOLDER/packages $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDER/var/lock $FOLDER/bin $FOLDER/sbin $FOLDER/sys $FOLDER/var/log/iop $FOLDER/var/run $FOLDER/var/crash $FOLDER/usr $FOLDER/lib $FOLDER/run $FOLDER/home/iop $FOLDER/boot $FOLDER/lib32 $FOLDER/lib64 $FOLDER/libx32 $FOLDER/home/iop
 
 mkdir -p $FOLDER.tmpfs $FOLDER.var.tmpfs
 mount --bind $FOLDER.tmpfs $FOLDER/tmp
@@ -64,6 +63,7 @@ mount --bind /etc $FOLDER/etc
 #cp -r /etc/pam.d $FOLDER/etc/pam.d
 cp /var/run/utmp $FOLDER/var/run/utmp
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
+cp $SCRIPTPATH/packages/* $FOLDER/packages/
 cp $SCRIPTPATH/run-server-with-logging.sh $FOLDER/
 cp /root/cert.pem $FOLDER/
 cp /root/privkey.pem $FOLDER/
@@ -74,6 +74,8 @@ sudo chmod 400 $FOLDER/cert.pem
 sudo chmod 400 $FOLDER/privkey.pem
 sudo chmod 400 $FOLDER/migrations/*
 sudo chmod 500 $FOLDER/migrations
+sudo chmod 400 $FOLDER/packages/*
+sudo chmod 500 $FOLDER/packages
 sudo chmod 555 $FOLDER
 sudo chmod 777 $FOLDER/tmp
 sudo chown iop.iop $FOLDER/home/iop
@@ -84,6 +86,8 @@ sudo chown iop.iop $FOLDER/cert.pem
 sudo chown iop.iop $FOLDER/privkey.pem
 sudo chown iop.iop $FOLDER/migrations
 sudo chown iop.iop $FOLDER/migrations/*
+sudo chown iop.iop $FOLDER/packages
+sudo chown iop.iop $FOLDER/packages/*
 sudo chown root.iop $FOLDER
 
 firejail --noprofile --private-tmp --chroot=$FOLDER << "EOT"

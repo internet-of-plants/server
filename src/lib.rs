@@ -23,7 +23,6 @@ pub use crate::db::{
     event::{DeviceStat, Event, EventId, EventView},
     firmware::{Firmware, FirmwareId, FirmwareView},
     organization::{Organization, OrganizationId, OrganizationView},
-    secret::SecretAlgo,
     sensor::{
         Definition, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
         SensorReference, SensorView, Setup, UnauthenticatedAction,
@@ -39,10 +38,13 @@ pub use crate::db::{
     sensor_measurement::{
         SensorMeasurement, SensorMeasurementKind, SensorMeasurementType, SensorMeasurementView,
     },
-    sensor_prototype::{SensorPrototype, SensorPrototypeId, SensorPrototypeView},
-    target::{Target, TargetId, TargetView},
+    sensor_prototype::{
+        NewSensorPrototype, SensorPrototype, SensorPrototypeId, SensorPrototypeView,
+    },
+    target::{NewTarget, Target, TargetId, TargetView},
     target_prototype::{
-        Certificate, CertificateId, Dependency, TargetPrototype, TargetPrototypeId,
+        Certificate, CertificateId, Dependency, NewDependency, NewTargetPrototype, TargetPrototype,
+        TargetPrototypeId,
     },
     user::{Login, NewUser, User, UserId, Username},
 };

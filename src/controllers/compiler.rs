@@ -143,7 +143,10 @@ pub async fn list(
     for compiler in compilers {
         // Compilers without collections aren't helpful
         if let Some(collection) = compiler.collection(&mut txn).await? {
-            if !Device::from_collection(&mut txn, &collection).await?.is_empty() {
+            if !Device::from_collection(&mut txn, &collection)
+                .await?
+                .is_empty()
+            {
                 views.push(CompilerView::new(&mut txn, compiler).await?);
             }
         }

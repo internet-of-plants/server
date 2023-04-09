@@ -5,6 +5,7 @@ use crate::{
 use derive::id;
 use derive_get::Getters;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 #[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +13,6 @@ pub struct TargetView {
     #[copy]
     id: TargetId,
     arch: String,
-    name: Option<String>,
     build_flags: String,
     platform: String,
     framework: Option<String>,
@@ -40,7 +40,6 @@ impl TargetView {
             extra_platformio_params: prototype.extra_platformio_params().clone(),
             ldf_mode: prototype.ldf_mode().clone(),
             board: target.board().clone(),
-            name: target.name().to_owned(),
             configuration_requests,
         })
     }
@@ -53,7 +52,6 @@ pub struct TargetId;
 pub struct Target {
     #[copy]
     id: TargetId,
-    pub name: Option<String>,
     board: Option<String>,
     #[copy]
     target_prototype_id: TargetPrototypeId,
@@ -61,56 +59,105 @@ pub struct Target {
     build_flags: Option<String>,
 }
 
+#[derive(Getters, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct NewTarget {
+    #[serde(default)]
+    board: Option<String>,
+    pins: Vec<String>,
+    pin_hpp: String,
+    target_prototype_arch: String,
+    config_requests: Vec<NewDeviceConfigRequest>,
+    #[serde(default)]
+    build_flags: Option<String>,
+}
+
+impl TryFrom<serde_json::Value> for NewTarget {
+    type Error = serde_json::Error;
+
+    fn try_from(json: serde_json::Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(json)
+    }
+}
+
 impl Target {
-    pub async fn new(
-        txn: &mut Transaction<'_>,
-        board: Option<String>,
-        pins: Vec<String>,
-        pin_hpp: String,
-        target_prototype: &TargetPrototype,
-        new_config_requests: Vec<NewDeviceConfigRequest>,
-    ) -> Result<Self> {
-        let (id,): (TargetId,) = sqlx::query_as(
-            "INSERT INTO targets (board, target_prototype_id, pin_hpp) VALUES ($1, $2, $3) RETURNING id",
-        )
-        .bind(&board)
-        .bind(target_prototype.id())
-        .bind(&pin_hpp)
-        .fetch_one(&mut *txn)
-        .await?;
-        for pin in pins {
-            sqlx::query("INSERT INTO pins (target_id, name) VALUES ($1, $2)")
-                .bind(id)
-                .bind(pin)
-                .execute(&mut *txn)
+    pub async fn new(txn: &mut Transaction<'_>, target: NewTarget) -> Result<Self> {
+        let target_prototype =
+            TargetPrototype::find_by_arch(txn, &target.target_prototype_arch).await?;
+
+        let maybe: Option<(TargetId,)> =
+            sqlx::query_as("SELECT id FROM targets WHERE target_prototype_id = $1")
+                .bind(target_prototype.id())
+                .fetch_optional(&mut *txn)
                 .await?;
-        }
+
+        let id = if let Some((id,)) = maybe {
+            sqlx::query(
+                "UPDATE targets SET pin_hpp = $2, build_flags = $3 WHERE target_prototype_id = $1",
+            )
+            .bind(target_prototype.id())
+            .bind(target.pin_hpp())
+            .bind(target.build_flags())
+            .execute(&mut *txn)
+            .await?;
+            id
+        } else {
+            let (id,): (TargetId,) = sqlx::query_as(
+                "INSERT INTO targets (target_prototype_id, pin_hpp, build_flags) VALUES ($1, $2, $3) RETURNING id"
+            )
+            .bind(target_prototype.id())
+            .bind(target.pin_hpp())
+            .bind(target.build_flags())
+            .fetch_one(&mut *txn)
+            .await?;
+            id
+        };
+
+        let config_requests = target.config_requests;
+        let pins = target.pins;
+
         let target = Self {
             id,
-            name: None,
-            board,
-            pin_hpp,
+            board: target.board,
+            pin_hpp: target.pin_hpp,
             target_prototype_id: target_prototype.id(),
-            build_flags: None,
+            build_flags: target.build_flags,
         };
-        for config_request in new_config_requests {
-            DeviceConfigRequest::new(
-                txn,
-                config_request.name,
-                config_request.human_name,
-                config_request.type_name,
-                config_request.widget,
-                &target,
-                config_request.secret_algo,
+
+        let mut existing_pins = target.pins(txn).await?;
+
+        for pin in pins {
+            existing_pins.retain(|p| p != &pin);
+
+            sqlx::query(
+                "INSERT INTO pins (target_id, name) VALUES ($1, $2) ON CONFLICT (target_id, name) DO NOTHING",
             )
+            .bind(id)
+            .bind(pin)
+            .execute(&mut *txn)
             .await?;
+        }
+
+        // TODO: deleting pins should invalidate compilers that use said pin
+        if !existing_pins.is_empty() {
+            panic!("Deleting pins is not supported");
+        }
+        // for pin in existing_pins {
+        //    sqlx::query("DELETE FROM pins WHERE target_id = $1 AND name = $2")
+        //        .bind(id)
+        //        .bind(pin)
+        //        .execute(&mut *txn)
+        //        .await?;
+        //}
+
+        for config_request in config_requests {
+            DeviceConfigRequest::new(txn, &config_request, &target).await?;
         }
         Ok(target)
     }
 
     pub async fn list(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         Ok(sqlx::query_as(
-            "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags
             FROM targets",
         )
         .fetch_all(txn)
@@ -119,7 +166,7 @@ impl Target {
 
     pub async fn find_by_id(txn: &mut Transaction<'_>, id: TargetId) -> Result<Self> {
         let target = sqlx::query_as(
-            "SELECT id, name, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
+            "SELECT id, board, target_prototype_id, pin_hpp, build_flags FROM targets WHERE id = $1",
         )
         .bind(id)
         .fetch_one(txn)
@@ -136,34 +183,6 @@ impl Target {
             .map(|(name,)| name)
             .collect();
         Ok(pins)
-    }
-
-    pub async fn set_name(
-        &mut self,
-        txn: &mut Transaction<'_>,
-        name: Option<String>,
-    ) -> Result<()> {
-        sqlx::query("UPDATE targets SET name = $1 WHERE id = $2")
-            .bind(&name)
-            .bind(self.id)
-            .execute(txn)
-            .await?;
-        self.name = name;
-        Ok(())
-    }
-
-    pub async fn set_build_flags(
-        &mut self,
-        txn: &mut Transaction<'_>,
-        build_flags: Option<String>,
-    ) -> Result<()> {
-        sqlx::query("UPDATE targets SET build_flags = $1 WHERE id = $2")
-            .bind(&build_flags)
-            .bind(self.id)
-            .execute(txn)
-            .await?;
-        self.build_flags = build_flags;
-        Ok(())
     }
 
     pub async fn prototype(&self, txn: &mut Transaction<'_>) -> Result<TargetPrototype> {
