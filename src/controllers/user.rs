@@ -16,6 +16,7 @@ pub async fn new(
     let token = User::login(
         &mut txn,
         Login {
+            organization: Some(user.organization_name().to_owned()),
             email: user.email().to_owned(),
             password: user.password().to_owned(),
         },
@@ -32,7 +33,13 @@ pub async fn login(
     file_hash: Option<TypedHeader<Version>>,
     MaybeTargetPrototype(maybe_target_prototype): MaybeTargetPrototype,
 ) -> Result<impl IntoResponse> {
-    info!("Login: {:?}, {:?}, {:?}", user.email(), mac, file_hash);
+    info!(
+        "Login: {:?} - {}, {:?}, {:?}",
+        user.organization(),
+        user.email(),
+        mac,
+        file_hash
+    );
     let mut txn = pool.begin().await?;
     let token = if let (Some(mac), Some(file_hash), Some(target_prototype)) =
         (mac, file_hash, maybe_target_prototype)

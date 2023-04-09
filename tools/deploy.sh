@@ -23,7 +23,6 @@ cd $SCRIPTPATH/..
   fi
 cd -
 
-ssh root@$DOMAIN "mkdir -p /opt/iop/migrations"
 scp $SCRIPTPATH/monitor.sh root@$DOMAIN:/opt/iop/
 ssh root@$DOMAIN "chmod 120 /opt/iop/monitor.sh"
 ssh root@$DOMAIN "chown iop.root /opt/iop/monitor.sh"
@@ -40,20 +39,51 @@ scp $SCRIPTPATH/run-server-with-logging.sh root@$DOMAIN:/opt/iop/
 ssh root@$DOMAIN "chmod 120 /opt/iop/run-server-with-logging.sh"
 ssh root@$DOMAIN "chown iop.root /opt/iop/run-server-with-logging.sh"
 
-scp $SCRIPTPATH/../target/release/server-bin root@$DOMAIN:/opt/iop/server
-ssh root@$DOMAIN "chmod 120 /opt/iop/server"
-ssh root@$DOMAIN "chown iop.root /opt/iop/server"
-
 ssh root@$DOMAIN "mkdir -p /opt/iop/migrations"
 ssh root@$DOMAIN "chmod 570 /opt/iop/migrations"
 ssh root@$DOMAIN "chown iop.root /opt/iop/migrations"
 
-scp $SCRIPTPATH/../migrations/* root@$DOMAIN:/opt/iop/migrations/
+scp -r $SCRIPTPATH/../migrations/* root@$DOMAIN:/opt/iop/migrations/
 ssh root@$DOMAIN "chmod 420 /opt/iop/migrations/*"
 ssh root@$DOMAIN "chown iop.root /opt/iop/migrations/*"
 
-scp $SCRIPTPATH/../packages/* root@$DOMAIN:/opt/iop/packages/
-ssh root@$DOMAIN "chmod 420 /opt/iop/packages/*"
-ssh root@$DOMAIN "chown iop.root /opt/iop/packages/*"
+ssh root@$DOMAIN "mkdir -p /opt/iop/packages"
+ssh root@$DOMAIN "chmod 420 /opt/iop/packages"
+ssh root@$DOMAIN "chown iop.root /opt/iop/packages"
+
+ssh root@$DOMAIN "mkdir -p /opt/iop/packages/sensor_prototypes"
+ssh root@$DOMAIN "chmod 570 /opt/iop/packages/sensor_prototypes"
+ssh root@$DOMAIN "chown iop.root /opt/iop/packages/sensor_prototypes"
+
+if [ -d "$SCRIPTPATH/../packages/sensor_prototypes" ]; then
+  scp $SCRIPTPATH/../packages/sensor_prototypes/* root@$DOMAIN:/opt/iop/packages/sensor_prototypes/
+  ssh root@$DOMAIN "chmod 420 /opt/iop/packages/sensor_prototypes/*"
+  ssh root@$DOMAIN "chown iop.root /opt/iop/packages/sensor_prototypes/*"
+fi
+
+ssh root@$DOMAIN "mkdir -p /opt/iop/packages/target_prototypes"
+ssh root@$DOMAIN "chmod 570 /opt/iop/packages/target_prototypes"
+ssh root@$DOMAIN "chown iop.root /opt/iop/packages/target_prototypes"
+
+for path in "$SCRIPTPATH/../packages/target_prototypes/"*; do
+  folder=$(basename "$path")
+  ssh root@$DOMAIN "mkdir -p /opt/iop/packages/target_prototypes/$folder/targets"
+  ssh root@$DOMAIN "chmod 570 /opt/iop/packages/target_prototypes/$folder"
+  ssh root@$DOMAIN "chown iop.root /opt/iop/packages/target_prototypes/$folder"
+  ssh root@$DOMAIN "chmod 570 /opt/iop/packages/target_prototypes/$folder/targets"
+  ssh root@$DOMAIN "chown iop.root /opt/iop/packages/target_prototypes/$folder/targets"
+
+  scp $path/$folder.json root@$DOMAIN:/opt/iop/packages/target_prototypes/$folder/
+  ssh root@$DOMAIN "chmod 420 /opt/iop/packages/target_prototypes/$folder/$folder.json"
+  ssh root@$DOMAIN "chown iop.root /opt/iop/packages/target_prototypes/$folder/$folder.json"
+
+  scp $path/targets/* root@$DOMAIN:/opt/iop/packages/target_prototypes/$folder/targets/
+  ssh root@$DOMAIN "chmod 420 /opt/iop/packages/target_prototypes/$folder/targets/*"
+  ssh root@$DOMAIN "chown iop.root /opt/iop/packages/target_prototypes/$folder/targets/*"
+done
+
+scp $SCRIPTPATH/../target/release/server-bin root@$DOMAIN:/opt/iop/server
+ssh root@$DOMAIN "chmod 120 /opt/iop/server"
+ssh root@$DOMAIN "chown iop.root /opt/iop/server"
 
 ssh root@$DOMAIN "reboot"

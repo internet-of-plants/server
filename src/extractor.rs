@@ -102,20 +102,22 @@ where
             .await
             .expect("`Pool` extension missing");
 
-        let driver = TypedHeader::<Driver>::from_request(req)
-            .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "No driver header"))?;
+        let driver = TypedHeader::<Driver>::from_request(req).await.ok();
 
-        let mut txn = pool
-            .begin()
-            .await
-            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
-
-        let maybe_target_prototype =
-            crate::TargetPrototype::try_find_by_arch(&mut txn, &driver.0 .0.to_lowercase())
+        if let Some(driver) = driver {
+            let mut txn = pool
+                .begin()
                 .await
-                .map_err(|_| (StatusCode::UNAUTHORIZED, "Device not found"))?;
-        Ok(Self(maybe_target_prototype))
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error"))?;
+
+            let maybe_target_prototype =
+                crate::TargetPrototype::try_find_by_arch(&mut txn, &driver.0 .0.to_lowercase())
+                    .await
+                    .map_err(|_| (StatusCode::UNAUTHORIZED, "Device not found"))?;
+            Ok(Self(maybe_target_prototype))
+        } else {
+            Ok(Self(None))
+        }
     }
 }
 

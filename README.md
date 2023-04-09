@@ -59,7 +59,7 @@ The device can have an empty compiler, providing arbitrary data, although that m
 ### Device requests
 
 - POST `/v1/user/login`: Device authentication
-    - JSON request: `{ user: string; password: string }` returns base64 token
+    - JSON request: `{ organization: string; user: string; password: string }` returns base64 token
 - POST `/v1/event`: Register Device Measurements
     - Arbitrary JSON request, type-checked if a compiler is attached to the device
     - Compilers are made of a target + configured sensors, it generates the C++ code

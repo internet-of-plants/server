@@ -96,12 +96,26 @@ impl Organization {
         user: &User,
     ) -> Result<Self> {
         let organization: Self = sqlx::query_as(
-            "SELECT w.id, w.name, w.description, w.created_at, w.updated_at
-             FROM organizations as w
-             INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = w.id
-             WHERE w.id = $1 AND bt.user_id = $2",
+            "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
+             FROM organizations as o
+             INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = o.id
+             WHERE o.id = $1 AND bt.user_id = $2",
         )
         .bind(organization_id)
+        .bind(user.id())
+        .fetch_one(&mut *txn)
+        .await?;
+        Ok(organization)
+    }
+
+    pub async fn find_by_name(txn: &mut Transaction<'_>, name: &str, user: &User) -> Result<Self> {
+        let organization: Self = sqlx::query_as(
+            "SELECT o.id, o.name, o.description, o.created_at, o.updated_at
+             FROM organizations as o
+             INNER JOIN user_belongs_to_organization as bt ON bt.organization_id = o.id
+             WHERE o.name = $1 AND bt.user_id = $2",
+        )
+        .bind(&name)
         .bind(user.id())
         .fetch_one(&mut *txn)
         .await?;

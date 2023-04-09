@@ -327,11 +327,14 @@ impl Device {
         new_device: NewDevice,
     ) -> Result<AuthToken> {
         let hash: Option<(UserId, String, String, DateTime, DateTime, String)> = sqlx::query_as(
-            "SELECT id, email, username, created_at, updated_at, password_hash
+            "SELECT users.id, users.email, ;sers.username, users.created_at, users.updated_at, users.password_hash
             FROM users
-            WHERE email = $1",
+            INNER JOIN user_belongs_to_organization bt ON bt.user_id = users.id
+            INNER JOIN organizations on organizations.id = bt.organization_id
+            WHERE users.email = $1 AND organizations.name = $2",
         )
         .bind(client.email())
+        .bind(client.organization())
         .fetch_optional(&mut *txn)
         .await?;
         let is_auth = match &hash {
@@ -342,6 +345,10 @@ impl Device {
 
         match (hash, is_auth) {
             (Some((id, email, username, created_at, updated_at, _)), true) => {
+                let organization_name = client
+                    .organization()
+                    .as_ref()
+                    .expect("organization should be available");
                 let user = User {
                     id,
                     email,
@@ -350,7 +357,8 @@ impl Device {
                     updated_at,
                 };
 
-                let organization = user.default_organization(txn).await?;
+                let organization =
+                    Organization::find_by_name(txn, organization_name, &user).await?;
                 let device = Device::put(txn, &organization, new_device).await?;
                 let token = AuthToken::random();
 

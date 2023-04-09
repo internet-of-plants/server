@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Login {
+    #[serde(default)]
+    pub organization: Option<String>,
     pub email: String,
     pub password: String,
 }
@@ -85,11 +87,11 @@ impl User {
 
     pub async fn login(txn: &mut Transaction<'_>, client: Login) -> Result<AuthToken> {
         let hash: Option<(UserId, String, String, DateTime, DateTime, String)> = sqlx::query_as(
-            "SELECT id, email, username, created_at, updated_at, password_hash
+            "SELECT users.id, users.email, users.username, users.created_at, users.updated_at, users.password_hash
             FROM users
-            WHERE email = $1",
+            WHERE users.email = $1"
         )
-        .bind(&client.email)
+        .bind(client.email())
         .fetch_optional(&mut *txn)
         .await?;
         let is_auth = match &hash {

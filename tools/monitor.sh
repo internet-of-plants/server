@@ -63,7 +63,7 @@ mount --bind /etc $FOLDER/etc
 #cp -r /etc/pam.d $FOLDER/etc/pam.d
 cp /var/run/utmp $FOLDER/var/run/utmp
 cp $SCRIPTPATH/migrations/* $FOLDER/migrations/
-cp $SCRIPTPATH/packages/* $FOLDER/packages/
+cp -r $SCRIPTPATH/packages/* $FOLDER/packages/
 cp $SCRIPTPATH/run-server-with-logging.sh $FOLDER/
 cp /root/cert.pem $FOLDER/
 cp /root/privkey.pem $FOLDER/
@@ -76,6 +76,18 @@ sudo chmod 400 $FOLDER/migrations/*
 sudo chmod 500 $FOLDER/migrations
 sudo chmod 400 $FOLDER/packages/*
 sudo chmod 500 $FOLDER/packages
+sudo chmod 500 $FOLDER/packages/target_prototypes/*
+sudo chmod 500 $FOLDER/packages/target_prototypes
+sudo chmod 400 $FOLDER/packages/sensor_prototypes/*
+sudo chmod 500 $FOLDER/packages/sensor_prototypes
+
+for path in "$FOLDER/packages/target_prototypes/"*; do
+  folder=$(basename "$path")
+  sudo chmod 400 $FOLDER/packages/target_prototypes/$folder/$folder.json
+  sudo chmod 500 $FOLDER/packages/target_prototypes/$folder/targets
+  sudo chmod 400 $FOLDER/packages/target_prototypes/$folder/targets/*
+done
+
 sudo chmod 555 $FOLDER
 sudo chmod 777 $FOLDER/tmp
 sudo chown iop.iop $FOLDER/home/iop
@@ -88,7 +100,15 @@ sudo chown iop.iop $FOLDER/migrations
 sudo chown iop.iop $FOLDER/migrations/*
 sudo chown iop.iop $FOLDER/packages
 sudo chown iop.iop $FOLDER/packages/*
+sudo chown iop.iop $FOLDER/packages/target_prototypes/*
+sudo chown iop.iop $FOLDER/packages/sensor_prototypes/*
 sudo chown root.iop $FOLDER
+
+for path in "$FOLDER/packages/target_prototypes/"*; do
+  folder=$(basename "$path")
+  sudo chown iop.iop $FOLDER/packages/target_prototypes/$folder/*
+  sudo chown iop.iop $FOLDER/packages/target_prototypes/$folder/targets/*
+done
 
 firejail --noprofile --private-tmp --chroot=$FOLDER << "EOT"
 cd /
