@@ -89,6 +89,16 @@ impl TryFrom<serde_json::Value> for NewTargetPrototype {
 impl TargetPrototype {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(txn: &mut Transaction<'_>, prototype: NewTargetPrototype) -> Result<Self> {
+        let platform_packages = if prototype.platform_packages().is_empty() {
+            None
+        } else {
+            Some(prototype.platform_packages().join("\n"))
+        };
+        let extra_platformio_params = if prototype.extra_platformio_params().is_empty() {
+            None
+        } else {
+            Some(prototype.extra_platformio_params().join("\n"))
+        };
         sqlx::query(
             "INSERT INTO target_prototypes
             (certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode)
@@ -109,8 +119,8 @@ impl TargetPrototype {
             .bind(prototype.build_unflags().join("\n    "))
             .bind(prototype.platform())
             .bind(prototype.framework())
-            .bind(prototype.platform_packages().join("\n"))
-            .bind(prototype.extra_platformio_params().join("\n"))
+            .bind(&platform_packages)
+            .bind(&extra_platformio_params)
             .bind(prototype.ldf_mode())
             .execute(&mut *txn)
             .await?;

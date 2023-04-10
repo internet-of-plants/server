@@ -327,7 +327,7 @@ impl Device {
         new_device: NewDevice,
     ) -> Result<AuthToken> {
         let hash: Option<(UserId, String, String, DateTime, DateTime, String)> = sqlx::query_as(
-            "SELECT users.id, users.email, ;sers.username, users.created_at, users.updated_at, users.password_hash
+            "SELECT users.id, users.email, users.username, users.created_at, users.updated_at, users.password_hash
             FROM users
             INNER JOIN user_belongs_to_organization bt ON bt.user_id = users.id
             INNER JOIN organizations on organizations.id = bt.organization_id

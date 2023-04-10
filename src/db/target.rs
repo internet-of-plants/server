@@ -203,7 +203,7 @@ impl Target {
     pub async fn compile_platformio_ini(
         &self,
         txn: &mut Transaction<'_>,
-        lib_deps: &[Dependency],
+        mut lib_deps: Vec<Dependency>,
     ) -> Result<String> {
         let prototype = self.prototype(txn).await?;
         let arch = prototype.arch();
@@ -225,13 +225,17 @@ impl Target {
         }
         let extra_platformio_params = prototype.extra_platformio_params();
         let platform_packages = prototype.platform_packages();
-        let mut lib_deps = lib_deps.to_owned();
+
+        lib_deps.dedup_by_key(|d| d.repo_url().clone());
         lib_deps.sort_unstable_by_key(|d| d.repo_url().clone());
-        let lib_deps = lib_deps
+        let mut lib_deps = lib_deps
             .into_iter()
             .map(|d| format!("{}#{}", d.repo_url(), d.branch()))
             .collect::<Vec<String>>()
             .join("\n    ");
+        if !lib_deps.is_empty() {
+            lib_deps.insert_str(0, "\n    ");
+        }
         let mut env_name = vec![arch.as_str()];
         let board = if let Some(board) = board {
             env_name.push(board.as_str());
@@ -267,9 +271,8 @@ build_type = {build_type}
 {board}\
 {ldf_mode}\
 {}\
-lib_deps =
-    {lib_deps}
-    https://github.com/internet-of-plants/iop\
+lib_deps ={lib_deps}
+    https://github.com/internet-of-plants/iop#main\
 {}",
             extra_platformio_params
                 .as_ref()

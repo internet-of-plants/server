@@ -259,7 +259,7 @@ impl Val {
                     ));
                 }
 
-                string.push('}');
+                string.push_str("\n}");
 
                 Ok(string)
             }

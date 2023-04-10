@@ -341,7 +341,11 @@ impl Compiler {
                 )
             }
         }
-        let device_configs = device_configs.join("\n");
+        let mut device_configs = device_configs.join("\n\n");
+        if !device_configs.is_empty() {
+            device_configs.insert(0, '\n');
+            device_configs.insert(0, '\n');
+        }
 
         let mut lib_deps = Vec::new();
         let mut includes = Vec::new();
@@ -401,16 +405,14 @@ impl Compiler {
                     .collect::<Result<Vec<String>>>()?
                     .join("\n    "),
             );
-            setups.extend(
-                prototype
+            setups.extend(prototype
                     .setups()
                     .iter()
                     .map(|setup| {
                         let reg = Handlebars::new();
                         reg.render_template(setup, &json!({ "index": index }))
                     })
-                    .collect::<Result<Vec<String>, _>>()?,
-            );
+                    .collect::<Result<Vec<String>, _>>()?);
             unauthenticated_actions.extend(
                 prototype
                     .unauthenticated_actions()
@@ -422,6 +424,7 @@ impl Compiler {
                     .collect::<Result<Vec<String>, _>>()?,
             );
 
+            let mut local_configs = Vec::new();
             for c in sensor.configurations() {
                 let req = SensorConfigRequest::find_by_id(txn, c.request().id()).await?;
                 let reg = Handlebars::new();
@@ -431,26 +434,24 @@ impl Compiler {
                         reg.render_template(req.variable_name(), &json!({ "index": index }))?;
                     let widget = req.ty(txn).await?.widget(txn, &[&target]).await?;
                     let value = c.value().compile(txn, widget).await?;
-                    configs.push((
-                        req.variable_name().clone(),
-                        format!("static const {} {} = {};", type_name, name, value),
-                    ));
+                    local_configs.push(format!("static const {} {} = {};", type_name, name, value));
                 }
             }
+            let mut local_configs = local_configs.join("\n");
+            local_configs.push('\n');
+            configs.push(local_configs);
         }
-        lib_deps.dedup_by_key(|d| d.repo_url().clone());
 
         includes.dedup();
         includes.sort_unstable();
 
         measurements.sort_unstable();
 
-        configs.sort_by(|a, b| a.0.cmp(&b.0));
+        configs.sort_unstable();
 
         setups.sort_unstable();
         unauthenticated_actions.sort_unstable();
 
-        // TODO: properly use device config
         for config in &device_configs_raw {
             let request = config.request(txn).await?;
             let ty = request.ty(txn).await?;
@@ -458,11 +459,11 @@ impl Compiler {
             match ty.widget() {
                 DeviceWidgetKind::SSID => setups.insert(
                     0,
-                    "loop.setAccessPointCredentials(config::SSID, config::PSK);".to_owned(),
+                    "loop.setAccessPointCredentials(config::SSID, config::PSK);\n".to_owned(),
                 ),
                 DeviceWidgetKind::PSK => {}
                 DeviceWidgetKind::Timezone => {
-                    setups.insert(0, "loop.setTimezone(config::timezone);".to_owned())
+                    setups.insert(0, "loop.setTimezone(config::timezone);\n".to_owned())
                 }
             }
         }
@@ -470,39 +471,57 @@ impl Compiler {
         definitions.sort_unstable();
 
         let pin_hpp = target.pin_hpp().to_owned();
-        let platformio_ini = target.compile_platformio_ini(txn, &lib_deps).await?;
+        let platformio_ini = target.compile_platformio_ini(txn, lib_deps).await?;
 
-        let includes = includes.join("\n");
-        let definitions = definitions.join("\n");
-        let measurements = measurements.join("\n    ");
-        let setups = setups.join("\n  ");
-        let unauthenticated_actions = unauthenticated_actions.join("\n  ");
-        let configs = configs
-            .into_iter()
-            .map(|c| c.1)
-            .collect::<Vec<_>>()
-            .join("\n");
+        let mut includes = includes.join("\n");
+        if !includes.is_empty() {
+            includes.push('\n');
+        }
+
+        let mut definitions = definitions.join("\n\n");
+        if !definitions.is_empty() {
+            definitions.insert(0, '\n');
+            definitions.push('\n');
+        }
+        let mut measurements = measurements.join("\n\n    ");
+        if !measurements.is_empty() {
+            measurements.insert_str(0, "\n    ");
+        }
+
+        let mut setups = setups.join("\n  ");
+
+        if !setups.is_empty() {
+            setups.insert_str(0, "\n  ");
+            setups.push('\n');
+        }
+
+        let mut unauthenticated_actions = unauthenticated_actions.join("\n  ");
+        if !unauthenticated_actions.is_empty() {
+            unauthenticated_actions.insert_str(0, "\n  ");
+        }
+
+        let configs = configs.join("\n");
+        let mut chars = configs.chars();
+        chars.next_back();
+        let mut configs = chars.as_str().to_owned();
+        if !configs.is_empty() {
+            configs.insert(0, '\n');
+            configs.insert(0, '\n');
+        }
 
         let main_cpp = format!(
             "#include <iop/loop.hpp>
 #include <pin.hpp>
 {includes}
-
 namespace config {{
 constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
-constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;
-
-{device_configs}
-{configs}
-}}
-{definitions}
-
+constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;{device_configs}{configs}
+}}{definitions}
 auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
   IOP_TRACE();
 
   loop.logger().infoln(IOP_STR(\"Collect Measurements\"));
-  auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{
-    {measurements}
+  auto json = loop.api().makeJson(IOP_FUNC, [](JsonDocument &doc) {{{measurements}
     (void) doc;
   }});
   iop_assert(json, IOP_STR(\"Unable to generate request payload, OOM or buffer overflow\"));
@@ -513,15 +532,12 @@ auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void
   loop.registerEvent(token, prepareJson(loop));
 }}
 
-auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{
-  {unauthenticated_actions}
+auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{{unauthenticated_actions}
   (void) loop;
 }}
 
 namespace iop {{
-auto setup(EventLoop &loop) noexcept -> void {{
-  {setups}
-
+auto setup(EventLoop &loop) noexcept -> void {{{setups}
   loop.setInterval(config::unauthenticatedActionsInterval, unauthenticatedAct);
   loop.setAuthenticatedInterval(config::measurementsInterval, monitor);
 }}

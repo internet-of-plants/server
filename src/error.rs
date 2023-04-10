@@ -189,7 +189,7 @@ impl IntoResponse for Error {
                 (StatusCode::UNAUTHORIZED, "Unauthorized")
             }
             Self::MissingHeader(header) => {
-                error!("Missing HeaderBad: {}", header);
+                error!("Missing Header: {}", header);
                 (StatusCode::BAD_REQUEST, "Bad Request")
             }
             Self::BadData => {

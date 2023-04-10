@@ -87,7 +87,7 @@ impl SensorConfig {
             SensorConfigRequestId,
             serde_json::Value,
         )> = sqlx::query_as(
-            "SELECT id, sensor_id, request_id, value FROM sensor_configs WHERE sensor_id = $1",
+            "SELECT id, sensor_id, request_id, value FROM sensor_configs WHERE sensor_id = $1 ORDER BY created_at",
         )
         .bind(sensor.id())
         .fetch_all(txn)
