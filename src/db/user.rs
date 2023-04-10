@@ -1,8 +1,32 @@
-use crate::{utils, AuthToken, DateTime, Error, Organization, Result, Transaction};
+use crate::{
+    utils, AuthToken, DateTime, Error, Organization, OrganizationView, Result, Transaction,
+};
 use derive::id;
 use derive_get::Getters;
 use derive_more::FromStr;
 use serde::{Deserialize, Serialize};
+
+#[derive(Getters, Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserView {
+    #[copy]
+    pub id: UserId,
+    pub email: String,
+    pub username: String,
+    pub default_organization: OrganizationView,
+}
+
+impl UserView {
+    pub async fn new(txn: &mut Transaction<'_>, user: &User) -> Result<Self> {
+        let organization = user.default_organization(txn).await?;
+        Ok(Self {
+            id: user.id(),
+            email: user.email().to_owned(),
+            username: user.username().to_owned(),
+            default_organization: OrganizationView::new(txn, &organization).await?,
+        })
+    }
+}
 
 #[derive(Getters, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Login {

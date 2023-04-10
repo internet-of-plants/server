@@ -1,7 +1,8 @@
 use crate::{
-    logger::*, Collection, CollectionId, Compilation, Device, DeviceConfig, DeviceConfigView,
-    DeviceId, DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor, Organization,
-    Result, Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView, Transaction,
+    logger::*, Collection, CollectionId, Compilation, CompilationView, Device, DeviceConfig,
+    DeviceConfigView, DeviceId, DeviceWidgetKind, Error, FirmwareView, NewDeviceConfig, NewSensor,
+    Organization, Result, Sensor, SensorConfigRequest, SensorView, Target, TargetId, TargetView,
+    Transaction,
 };
 use derive::id;
 use derive_get::Getters;
@@ -36,6 +37,7 @@ pub struct CompilerView {
     devices_count: usize,
     target: TargetView,
     latest_firmware: FirmwareView,
+    latest_compilation: CompilationView,
 }
 
 impl CompilerView {
@@ -67,6 +69,7 @@ impl CompilerView {
             device_configs,
             devices_count: devices.len(),
             collection_name: collection.name().to_owned(),
+            latest_compilation: CompilationView::new(latest_compilation),
         })
     }
 }

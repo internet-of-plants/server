@@ -276,7 +276,7 @@ impl Compilation {
                 .await??;
 
                 sqlx::query("INSERT INTO dependency_belongs_to_compilation (repo_url, branch, sensor_id, commit_hash, compilation_id) VALUES ($1, $2, $3, $4, $5)
-                             ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $2")
+                             ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $4")
                     .bind(dependency.repo_url())
                     .bind(dependency.branch())
                     .bind(sensor.id())
@@ -306,7 +306,7 @@ impl Compilation {
             sqlx::query(
                 "INSERT INTO dependency_belongs_to_compilation (repo_url, branch, commit_hash, compilation_id)
                  VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $2",
+                 ON CONFLICT (repo_url, compilation_id) DO UPDATE SET commit_hash = $3",
             )
             .bind(dependency.repo_url())
             .bind(dependency.branch())

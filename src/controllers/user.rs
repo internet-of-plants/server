@@ -1,6 +1,6 @@
 use crate::{
-    extractor::MacAddress, extractor::MaybeTargetPrototype, extractor::Version, logger::*, Device,
-    Error, Login, NewDevice, NewUser, Pool, Result, User,
+    extractor::MacAddress, extractor::MaybeTargetPrototype, extractor::User, extractor::Version,
+    logger::*, Device, Error, Login, NewDevice, NewUser, Pool, Result, UserView,
 };
 use axum::{extract::Extension, extract::Json, extract::TypedHeader, response::IntoResponse};
 
@@ -12,8 +12,8 @@ pub async fn new(
     //return Result::<&'static str, _>::Err(Error::Unauthorized.into());
 
     let mut txn = pool.begin().await?;
-    User::new(&mut txn, user.clone()).await?;
-    let token = User::login(
+    crate::User::new(&mut txn, user.clone()).await?;
+    let token = crate::User::login(
         &mut txn,
         Login {
             organization: Some(user.organization_name().to_owned()),
@@ -51,11 +51,22 @@ pub async fn login(
             )
             .await?
         }
-        (None, None, None) => User::login(&mut txn, user).await?,
+        (None, None, None) => crate::User::login(&mut txn, user).await?,
         (_, _, None) => return Err(Error::MissingHeader("DRIVER")),
         (_, None, _) => return Err(Error::MissingHeader("VERSION")),
         (None, _, _) => return Err(Error::MissingHeader("MAC_ADDRESS")),
     };
     txn.commit().await?;
     Ok(token)
+}
+
+pub async fn find(
+    Extension(pool): Extension<&'static Pool>,
+    User(user): User,
+) -> Result<Json<UserView>> {
+    let mut txn = pool.begin().await?;
+    let user = UserView::new(&mut txn, &user).await?;
+    txn.commit().await?;
+
+    Ok(Json(user))
 }

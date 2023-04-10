@@ -46,7 +46,7 @@ pub use crate::db::{
         Certificate, CertificateId, Dependency, NewDependency, NewTargetPrototype, TargetPrototype,
         TargetPrototypeId,
     },
-    user::{Login, NewUser, User, UserId, Username},
+    user::{Login, NewUser, User, UserId, UserView, Username},
 };
 pub use error::{Error, Result};
 
@@ -160,6 +160,7 @@ pub async fn router(pool: &'static Pool) -> Router {
     Router::new()
         .route("/v1/user/login", post(controllers::user::login))
         .route("/v1/user", post(controllers::user::new))
+        .route("/v1/user", get(controllers::user::find))
         .route("/v1/targets", get(controllers::target::list))
         .route(
             "/v1/target/sensor/prototypes",

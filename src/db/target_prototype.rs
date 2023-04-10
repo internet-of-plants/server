@@ -62,16 +62,16 @@ pub struct TargetPrototype {
 pub struct NewTargetPrototype {
     certs_url: String,
     arch: String,
-    build_flags: String,
+    build_flags: Vec<String>,
     #[serde(default)]
-    build_unflags: Option<String>,
+    build_unflags: Vec<String>,
     platform: String,
     #[serde(default)]
     framework: Option<String>,
     #[serde(default)]
-    platform_packages: Option<String>,
+    platform_packages: Vec<String>,
     #[serde(default)]
-    extra_platformio_params: Option<String>,
+    extra_platformio_params: Vec<String>,
     #[serde(default)]
     ldf_mode: Option<String>,
     #[serde(default)]
@@ -91,24 +91,26 @@ impl TargetPrototype {
     pub async fn new(txn: &mut Transaction<'_>, prototype: NewTargetPrototype) -> Result<Self> {
         sqlx::query(
             "INSERT INTO target_prototypes
-            (certs_url, arch, build_flags, platform, framework, platform_packages, extra_platformio_params, ldf_mode) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (certs_url, arch, build_flags, build_unflags, platform, framework, platform_packages, extra_platformio_params, ldf_mode)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (arch)
             DO UPDATE SET certs_url = $1,
                           build_flags = $3,
-                          platform = $4,
-                          framework = $5,
-                          platform_packages = $6,
-                          extra_platformio_params = $7,
-                          ldf_mode = $8",
+                          build_unflags = $4,
+                          platform = $5,
+                          framework = $6,
+                          platform_packages = $7,
+                          extra_platformio_params = $8,
+                          ldf_mode = $9",
         )
             .bind(prototype.certs_url())
             .bind(prototype.arch())
-            .bind(prototype.build_flags())
+            .bind(prototype.build_flags().join("\n    "))
+            .bind(prototype.build_unflags().join("\n    "))
             .bind(prototype.platform())
             .bind(prototype.framework())
-            .bind(prototype.platform_packages())
-            .bind(prototype.extra_platformio_params())
+            .bind(prototype.platform_packages().join("\n"))
+            .bind(prototype.extra_platformio_params().join("\n"))
             .bind(prototype.ldf_mode())
             .execute(&mut *txn)
             .await?;

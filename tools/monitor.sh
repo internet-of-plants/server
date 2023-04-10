@@ -5,21 +5,21 @@ FOLDER=/tmp/iop-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '').r
 
 for f in /tmp/iop-*.root; do
   umount -l $f/bin
-  #umount -l $f/sbin
-  #umount -l $f/var/lock
-  umount -l $f/var/tmp
-  #umount -l $f/var/run
-  umount -l $f/tmp
-  #umount -l $f/sys
   umount -l $f/usr
-  #umount -l $f/dev
   umount -l $f/proc
   umount -l $f/lib
-  #umount -l $f/lib32
   umount -l $f/lib64
+  umount -l $f/etc
+  #umount -l $f/sbin
+  #umount -l $f/var/lock
+  #umount -l $f/var/tmp
+  #umount -l $f/var/run
+  #umount -l $f/tmp
+  #umount -l $f/sys
+  #umount -l $f/dev
+  #umount -l $f/lib32
   #umount -l $f/libx32
   #umount -l $f/run
-  umount -l $f/etc
   #umount -l $f/boot
   rm -rf $f
 done
@@ -104,7 +104,7 @@ sudo chown iop.iop $FOLDER/packages
 sudo chown iop.iop $FOLDER/packages/*
 sudo chown iop.iop $FOLDER/packages/target_prototypes/*
 sudo chown iop.iop $FOLDER/packages/sensor_prototypes/*
-sudo chown iop.iop $FOLDER
+sudo chown root.iop $FOLDER
 
 for path in "$FOLDER/packages/target_prototypes/"*; do
   folder=$(basename "$path")
