@@ -101,7 +101,7 @@ impl Device {
         txn: &mut Transaction<'_>,
         organization: &Organization,
         new_device: NewDevice,
-    ) -> Result<Device> {
+    ) -> Result<Self> {
         let device = Self::try_find_by_mac(txn, organization, &new_device.mac).await?;
 
         // TODO: add target prototype check here
@@ -407,6 +407,7 @@ impl Device {
         let updated_at = Self::update_collection(txn, self.id, collection).await?;
 
         if old_collection.devices(txn).await?.is_empty() {
+            // TODO FIXME: race
             old_collection.delete(txn).await?;
         }
 

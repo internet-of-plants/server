@@ -16,7 +16,8 @@ pub async fn new(
 
     let mut device = match new_compiler.device_id() {
         Some(device_id) => Some(Device::find_by_id(&mut txn, device_id, &user).await?),
-        None => None,
+        // TODO: fix this
+        None => unreachable!(),
     };
     let mut collection =
         Collection::find_by_id(&mut txn, new_compiler.collection_id(), &user).await?;
@@ -101,6 +102,7 @@ pub async fn set(
         for device in collection.devices(&mut txn).await? {
             Device::update_collection(&mut txn, device.id(), &col).await?;
         }
+        // TODO FIXME: race
         collection.delete(&mut txn).await?;
     } else if let Id::DeviceId { device_id } = request.id {
         let target = compiler.target(&mut txn).await?;

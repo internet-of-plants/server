@@ -99,6 +99,7 @@ impl Compiler {
         sensors_and_alias.dedup_by_key(|(s, _)| s.id());
         device_configs.dedup_by_key(|c| c.id());
 
+        // TODO: fix this, its probably wrong, btw ignores builtin
         let id: Option<(CompilerId,)> = dbg!(
             sqlx::query_as(
                 "SELECT compilers.id
@@ -405,14 +406,16 @@ impl Compiler {
                     .collect::<Result<Vec<String>>>()?
                     .join("\n    "),
             );
-            setups.extend(prototype
+            setups.extend(
+                prototype
                     .setups()
                     .iter()
                     .map(|setup| {
                         let reg = Handlebars::new();
                         reg.render_template(setup, &json!({ "index": index }))
                     })
-                    .collect::<Result<Vec<String>, _>>()?);
+                    .collect::<Result<Vec<String>, _>>()?,
+            );
             unauthenticated_actions.extend(
                 prototype
                     .unauthenticated_actions()
@@ -483,7 +486,7 @@ impl Compiler {
             definitions.insert(0, '\n');
             definitions.push('\n');
         }
-        let mut measurements = measurements.join("\n\n    ");
+        let mut measurements = dbg!(measurements).join("\n\n    ");
         if !measurements.is_empty() {
             measurements.insert_str(0, "\n    ");
         }
@@ -610,18 +613,5 @@ auto setup(EventLoop &loop) noexcept -> void {{{setups}
 
     pub async fn organization(&self, txn: &mut Transaction<'_>) -> Result<Organization> {
         Organization::find_by_compiler(txn, self).await
-    }
-
-    pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
-        let comps = sqlx::query_as(
-            "SELECT DISTINCT ON (compilers.id) compilers.id, compilers.target_id
-             FROM compilers
-             INNER JOIN collections ON collections.compiler_id = compilers.id
-             INNER JOIN devices ON devices.collection_id = collections.id
-             ORDER BY compilers.id, compilers.created_at DESC",
-        )
-        .fetch_all(txn)
-        .await?;
-        Ok(comps)
     }
 }

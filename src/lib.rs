@@ -175,8 +175,6 @@ pub async fn router(pool: &'static Pool) -> Router {
             "/v1/organizations",
             get(controllers::organization::from_user),
         )
-        .route("/v1/organization", get(controllers::organization::find))
-        .route("/v1/collection", get(controllers::collection::find))
         .route(
             "/v1/collection/name",
             post(controllers::collection::set_name),

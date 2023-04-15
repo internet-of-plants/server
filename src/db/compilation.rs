@@ -137,7 +137,7 @@ impl Compilation {
         Ok(comp)
     }
 
-    pub async fn all_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
+    pub async fn list_active(txn: &mut Transaction<'_>) -> Result<Vec<Self>> {
         let comps = sqlx::query_as(
             "SELECT DISTINCT ON (compilations.compiler_id) compilations.compiler_id, compilations.id, platformio_ini, main_cpp, pin_hpp, certificate_id
              FROM compilations

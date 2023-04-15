@@ -86,7 +86,7 @@ async fn update_compilations(pool: &'static Pool) {
 
 async fn update_compilations_tick(pool: &'static Pool) -> Result<()> {
     let mut txn = pool.begin().await?;
-    let all_compilations = Compilation::all_active(&mut txn).await?;
+    let all_compilations = Compilation::list_active(&mut txn).await?;
     txn.commit().await?;
 
     for compilation in all_compilations {
@@ -127,7 +127,7 @@ async fn recompile_tick(pool: &'static Pool) -> Result<()> {
     }
 
     let mut txn = pool.begin().await?;
-    let all_compilations = Compilation::all_active(&mut txn).await?;
+    let all_compilations = Compilation::list_active(&mut txn).await?;
     let latest_certificates = TargetPrototype::latest_certificates(&mut txn).await?;
     txn.commit().await?;
 
