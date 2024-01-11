@@ -67,27 +67,34 @@ mkdir -p /var/log/iop
 echo "Setting filesystem permissions"
 touch /var/log/iop/certbot.log
 chmod 640 /var/log/iop/certbot.log
-chown iop.root /var/log/iop/certbot.log
+chown iop:root /var/log/iop/certbot.log
 
 touch /var/log/iop/monitor.log
 chmod 640 /var/log/iop/monitor.log
-chown iop.root /var/log/iop/monitor.log
+chown iop:root /var/log/iop/monitor.log
 
 touch /var/log/iop/run-server.cron.log
 chmod 640 /var/log/iop/run-server.cron.log
-chown iop.root /var/log/iop/run-server.cron.log
+chown iop:root /var/log/iop/run-server.cron.log
 
 chmod 770 /var/log/iop
-chown iop.root /var/log/iop
+chown iop:root /var/log/iop
 
 mkdir -p /opt/iop
 
 chmod 770 /opt/iop
-chown iop.root /opt/iop
+chown iop:root /opt/iop
 
 # Add run-server.sh to crontab to run on reboot
 CRON=$(crontab -l 2>/dev/null | grep '/opt/iop/run-server.sh')
 if [ -z "$CRON" ]; then
   echo "Add server to cron"
   (crontab -l 2>/dev/null; echo "@reboot /opt/iop/run-server.sh >> /var/log/iop/run-server.cron.log 2>&1") | crontab -
+fi
+
+# Reboot every night
+CRON=$(crontab -l 2>/dev/null | grep '00 0 * * * root /usr/sbin/shutdown -r now')
+if [ -z "$CRON" ]; then
+  echo "Add daily update to cron"
+  (crontab -l 2>/dev/null; echo "00 0 * * * root /usr/sbin/shutdown -r now") | crontab -
 fi

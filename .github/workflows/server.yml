@@ -1,0 +1,34 @@
+name: Server
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: ⚡ Cache
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        if_key_exists: replace
+        key: ${{ secrets.SSH_PRIV_KEY }}
+        known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+    - name: Build Server
+      run: RUSTFLAGS=-g cargo build --release
+    - name: Deploy
+      run: ./tools/deploy.sh
