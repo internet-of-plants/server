@@ -317,42 +317,32 @@ impl Compilation {
         }
 
         let firmware = {
-            let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
+            // let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
+            let dir = fs::create_dir("/tmp/.my-test").await?;
+            let path = std::path::PathBuf::from("/tmp/.my-test");
             info!("Created temp dir {dir:?}");
 
-            dbg!(
-                fs::write(
-                    dir.path().join("platformio.ini"),
-                    self.platformio_ini.as_bytes(),
-                )
-                .await
-            )?;
+            dbg!(fs::write(path.join("platformio.ini"), self.platformio_ini.as_bytes(),).await)?;
 
-            dbg!(fs::create_dir(dir.path().join("src")).await)?;
+            dbg!(fs::create_dir(path.join("src")).await)?;
+            dbg!(fs::write(path.join("src").join("main.cpp"), self.main_cpp.as_bytes(),).await)?;
+            dbg!(fs::create_dir(path.join("include")).await)?;
             dbg!(
                 fs::write(
-                    dir.path().join("src").join("main.cpp"),
-                    self.main_cpp.as_bytes(),
-                )
-                .await
-            )?;
-            dbg!(fs::create_dir(dir.path().join("include")).await)?;
-            dbg!(
-                fs::write(
-                    dir.path().join("include").join("pin.hpp"),
+                    path.join("include").join("pin.hpp"),
                     self.pin_hpp.as_bytes(),
                 )
                 .await
             )?;
 
-            info!("pio run -e {env_name} -d \"{}\"", dir.path().display());
+            info!("pio run -e {env_name} -d \"{}\"", path.display());
 
-            let dir_arg = dir.path().to_string_lossy();
+            let dir_arg = path.to_string_lossy();
             let mut command = tokio::process::Command::new("pio");
             command.args(["run", "-e", &env_name, "-d", &*dir_arg]);
             // TODO: stream output
             // TODO: check exit code?
-            let output = dbg!(command.spawn()?.wait_with_output().await)?;
+            let output = dbg!(dbg!(command.spawn())?.wait_with_output().await)?;
 
             if !output.stderr.is_empty() {
                 error!("{}", String::from_utf8_lossy(&output.stderr));
@@ -369,8 +359,7 @@ impl Compilation {
 
             println!("Read firmware");
             fs::read(
-                dir.path()
-                    .join(".pio")
+                path.join(".pio")
                     .join("build")
                     .join(&env_name)
                     .join(filename),
