@@ -320,24 +320,30 @@ impl Compilation {
             let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
             info!("Created temp dir {dir:?}");
 
-            fs::write(
-                dir.path().join("platformio.ini"),
-                self.platformio_ini.as_bytes(),
-            )
-            .await?;
+            dbg!(
+                fs::write(
+                    dir.path().join("platformio.ini"),
+                    self.platformio_ini.as_bytes(),
+                )
+                .await
+            )?;
 
-            fs::create_dir(dir.path().join("src")).await?;
-            fs::write(
-                dir.path().join("src").join("main.cpp"),
-                self.main_cpp.as_bytes(),
-            )
-            .await?;
-            fs::create_dir(dir.path().join("include")).await?;
-            fs::write(
-                dir.path().join("include").join("pin.hpp"),
-                self.pin_hpp.as_bytes(),
-            )
-            .await?;
+            dbg!(fs::create_dir(dir.path().join("src")).await)?;
+            dbg!(
+                fs::write(
+                    dir.path().join("src").join("main.cpp"),
+                    self.main_cpp.as_bytes(),
+                )
+                .await
+            )?;
+            dbg!(fs::create_dir(dir.path().join("include")).await)?;
+            dbg!(
+                fs::write(
+                    dir.path().join("include").join("pin.hpp"),
+                    self.pin_hpp.as_bytes(),
+                )
+                .await
+            )?;
 
             info!("pio run -e {env_name} -d \"{}\"", dir.path().display());
 
@@ -346,7 +352,7 @@ impl Compilation {
             command.args(["run", "-e", &env_name, "-d", &*dir_arg]);
             // TODO: stream output
             // TODO: check exit code?
-            let output = command.spawn()?.wait_with_output().await?;
+            let output = dbg!(command.spawn()?.wait_with_output().await)?;
 
             if !output.stderr.is_empty() {
                 error!("{}", String::from_utf8_lossy(&output.stderr));
