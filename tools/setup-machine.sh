@@ -16,7 +16,7 @@ if [ -z "$DOMAIN" ]; then
 fi
 
 echo "Setup swapfile"
-fallocate -l 5G /swapfile-iop
+fallocate -l 2G /swapfile-iop
 chmod 600 /swapfile-iop
 mkswap /swapfile-iop
 swapon /swapfile-iop
