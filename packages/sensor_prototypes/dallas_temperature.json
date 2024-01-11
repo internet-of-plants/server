@@ -1,0 +1,34 @@
+{
+    "name": "Dallas Temperature",
+    "variable_name": "soilTemperature",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/dallas-temperature",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["dallas_temperature.hpp"],
+    "definitions": [
+	{
+	    "line": "static dallas::TemperatureCollection soilTemperature{{index}}(IOP_PIN_RAW(config::soilTemperature{{index}}));"
+	}
+    ],
+    "setups": ["soilTemperature{{index}}.begin();"],
+    "measurements": [
+	{
+	    "name": "Soil Temperature",
+	    "variable_name": "soil_temperature_celsius{{index}}",
+	    "value": "soilTemperature{{index}}.measure();",
+	    "ty": "FloatCelsius",
+	    "kind": "SoilTemperature"
+	}
+    ],
+    "config_requests": [
+	{
+	    "name": "Port",
+	    "variable_name": "soilTemperature{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	}
+    ]
+}

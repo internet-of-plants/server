@@ -1,0 +1,40 @@
+{
+    "name": "Water Pump",
+    "variable_name": "waterPump",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/water-pump",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["water_pump.hpp"],
+    "definitions": [
+	{
+	    "line": "static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));"
+	}
+    ],
+    "setups": [
+	"waterPump{{index}}.begin();\n  for (const auto &[moment, seconds]: config::waterPumpActions{{index}}) {\n    waterPump{{index}}.setTime(moment, seconds);\n  }"
+    ],
+    "unauthenticated_actions": ["waterPump{{index}}.actIfNeeded();"],
+    "config_requests": [
+	{
+	    "name": "Port",
+	    "variable_name": "waterPump{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	},
+	{
+	    "name": "Timed Actions",
+	    "variable_name": "waterPumpActions{{index}}[]",
+	    "type_name": "std::pair<relay::Moment, iop::time::seconds>",
+	    "widget": {
+		"kind": "Map",
+		"data": [
+		    { "kind": "Moment" },
+		    { "kind": "Seconds" }
+		]
+	    }
+	}
+    ]
+}

@@ -1,0 +1,20 @@
+{
+    "name": "Factory Reset Button",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/factory-reset-button",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["factory_reset_button.hpp"],
+    "setups": ["reset::setup(IOP_PIN_RAW(config::factoryResetButton{{index}}));"],
+    "unauthenticated_actions": ["reset::resetIfNeeded(loop);"],
+    "config_requests": [
+	{
+	    "name": "Button",
+	    "variable_name": "factoryResetButton{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	}
+    ]
+}

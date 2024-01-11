@@ -1,0 +1,27 @@
+{
+    "arch": "esp8266",
+    "certs_url": "https://ccadb-public.secure.force.com/mozilla/IncludedCACertificateReportPEMCSV",
+    "build_flags": [
+        "-D IOP_ESP8266",
+        "-D IOP_SSL"
+    ],
+    "platform": "espressif8266",
+    "framework": "arduino",
+    "platform_packages": ["framework-arduinoespressif8266 @ https://github.com/esp8266/Arduino"],
+    "extra_platformio_params": [
+        "monitor_filters = esp8266_exception_decoder",
+        "board_build.f_cpu = 160000000L",
+        "monitor_speed = 115200"
+    ],
+    "ldf_mode": "deep",
+    "dependencies": [
+        {
+            "repo_url": "https://github.com/esp8266/Arduino",
+            "branch": "master"
+        },
+        {
+            "repo_url": "https://github.com/platformio/platform-espressif8266",
+            "branch": "master"
+        }
+    ]
+}

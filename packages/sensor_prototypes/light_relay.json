@@ -1,0 +1,46 @@
+{
+    "name": "Light Relay",
+    "variable_name": "light",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/light",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["light.hpp"],
+    "definitions": [
+	{
+	    "line": "static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));"
+	}
+    ],
+    "setups": [
+	"light{{index}}.begin();\n  for (const auto &[moment, state]: config::lightActions{{index}}) {\n    light{{index}}.setTime(moment, state);\n  }"
+    ],
+    "unauthenticated_actions": ["light{{index}}.actIfNeeded();"],
+    "config_requests": [
+	{
+	    "name": "Port",
+	    "variable_name": "light{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	},
+	{
+	    "name": "Timed Switches",
+	    "variable_name": "lightActions{{index}}[]",
+	    "type_name": "std::pair<relay::Moment, relay::State>",
+	    "widget": {
+		"kind": "Map",
+		"data": [
+		    { "kind": "Moment" },
+		    {
+			"kind": "Selection",
+			"data": [
+			    "relay::State::ON",
+			    "relay::State::OFF"
+			]
+		    }
+		]
+	    }
+	}
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "arch": "esp32",
+    "certs_url": "https://hg.mozilla.org/releases/mozilla-release/raw-file/default/security/nss/lib/ckfw/builtins/certdata.txt",
+    "build_flags": [
+        "-D IOP_ESP32",
+        "-D IOP_SSL"
+    ],
+    "build_unflags": ["-std=gnu++11"],
+    "platform": "https://github.com/internet-of-plants/platform-espressif32",
+    "framework": "arduino",
+    "platform_packages": [
+        "toolchain-xtensa-esp32 @ 8.4.0+2021r1",
+        "espressif/toolchain-riscv32-esp @ 8.4.0+2021r1",
+        "framework-arduinoespressif32 @ https://github.com/internet-of-plants/arduino-esp32",
+        "platformio/tool-esptoolpy @ https://github.com/tasmota/esptool/releases/download/v3.2/esptool-v3.2.zip"
+    ],
+    "extra_platformio_params": [
+        "board_build.mcu = esp32",
+        "board_build.f_cpu = 240000000L",
+        "monitor_speed = 115200"
+    ],
+    "dependencies": [
+        {
+            "repo_url": "https://github.com/internet-of-plants/arduino-esp32",
+            "branch": "main"
+        },
+        {
+            "repo_url": "https://github.com/internet-of-plants/platform-espressif32",
+            "branch": "main"
+        }
+    ]
+}

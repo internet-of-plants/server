@@ -76,8 +76,8 @@ ssh root@$DOMAIN "chmod 400 /opt/iop/packages/target_prototypes"
 ssh root@$DOMAIN "chown iop:root /opt/iop/packages/target_prototypes"
 
 for path in "$SCRIPTPATH/../packages/target_prototypes/"*; do
-  echo "Sending packages/target_prototypes/$folder/targets"
   folder=$(basename "$path")
+  echo "Sending packages/target_prototypes/$folder/targets"
   ssh root@$DOMAIN "mkdir -p /opt/iop/packages/target_prototypes/$folder/targets"
   ssh root@$DOMAIN "chmod 400 /opt/iop/packages/target_prototypes/$folder"
   ssh root@$DOMAIN "chown iop:root /opt/iop/packages/target_prototypes/$folder"

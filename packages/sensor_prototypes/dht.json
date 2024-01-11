@@ -1,0 +1,56 @@
+{
+    "name": "DHT",
+    "variable_name": "airTempAndHumidity",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/dht",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["dht.hpp"],
+    "definitions": [
+	{
+	    "line": "static dht::Dht airTempAndHumidity{{index}}(IOP_PIN_RAW(config::airTempAndHumidity{{index}}), config::dhtVersion{{index}});"
+	}
+    ],
+    "setups": ["airTempAndHumidity{{index}}.begin();"],
+    "measurements": [
+	{
+	    "name": "Air Temperature",
+	    "variable_name": "air_temperature_celsius{{index}}",
+	    "value": "airTempAndHumidity{{index}}.measureTemperature()",
+	    "ty": "FloatCelsius",
+	    "kind": "AirTemperature"
+	},
+	{
+	    "name": "Air Humidity",
+	    "variable_name": "air_humidity_percentage{{index}}",
+	    "value": "airTempAndHumidity{{index}}.measureHumidity()",
+	    "ty": "Percentage",
+	    "kind": "AirHumidity"
+	}
+    ],
+    "config_requests": [
+	{
+	    "name": "Port",
+	    "variable_name": "airTempAndHumidity{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	},
+	{
+	    "name": "Model",
+	    "variable_name": "dhtVersion{{index}}",
+	    "type_name": "dht::Version",
+	    "widget": {
+		"kind": "Selection",
+		"data": [
+		    "dht::Version::DHT11",
+		    "dht::Version::DHT12",
+		    "dht::Version::DHT21",
+		    "dht::Version::DHT22",
+		    "dht::Version::AM2301"
+		]
+	    } 
+	}
+    ]
+}

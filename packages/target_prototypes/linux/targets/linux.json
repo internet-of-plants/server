@@ -1,0 +1,32 @@
+{
+    "pins": [
+        "Pin::D1",
+        "Pin::D2",
+        "Pin::D5",
+        "Pin::D6",
+        "Pin::D7"
+    ],
+    "pin_hpp": "#ifndef PIN_HPP\n#define PIN_HPP\n\n/// Dummy pin mapping for LINUX mock\nenum class Pin { D1 = 5, D2 = 4, D5 = 14, D6 = 12, D7 = 13 };\n\n#endif",
+    "target_prototype_arch": "linux",
+    "config_requests": [
+        {
+            "variable_name": "SSID",
+            "name": "Captive Portal SSID",
+            "type_name": "iop::StaticString",
+            "widget": "SSID"
+        },
+        {
+            "variable_name": "PSK",
+            "name": "Captive Portal Password",
+            "type_name": "iop::StaticString",
+            "widget": "PSK"
+        },
+        {
+            "variable_name": "timezone",
+            "name": "Timezone",
+            "type_name": "int8_t",
+            "widget": "Timezone"
+        }
+    ],
+    "build_flags": "-D IOP_LINUX_MOCK"
+}

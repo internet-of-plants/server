@@ -1,0 +1,17 @@
+{
+    "arch": "linux",
+    "certs_url": "https://hg.mozilla.org/releases/mozilla-release/raw-file/default/security/nss/lib/ckfw/builtins/certdata.txt",
+    "build_flags": [
+        "-Wextra",
+        "-Wpedantic",
+        "-pedantic-errors",
+        "-fstack-protector",
+        "-Wstack-protector",
+        "-D IOP_SSL",
+        "-lpthread",
+        "-lcrypto",
+        "-lssl"
+    ],
+    "platform": "native"
+}
+

@@ -1,0 +1,43 @@
+{
+    "name": "Cooler",
+    "variable_name": "cooler",
+    "dependencies": [
+	{
+	    "repo_url": "https://github.com/internet-of-plants/cooler",
+	    "branch": "main"
+	}
+    ],
+    "includes": ["cooler.hpp"],
+    "definitions": [
+	{
+	    "line": "static relay::Cooler cooler{{index}}(IOP_PIN_RAW(config::cooler{{index}}), std::ref({{dhtSensor}}), config::coolerMax{{index}});",
+	    "sensors_referenced": [
+		{
+		    "sensor_name": "DHT",
+		    "request_name": "dhtSensor"
+		}
+	    ]
+	}
+    ],
+    "setups": ["cooler{{index}}.begin();"],
+    "unauthenticated_actions": ["cooler{{index}}.actIfNeeded();"],
+    "config_requests": [
+	{
+	    "name": "Port",
+	    "variable_name": "cooler{{index}}",
+	    "type_name": "Pin",
+	    "widget": { "kind": "PinSelection" } 
+	},
+	{
+	    "name": "Max Celsius",
+	    "variable_name": "coolerMax{{index}}",
+	    "type_name": "float",
+	    "widget": { "kind": "F32" }
+	},
+	{
+	    "name": "DHT Sensor",
+	    "variable_name": "dhtSensor",
+	    "widget": { "kind": "Sensor", "data": "DHT" }
+	}
+    ]
+}

@@ -1,0 +1,26 @@
+{
+    "board": "esp32dev",
+    "pins": [],
+    "pin_hpp": "",
+    "target_prototype_arch": "esp32",
+    "config_requests": [
+        {
+            "variable_name": "SSID",
+            "name": "Captive Portal SSID",
+            "type_name": "iop::StaticString",
+            "widget": "SSID"
+        },
+        {
+            "variable_name": "PSK",
+            "name": "Captive Portal Password",
+            "type_name": "iop::StaticString",
+            "widget": "PSK"
+        },
+        {
+            "variable_name": "timezone",
+            "name": "Timezone",
+            "type_name": "int8_t",
+            "widget": "Timezone"
+        }
+    ]
+}
