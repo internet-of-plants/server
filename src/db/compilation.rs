@@ -318,6 +318,7 @@ impl Compilation {
 
         let firmware = {
             // let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
+            // let path = dir.path();
             let dir = fs::create_dir("/tmp/.my-test").await?;
             let path = std::path::PathBuf::from("/tmp/.my-test");
             info!("Created temp dir {dir:?}");
@@ -325,8 +326,11 @@ impl Compilation {
             dbg!(fs::write(path.join("platformio.ini"), self.platformio_ini.as_bytes(),).await)?;
 
             dbg!(fs::create_dir(path.join("src")).await)?;
+
             dbg!(fs::write(path.join("src").join("main.cpp"), self.main_cpp.as_bytes(),).await)?;
+
             dbg!(fs::create_dir(path.join("include")).await)?;
+
             dbg!(
                 fs::write(
                     path.join("include").join("pin.hpp"),

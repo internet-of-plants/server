@@ -114,5 +114,7 @@ done
 
 firejail --noprofile --private-tmp --chroot=$FOLDER << "EOT"
 cd /
+ls
+pio -h
 sudo -su iop ./run-server-with-logging.sh
 EOT
