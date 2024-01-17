@@ -38,6 +38,11 @@ scp $SCRIPTPATH/run-server.sh root@$DOMAIN:/opt/iop/
 ssh root@$DOMAIN "chmod 100 /opt/iop/run-server.sh"
 ssh root@$DOMAIN "chown iop:root /opt/iop/run-server.sh"
 
+echo "Sending tools/firejail.config"
+scp $SCRIPTPATH/firejail.config root@$DOMAIN:/etc/firejail/
+ssh root@$DOMAIN "chmod 100 /opt/iop/firejail.config"
+ssh root@$DOMAIN "chown root:root /etc/firejail/firejail.config"
+
 echo "Sending tools/run-server-with-logging.sh"
 scp $SCRIPTPATH/run-server-with-logging.sh root@$DOMAIN:/opt/iop/
 ssh root@$DOMAIN "chmod 100 /opt/iop/run-server-with-logging.sh"

@@ -92,24 +92,24 @@ done
 
 sudo chmod 555 $FOLDER
 sudo chmod 777 $FOLDER/tmp
-sudo chown iop.iop $FOLDER/home/iop
-sudo chown iop.iop $FOLDER/server
-sudo chown iop.iop $FOLDER/run-server-with-logging.sh
-sudo chown iop.iop $FOLDER/var/crash
-sudo chown iop.iop $FOLDER/cert.pem
-sudo chown iop.iop $FOLDER/privkey.pem
-sudo chown iop.iop $FOLDER/migrations
-sudo chown iop.iop $FOLDER/migrations/*
-sudo chown iop.iop $FOLDER/packages
-sudo chown iop.iop $FOLDER/packages/*
-sudo chown iop.iop $FOLDER/packages/target_prototypes/*
-sudo chown iop.iop $FOLDER/packages/sensor_prototypes/*
-sudo chown root.iop $FOLDER
+sudo chown iop:iop $FOLDER/home/iop
+sudo chown iop:iop $FOLDER/server
+sudo chown iop:iop $FOLDER/run-server-with-logging.sh
+sudo chown iop:iop $FOLDER/var/crash
+sudo chown iop:iop $FOLDER/cert.pem
+sudo chown iop:iop $FOLDER/privkey.pem
+sudo chown iop:iop $FOLDER/migrations
+sudo chown iop:iop $FOLDER/migrations/*
+sudo chown iop:iop $FOLDER/packages
+sudo chown iop:iop $FOLDER/packages/*
+sudo chown iop:iop $FOLDER/packages/target_prototypes/*
+sudo chown iop:iop $FOLDER/packages/sensor_prototypes/*
+sudo chown root:iop $FOLDER
 
 for path in "$FOLDER/packages/target_prototypes/"*; do
   folder=$(basename "$path")
-  sudo chown iop.iop $FOLDER/packages/target_prototypes/$folder/*
-  sudo chown iop.iop $FOLDER/packages/target_prototypes/$folder/targets/*
+  sudo chown iop:iop $FOLDER/packages/target_prototypes/$folder/*
+  sudo chown iop:iop $FOLDER/packages/target_prototypes/$folder/targets/*
 done
 
 firejail --noprofile --private-tmp --chroot=$FOLDER << "EOT"
