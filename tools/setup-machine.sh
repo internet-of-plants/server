@@ -34,7 +34,11 @@ ufw --force enable
 
 echo "Install ubuntu dependencies needed"
 apt-get -q -y update < /dev/null
-apt-get -q -y install postgresql postgresql-contrib snap firejail libssl-dev binutils build-essential < /dev/null;
+apt-get -q -y install postgresql postgresql-contrib snap firejail libssl-dev binutils build-essential curl python3.11-venv < /dev/null;
+
+curl -fsSL -o get-platformio.py https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py
+python3 get-platformio.py
+rm get-platformio.py
 
 if [ ! -z "$DOMAIN" ]; then
   echo "Setup certbot"

@@ -112,6 +112,8 @@ for path in "$FOLDER/packages/target_prototypes/"*; do
   sudo chown iop:iop $FOLDER/packages/target_prototypes/$folder/targets/*
 done
 
+PATH=$PATH:/root/.platformio/penv/bin
+
 firejail --noprofile --private-tmp --chroot=$FOLDER << "EOT"
 cd /
 ls
