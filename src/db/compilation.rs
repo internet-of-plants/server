@@ -317,10 +317,10 @@ impl Compilation {
         }
 
         let firmware = {
-            // let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
-            // let path = dir.path();
-            let dir = fs::create_dir("/tmp/.my-test").await?;
-            let path = std::path::PathBuf::from("/tmp/.my-test");
+            let dir = tokio::task::spawn_blocking(tempfile::tempdir).await??;
+            let path = dir.path();
+            // let dir = fs::create_dir("/tmp/.my-test").await?;
+            // let path = std::path::PathBuf::from("/tmp/.my-test");
             info!("Created temp dir {dir:?}");
 
             dbg!(fs::write(path.join("platformio.ini"), self.platformio_ini.as_bytes(),).await)?;
