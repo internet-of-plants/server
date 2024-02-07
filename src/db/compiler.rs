@@ -517,7 +517,7 @@ impl Compiler {
 #include <pin.hpp>
 {includes}
 namespace config {{
-constexpr static iop::time::milliseconds measurementsInterval = 180 * 1000;
+constexpr static iop::time::milliseconds measurementsInterval = 30 * 1000;
 constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;{device_configs}{configs}
 }}{definitions}
 auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
