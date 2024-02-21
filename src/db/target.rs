@@ -92,21 +92,23 @@ impl Target {
 
         let id = if let Some((id,)) = maybe {
             sqlx::query(
-                "UPDATE targets SET pin_hpp = $2, build_flags = $3 WHERE target_prototype_id = $1",
+                "UPDATE targets SET pin_hpp = $2, build_flags = $3, board = $4 WHERE target_prototype_id = $1",
             )
             .bind(target_prototype.id())
             .bind(target.pin_hpp())
             .bind(target.build_flags())
+            .bind(target.board())
             .execute(&mut *txn)
             .await?;
             id
         } else {
             let (id,): (TargetId,) = sqlx::query_as(
-                "INSERT INTO targets (target_prototype_id, pin_hpp, build_flags) VALUES ($1, $2, $3) RETURNING id"
+                "INSERT INTO targets (target_prototype_id, pin_hpp, build_flags, board) VALUES ($1, $2, $3, $4) RETURNING id"
             )
             .bind(target_prototype.id())
             .bind(target.pin_hpp())
             .bind(target.build_flags())
+            .bind(target.board())
             .fetch_one(&mut *txn)
             .await?;
             id

@@ -10,7 +10,7 @@
     "includes": ["soil_resistivity.hpp"],
     "definitions": [
 	{
-	    "line": "static sensor::SoilResistivity soilResistivity{{index}}(IOP_PIN_RAW(config::soilResistivityPower{{index}}));"
+	    "line": "static sensor::SoilResistivity soilResistivity{{index}};"
 	}
     ],
     "setups": ["soilResistivity{{index}}.begin();"],
