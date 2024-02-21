@@ -23,12 +23,5 @@
 	    "kind": "SoilMoisture"
 	}
     ],
-    "config_requests": [
-	{
-	    "name": "Port",
-	    "variable_name": "soilResistivityPower{{index}}",
-	    "type_name": "Pin",
-	    "widget": { "kind": "PinSelection" } 
-	}
-    ]
+    "config_requests": []
 }
