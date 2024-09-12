@@ -5,12 +5,12 @@ FOLDER=$SCRIPTPATH
 # FOLDER=/tmp/iop-$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo '').root
 
 for f in /tmp/iop-*.root; do
-  umount -l $f/bin
-  umount -l $f/usr
-  umount -l $f/proc
-  umount -l $f/lib
-  umount -l $f/lib64
-  umount -l $f/etc
+  #umount -l $f/bin
+  #umount -l $f/usr
+  #umount -l $f/proc
+  #umount -l $f/lib
+  #umount -l $f/lib64
+  #umount -l $f/etc
   #umount -l $f/sbin
   #umount -l $f/var/lock
   #umount -l $f/var/tmp
@@ -25,17 +25,17 @@ for f in /tmp/iop-*.root; do
   rm -rf $f
 done
 
-for f in /tmp/iop-*.tmpfs; do
-  rm -rf $f
-done
+# for f in /tmp/iop-*.tmpfs; do
+#   rm -rf $f
+# done
 
 # Allows to update the binary without stopping it, and jails it
 echo $FOLDER
 # mkdir -p $FOLDER/migrations $FOLDER/packages $FOLDER/dev $FOLDER/etc $FOLDER/proc $FOLDER/tmp $FOLDER/var/tmp $FOLDER/var/lock $FOLDER/bin $FOLDER/sbin $FOLDER/sys $FOLDER/var/run $FOLDER/var/crash $FOLDER/usr $FOLDER/lib $FOLDER/run $FOLDER/home/iop $FOLDER/boot $FOLDER/lib32 $FOLDER/lib64 $FOLDER/libx32 $FOLDER/home/iop
 
-ln /var/log/iop/monitor.log $FOLDER/
-ln /root/cert.pem $FOLDER/
-ln /root/privkey.pem $FOLDER/
+ln -f /var/log/iop/monitor.log $FOLDER/
+ln -f /root/cert.pem $FOLDER/
+ln -f /root/privkey.pem $FOLDER/
 
 # mount --bind /bin $FOLDER/bin
 # mount --bind /lib $FOLDER/lib
@@ -129,4 +129,6 @@ PATH=$PATH:/root/.platformio/penv/bin
 ls
 pio -h
 # sudo -su iop $FOLDER/run-server-with-logging.sh
+cd /opt/iop
 sh $FOLDER/run-server-with-logging.sh
+cd --
