@@ -1,0 +1,1 @@
+alter table firmwares drop constraint firmwares_organization_id_binary_hash_key;
