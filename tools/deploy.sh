@@ -25,27 +25,27 @@ cd -
 
 echo "Sending tools/monitor.sh"
 scp $SCRIPTPATH/monitor.sh root@$DOMAIN:/opt/iop/
-ssh root@$DOMAIN "chmod 100 /opt/iop/monitor.sh"
+ssh root@$DOMAIN "chmod 110 /opt/iop/monitor.sh"
 ssh root@$DOMAIN "chown iop:root /opt/iop/monitor.sh"
 
 echo "Sending tools/renew-cert.sh"
 scp $SCRIPTPATH/renew-cert.sh root@$DOMAIN:/opt/iop/
-ssh root@$DOMAIN "chmod 100 /opt/iop/renew-cert.sh"
+ssh root@$DOMAIN "chmod 110 /opt/iop/renew-cert.sh"
 ssh root@$DOMAIN "chown iop:root /opt/iop/renew-cert.sh"
 
 echo "Sending tools/run-server.sh"
 scp $SCRIPTPATH/run-server.sh root@$DOMAIN:/opt/iop/
-ssh root@$DOMAIN "chmod 100 /opt/iop/run-server.sh"
+ssh root@$DOMAIN "chmod 110 /opt/iop/run-server.sh"
 ssh root@$DOMAIN "chown iop:root /opt/iop/run-server.sh"
 
 echo "Sending tools/firejail.config"
 scp $SCRIPTPATH/firejail.config root@$DOMAIN:/etc/firejail/
-ssh root@$DOMAIN "chmod 100 /opt/iop/firejail.config"
+ssh root@$DOMAIN "chmod 110 /opt/iop/firejail.config"
 ssh root@$DOMAIN "chown root:root /etc/firejail/firejail.config"
 
 echo "Sending tools/run-server-with-logging.sh"
 scp $SCRIPTPATH/run-server-with-logging.sh root@$DOMAIN:/opt/iop/
-ssh root@$DOMAIN "chmod 100 /opt/iop/run-server-with-logging.sh"
+ssh root@$DOMAIN "chmod 110 /opt/iop/run-server-with-logging.sh"
 ssh root@$DOMAIN "chown iop:root /opt/iop/run-server-with-logging.sh"
 
 echo "Sending migrations"
@@ -102,7 +102,7 @@ done
 
 echo "Sending server-bin"
 scp $SCRIPTPATH/../target/release/server-bin root@$DOMAIN:/opt/iop/server
-ssh root@$DOMAIN "chmod 100 /opt/iop/server"
+ssh root@$DOMAIN "chmod 110 /opt/iop/server"
 ssh root@$DOMAIN "chown iop:root /opt/iop/server"
 
 echo "screen kill"
