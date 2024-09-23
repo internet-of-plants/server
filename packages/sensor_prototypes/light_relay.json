@@ -7,7 +7,7 @@
 	    "branch": "main"
 	}
     ],
-    "includes": ["light.hpp"],
+    "includes": ["light.hpp", "iop-hal/device.hpp"],
     "definitions": [
 	{
 	    "line": "static relay::Light light{{index}}(IOP_PIN_RAW(config::light{{index}}));"
@@ -27,7 +27,7 @@
 	{
 	    "name": "Timed Switches",
 	    "variable_name": "lightActions{{index}}[]",
-	    "type_name": "std::pair<relay::Moment, relay::State>",
+	    "type_name": "std::pair<iop_hal::Moment, relay::State>",
 	    "widget": {
 		"kind": "Map",
 		"data": [

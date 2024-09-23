@@ -240,7 +240,7 @@ impl Val {
                 hours,
                 minutes,
                 seconds,
-            } => Ok(format!("relay::Moment({hours}, {minutes}, {seconds})")),
+            } => Ok(format!("iop_hal::Moment({hours}, {minutes}, {seconds})")),
             val @ Val::Map(vec) => {
                 let mut string = String::new();
                 string.push('{');

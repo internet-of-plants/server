@@ -7,7 +7,7 @@
 	    "branch": "main"
 	}
     ],
-    "includes": ["water_pump.hpp"],
+    "includes": ["water_pump.hpp", "iop-hal/device.hpp"],
     "definitions": [
 	{
 	    "line": "static relay::WaterPump waterPump{{index}}(IOP_PIN_RAW(config::waterPump{{index}}));"
@@ -27,7 +27,7 @@
 	{
 	    "name": "Timed Actions",
 	    "variable_name": "waterPumpActions{{index}}[]",
-	    "type_name": "std::pair<relay::Moment, iop::time::seconds>",
+	    "type_name": "std::pair<iop_hal::Moment, iop::time::seconds>",
 	    "widget": {
 		"kind": "Map",
 		"data": [
