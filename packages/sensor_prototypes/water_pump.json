@@ -16,7 +16,7 @@
     "setups": [
 	"waterPump{{index}}.begin();\n  for (const auto &[moment, seconds]: config::waterPumpActions{{index}}) {\n    waterPump{{index}}.setTime(moment, seconds);\n  }"
     ],
-    "unauthenticated_actions": ["waterPump{{index}}.actIfNeeded();"],
+    "authenticated_actions": ["waterPump{{index}}.actIfNeeded();"],
     "config_requests": [
 	{
 	    "name": "Port",

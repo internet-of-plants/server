@@ -128,6 +128,7 @@ pub struct SensorView {
     includes: Vec<String>,
     definitions: Vec<Definition>,
     setups: Vec<String>,
+    authenticated_actions: Vec<String>,
     unauthenticated_actions: Vec<String>,
     measurements: Vec<SensorMeasurementView>,
     configurations: Vec<SensorConfigView>,
@@ -179,6 +180,7 @@ impl SensorView {
                 includes: prototype.includes(txn).await?,
                 definitions: prototype.definitions(txn).await?,
                 setups: prototype.setups(txn).await?,
+                authenticated_actions: prototype.authenticated_actions(txn).await?,
                 unauthenticated_actions: prototype.unauthenticated_actions(txn).await?,
                 measurements: prototype
                     .measurements(txn)
@@ -242,6 +244,7 @@ impl From<String> for Definition {
     }
 }
 pub type Setup = String;
+pub type AuthenticatedAction = String;
 pub type UnauthenticatedAction = String;
 
 #[id]

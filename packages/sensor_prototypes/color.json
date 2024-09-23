@@ -20,7 +20,7 @@
 	}
     ],
     "setups": ["cooler{{index}}.begin();"],
-    "unauthenticated_actions": ["cooler{{index}}.actIfNeeded();"],
+    "authenticated_actions": ["cooler{{index}}.actIfNeeded();"],
     "config_requests": [
 	{
 	    "name": "Port",

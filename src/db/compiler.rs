@@ -353,6 +353,7 @@ impl Compiler {
         let mut definitions = Vec::new();
         let mut measurements = Vec::new();
         let mut setups = Vec::new();
+        let mut authenticated_actions = Vec::new();
         let mut unauthenticated_actions = Vec::new();
         let mut configs = Vec::with_capacity(sensors.len());
         for sensor in &sensors {
@@ -416,6 +417,16 @@ impl Compiler {
                     })
                     .collect::<Result<Vec<String>, _>>()?,
             );
+            authenticated_actions.extend(
+                prototype
+                    .authenticated_actions()
+                    .iter()
+                    .map(|authenticated_action| {
+                        let reg = Handlebars::new();
+                        reg.render_template(authenticated_action, &json!({ "index": index }))
+                    })
+                    .collect::<Result<Vec<String>, _>>()?,
+            );
             unauthenticated_actions.extend(
                 prototype
                     .unauthenticated_actions()
@@ -453,6 +464,7 @@ impl Compiler {
         configs.sort_unstable();
 
         setups.sort_unstable();
+        authenticated_actions.sort_unstable();
         unauthenticated_actions.sort_unstable();
 
         for config in &device_configs_raw {
@@ -498,6 +510,11 @@ impl Compiler {
             setups.push('\n');
         }
 
+        let mut authenticated_actions = authenticated_actions.join("\n  ");
+        if !authenticated_actions.is_empty() {
+            authenticated_actions.insert_str(0, "\n  ");
+        }
+
         let mut unauthenticated_actions = unauthenticated_actions.join("\n  ");
         if !unauthenticated_actions.is_empty() {
             unauthenticated_actions.insert_str(0, "\n  ");
@@ -518,7 +535,8 @@ impl Compiler {
 {includes}
 namespace config {{
 constexpr static iop::time::milliseconds measurementsInterval = 30 * 1000;
-constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;{device_configs}{configs}
+constexpr static iop::time::milliseconds unauthenticatedActionsInterval = 1000;
+constexpr static iop::time::milliseconds authenticatedActionsInterval = 1000;{device_configs}{configs}
 }}{definitions}
 auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
   IOP_TRACE();
@@ -535,6 +553,11 @@ auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void
   loop.registerEvent(token, prepareJson(loop));
 }}
 
+auto authenticatedAct(iop::EventLoop &loop, iop::AuthToken &token) noexcept -> void {{{authenticated_actions}
+  (void) loop;
+  (void) token;
+}}
+
 auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{{unauthenticated_actions}
   (void) loop;
 }}
@@ -542,6 +565,7 @@ auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{{unauthenticate
 namespace iop {{
 auto setup(EventLoop &loop) noexcept -> void {{{setups}
   loop.setInterval(config::unauthenticatedActionsInterval, unauthenticatedAct);
+  loop.setAuthenticatedInterval(config::authenticatedActionsInterval, unauthenticatedAct);
   loop.setAuthenticatedInterval(config::measurementsInterval, monitor);
 }}
 }}",

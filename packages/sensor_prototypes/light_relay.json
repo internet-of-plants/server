@@ -16,7 +16,7 @@
     "setups": [
 	"light{{index}}.begin();\n  for (const auto &[moment, state]: config::lightActions{{index}}) {\n    light{{index}}.setTime(moment, state);\n  }"
     ],
-    "unauthenticated_actions": ["light{{index}}.actIfNeeded();"],
+    "authenticated_actions": ["light{{index}}.actIfNeeded();"],
     "config_requests": [
 	{
 	    "name": "Port",

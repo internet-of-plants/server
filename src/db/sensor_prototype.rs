@@ -18,6 +18,7 @@ pub struct SensorPrototypeView {
     includes: Vec<Include>,
     definitions: Vec<Definition>,
     setups: Vec<Setup>,
+    authenticated_actions: Vec<AuthenticatedAction>,
     unauthenticated_actions: Vec<UnauthenticatedAction>,
     measurements: Vec<SensorMeasurement>,
     configuration_requests: Vec<SensorConfigRequestView>,
@@ -44,6 +45,7 @@ impl SensorPrototypeView {
             includes: prototype.includes(txn).await?,
             definitions: prototype.definitions(txn).await?,
             setups: prototype.setups(txn).await?,
+            authenticated_actions: prototype.authenticated_actions(txn).await?,
             unauthenticated_actions: prototype.unauthenticated_actions(txn).await?,
             measurements: prototype.measurements(txn).await?,
             configuration_requests: configuration_requests_view,
@@ -73,6 +75,8 @@ pub struct NewSensorPrototype {
     #[serde(default)]
     definitions: Vec<Definition>,
     setups: Vec<Setup>,
+    #[serde(default)]
+    authenticated_actions: Vec<AuthenticatedAction>,
     #[serde(default)]
     unauthenticated_actions: Vec<UnauthenticatedAction>,
     #[serde(default)]
@@ -163,6 +167,15 @@ impl SensorPrototype {
                 "INSERT INTO sensor_prototype_setups (setup, sensor_prototype_id) VALUES ($1, $2)",
             )
             .bind(setup)
+            .bind(id)
+            .execute(&mut *txn)
+            .await?;
+        }
+        for authenticated_action in &prototype.authenticated_actions {
+            sqlx::query(
+                "INSERT INTO sensor_prototype_authenticated_actions (authenticated_action, sensor_prototype_id) VALUES ($1, $2)",
+            )
+            .bind(authenticated_action)
             .bind(id)
             .execute(&mut *txn)
             .await?;
@@ -260,6 +273,17 @@ impl SensorPrototype {
     pub async fn setups(&self, txn: &mut Transaction<'_>) -> Result<Vec<Setup>> {
         let list = sqlx::query_as(
             "SELECT setup FROM sensor_prototype_setups WHERE sensor_prototype_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(&mut *txn)
+        .await?;
+        Ok(list.into_iter().map(|(text,)| text).collect())
+    }
+
+    /// A sensor may have authenticated actions to execute
+    pub async fn authenticated_actions(&self, txn: &mut Transaction<'_>) -> Result<Vec<Setup>> {
+        let list = sqlx::query_as(
+            "SELECT authenticated_action FROM sensor_prototype_authenticated_actions WHERE sensor_prototype_id = $1",
         )
         .bind(self.id)
         .fetch_all(&mut *txn)

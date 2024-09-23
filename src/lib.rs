@@ -26,6 +26,7 @@ pub use crate::db::{
     sensor::{
         Definition, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
         SensorReference, SensorView, Setup, UnauthenticatedAction,
+        AuthenticatedAction
     },
     sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val, ValRaw},
     sensor_config_request::{
