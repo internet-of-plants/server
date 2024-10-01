@@ -32,7 +32,7 @@
 		"kind": "Map",
 		"data": [
 		    { "kind": "Moment" },
-		    { "kind": "Seconds" }
+		    { "kind": "U8" }
 		]
 	    }
 	}
