@@ -244,6 +244,7 @@ impl Val {
             val @ Val::Map(vec) => {
                 let mut string = String::new();
                 string.push('{');
+
                 let (key, value) = if let SensorWidgetKindView::Map(key, value) = &widget {
                     (key.clone(), value.clone())
                 } else {
