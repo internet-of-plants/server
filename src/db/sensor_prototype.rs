@@ -1,7 +1,7 @@
 use crate::{
-    Definition, Dependency, Include, NewDependency, NewSensorConfigRequest, Result,
-    SensorConfigRequest, SensorConfigRequestView, SensorMeasurement, SensorPrototypeDefinitionId,
-    Setup, Target, Transaction, UnauthenticatedAction,
+    AuthenticatedAction, Definition, Dependency, Include, NewDependency, NewSensorConfigRequest,
+    Result, SensorConfigRequest, SensorConfigRequestView, SensorMeasurement,
+    SensorPrototypeDefinitionId, Setup, Target, Transaction, UnauthenticatedAction,
 };
 use derive::id;
 use derive_get::Getters;

@@ -24,9 +24,8 @@ pub use crate::db::{
     firmware::{Firmware, FirmwareId, FirmwareView},
     organization::{Organization, OrganizationId, OrganizationView},
     sensor::{
-        Definition, Include, NewSensor, Sensor, SensorId, SensorPrototypeDefinitionId,
-        SensorReference, SensorView, Setup, UnauthenticatedAction,
-        AuthenticatedAction
+        AuthenticatedAction, Definition, Include, NewSensor, Sensor, SensorId,
+        SensorPrototypeDefinitionId, SensorReference, SensorView, Setup, UnauthenticatedAction,
     },
     sensor_config::{NewSensorConfig, SensorConfig, SensorConfigId, SensorConfigView, Val, ValRaw},
     sensor_config_request::{
