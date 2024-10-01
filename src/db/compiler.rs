@@ -549,11 +549,11 @@ auto prepareJson(iop::EventLoop & loop) noexcept -> iop::Api::Json {{
   return json;
 }}
 
-auto monitor(iop::EventLoop &loop, iop::AuthToken &token) noexcept -> void {{
+auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
   loop.registerEvent(token, prepareJson(loop));
 }}
 
-auto authenticatedAct(iop::EventLoop &loop, iop::AuthToken &token) noexcept -> void {{{authenticated_actions}
+auto authenticatedAct(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{{authenticated_actions}
   (void) loop;
   (void) token;
 }}
