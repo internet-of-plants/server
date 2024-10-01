@@ -565,7 +565,7 @@ auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{{unauthenticate
 namespace iop {{
 auto setup(EventLoop &loop) noexcept -> void {{{setups}
   loop.setInterval(config::unauthenticatedActionsInterval, unauthenticatedAct);
-  loop.setAuthenticatedInterval(config::authenticatedActionsInterval, unauthenticatedAct);
+  loop.setAuthenticatedInterval(config::authenticatedActionsInterval, authenticatedAct);
   loop.setAuthenticatedInterval(config::measurementsInterval, monitor);
 }}
 }}",
