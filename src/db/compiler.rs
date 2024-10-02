@@ -553,12 +553,14 @@ auto monitor(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void
   loop.registerEvent(token, prepareJson(loop));
 }}
 
-auto authenticatedAct(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{{authenticated_actions}
+auto authenticatedAct(iop::EventLoop &loop, const iop::AuthToken &token) noexcept -> void {{
+  loop.logger().infoln(IOP_STR(\"Authenticated Act\"));{authenticated_actions}
   (void) loop;
   (void) token;
 }}
 
-auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{{unauthenticated_actions}
+auto unauthenticatedAct(iop::EventLoop &loop) noexcept -> void {{
+  loop.logger().infoln(IOP_STR(\"Unauthenticated Act\"));{unauthenticated_actions}
   (void) loop;
 }}
 
