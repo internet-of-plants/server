@@ -63,14 +63,21 @@ async fn main() {
 
     #[cfg(not(debug_assertions))]
     {
-        let tls_config =
-            RustlsConfig::from_pem_file(PathBuf::from("cert.pem"), PathBuf::from("privkey.pem"))
+        if std::env::var("TLS").is_ok() {
+            let tls_config =
+                RustlsConfig::from_pem_file(PathBuf::from("cert.pem"), PathBuf::from("privkey.pem"))
+                    .await
+                    .expect("unable to open certificate files");
+            axum_server::bind_rustls(addr, tls_config)
+                .serve(router.into_make_service())
                 .await
-                .expect("unable to open certificate files");
-        axum_server::bind_rustls(addr, tls_config)
-            .serve(router.into_make_service())
-            .await
-            .expect("unable to bind https server");
+                .expect("unable to bind https server");
+        } else {
+            axum_server::bind(addr)
+                .serve(router.into_make_service())
+                .await
+                .expect("unable to bind http server");
+        }
     }
 }
 
