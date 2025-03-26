@@ -39,7 +39,6 @@ async fn main() {
 
     let url = std::env::var("POSTGRES_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432/iop".to_owned());
-    println!("{url}");
     let pool = Pool::connect(&url)
         .await
         .expect("Unable to connect to database");
