@@ -37,8 +37,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let url = "postgres://postgres:postgres@127.0.0.1:5432/iop";
-    let pool = Pool::connect(url)
+    let url = std::env::var("POSTGRES_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432/iop".to_owned());
+    let pool = Pool::connect(&url)
         .await
         .expect("Unable to connect to database");
     let pool: &'static Pool = Box::leak(pool.into());
