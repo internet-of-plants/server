@@ -11,8 +11,8 @@ RUN dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
 RUN apt-get install -y ca-certificates
 
 WORKDIR /app
-COPY --from=builder /app/target/release/server-bin ~/server
-COPY --from=builder /app/migrations ~/migrations
-COPY --from=builder /app/packages ~/packages
-ENTRYPOINT ["~/server"]
+COPY --from=builder /app/target/release/server-bin /app/server
+COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/packages /app/packages
+ENTRYPOINT ["/app/server"]
 
